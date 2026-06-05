@@ -18,6 +18,7 @@ export interface DashboardData {
   monthly: { month: string; total: number }[];
   byCategory: { category: string; total: number }[];
   recent: Expense[];
+  expenses: Expense[];
   yearTotal: number;
   thisMonthTotal: number;
   count: number;
@@ -95,6 +96,7 @@ export async function fetchExpenseData(): Promise<DashboardData> {
     monthly,
     byCategory,
     recent,
+    expenses,
     yearTotal,
     thisMonthTotal,
     count: expenses.length,

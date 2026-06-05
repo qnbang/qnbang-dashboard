@@ -17,6 +17,7 @@ type DashboardData = {
   monthly: { month: string; total: number }[];
   byCategory: { category: string; total: number }[];
   recent: Expense[];
+  expenses: Expense[];
   yearTotal: number;
   thisMonthTotal: number;
   count: number;
@@ -56,18 +57,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* 헤더 */}
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-lg font-bold text-slate-800">큐앤뱅 대시보드</h1>
-          <button
-            onClick={logout}
-            className="text-sm text-slate-500 hover:text-slate-800"
-          >
+          <button onClick={logout} className="text-sm text-slate-500 hover:text-slate-800">
             로그아웃
           </button>
         </div>
-        {/* 탭 */}
         <div className="max-w-5xl mx-auto px-4 flex gap-1">
           {TABS.map((t) => (
             <button
@@ -104,31 +100,70 @@ export default function Home() {
 }
 
 function ExpenseView({ data }: { data: DashboardData }) {
+  const [sel, setSel] = useState<'all' | number>('all');
+
+  const monthsWithData = Array.from(new Set(data.expenses.map((e) => e.month))).sort(
+    (a, b) => a - b
+  );
+
+  const filtered = sel === 'all' ? data.expenses : data.expenses.filter((e) => e.month === sel);
+  const total = filtered.reduce((s, e) => s + e.cost, 0);
+
+  const catMap: Record<string, number> = {};
+  for (const e of filtered) {
+    const k = e.category || '미분류';
+    catMap[k] = (catMap[k] || 0) + e.cost;
+  }
+  const byCategory = Object.entries(catMap)
+    .map(([category, t]) => ({ category, total: t }))
+    .sort((a, b) => b.total - a.total);
+
+  const list = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const periodLabel = sel === 'all' ? '올해 누적 지출' : `${sel}월 지출`;
+
   return (
     <div className="space-y-6">
+      {/* 월 선택창 */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-slate-500">기간 선택</span>
+        <select
+          value={String(sel)}
+          onChange={(e) => setSel(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500"
+        >
+          <option value="all">전체 (올해 누적)</option>
+          {monthsWithData.map((m) => (
+            <option key={m} value={m}>
+              {m}월
+            </option>
+          ))}
+        </select>
+      </div>
+
       {/* 요약 카드 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <SummaryCard label="올해 누적 지출" value={won(data.yearTotal)} accent />
-        <SummaryCard label="이번 달 지출" value={won(data.thisMonthTotal)} />
-        <SummaryCard label="총 기록 건수" value={`${data.count}건`} />
+        <SummaryCard label={periodLabel} value={won(total)} accent />
+        <SummaryCard label="기록 건수" value={`${filtered.length}건`} />
+        <SummaryCard label="카테고리 수" value={`${byCategory.length}개`} />
       </div>
 
       {/* 차트 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title="월별 지출">
+        <Card title="월별 지출 (전체 비교)">
           <MonthlyBar data={data.monthly} />
         </Card>
-        <Card title="카테고리별 지출">
-          {data.byCategory.length ? (
-            <CategoryPie data={data.byCategory} />
+        <Card title={sel === 'all' ? '카테고리별 지출 (전체)' : `카테고리별 지출 (${sel}월)`}>
+          {byCategory.length ? (
+            <CategoryPie data={byCategory} />
           ) : (
             <p className="text-slate-400 text-center py-20">데이터 없음</p>
           )}
         </Card>
       </div>
 
-      {/* 최근 지출 */}
-      <Card title="최근 지출">
+      {/* 지출 내역 */}
+      <Card title={sel === 'all' ? '지출 내역 (전체)' : `${sel}월 지출 내역`}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -141,7 +176,7 @@ function ExpenseView({ data }: { data: DashboardData }) {
               </tr>
             </thead>
             <tbody>
-              {data.recent.map((e, i) => (
+              {list.map((e, i) => (
                 <tr key={i} className="border-b border-slate-50">
                   <td className="py-2 pr-3 text-slate-500 whitespace-nowrap">{e.dateLabel}</td>
                   <td className="py-2 pr-3">
@@ -156,6 +191,13 @@ function ExpenseView({ data }: { data: DashboardData }) {
                   <td className="py-2 text-slate-400 text-xs">{e.note}</td>
                 </tr>
               ))}
+              {list.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-10 text-center text-slate-400">
+                    이 기간에는 지출이 없어요.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -166,7 +208,11 @@ function ExpenseView({ data }: { data: DashboardData }) {
 
 function SummaryCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className={`rounded-2xl border p-5 ${accent ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200'}`}>
+    <div
+      className={`rounded-2xl border p-5 ${
+        accent ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200'
+      }`}
+    >
       <p className={`text-sm ${accent ? 'text-indigo-100' : 'text-slate-400'}`}>{label}</p>
       <p className="mt-1 text-2xl font-bold">{value}</p>
     </div>
