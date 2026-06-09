@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { MonthlyBar, CategoryPie } from './components/charts';
 
 type Expense = {
@@ -29,6 +30,18 @@ const TABS = [
   { key: 'expense', label: '지출', ready: true },
   { key: 'revenue', label: '매출', ready: false },
   { key: 'work', label: '업무', ready: false },
+  { key: 'tools', label: '업무툴', ready: true },
+];
+
+// 업무에 쓰는 외부 도구 목록 — 새 도구가 생기면 여기에 한 줄 추가하면 됩니다.
+const WORK_TOOLS = [
+  {
+    name: '키워드 광고 도구',
+    desc: '네이버 검색광고 키워드 월간 검색량·연관키워드 조회',
+    href: 'https://qnbang-naver-keyword.vercel.app',
+    icon: '🔍',
+    color: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  },
 ];
 
 export default function Home() {
@@ -60,9 +73,17 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-lg font-bold text-slate-800">큐앤뱅 대시보드</h1>
-          <button onClick={logout} className="text-sm text-slate-500 hover:text-slate-800">
-            로그아웃
-          </button>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/tax-invoice"
+              className="text-sm font-medium rounded-lg bg-slate-800 text-white px-3 py-1.5 hover:bg-slate-700"
+            >
+              세금계산서 발행
+            </Link>
+            <button onClick={logout} className="text-sm text-slate-500 hover:text-slate-800">
+              로그아웃
+            </button>
+          </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 flex gap-1">
           {TABS.map((t) => (
@@ -88,7 +109,9 @@ export default function Home() {
 
         {!loading && !error && tab === 'expense' && data && <ExpenseView data={data} />}
 
-        {tab !== 'expense' && (
+        {tab === 'tools' && <ToolsView />}
+
+        {tab !== 'expense' && tab !== 'tools' && (
           <div className="text-center py-20 text-slate-400">
             <p className="text-lg">🚧 {TABS.find((t) => t.key === tab)?.label} 대시보드</p>
             <p className="text-sm mt-2">준비 중이에요. 곧 추가됩니다.</p>
@@ -202,6 +225,35 @@ function ExpenseView({ data }: { data: DashboardData }) {
           </table>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function ToolsView() {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">업무에 쓰는 도구 모음입니다. 아이콘을 누르면 새 창에서 열려요.</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {WORK_TOOLS.map((t) => (
+          <a
+            key={t.name}
+            href={t.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col items-center text-center transition hover:shadow-md hover:-translate-y-0.5"
+          >
+            <div
+              className={`w-14 h-14 rounded-2xl border flex items-center justify-center text-2xl ${t.color}`}
+            >
+              {t.icon}
+            </div>
+            <p className="mt-3 text-sm font-semibold text-slate-800 group-hover:text-indigo-600">
+              {t.name}
+            </p>
+            <p className="mt-1 text-xs text-slate-400 leading-snug">{t.desc}</p>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }
