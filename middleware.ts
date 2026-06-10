@@ -13,6 +13,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // login, api/login, 정적 자원은 검사에서 제외
-  matcher: ['/((?!login|api/login|_next/static|_next/image|favicon.ico).*)'],
+  // login, api/login, 정적 자원, 파비콘은 검사에서 제외
+  matcher: ['/((?!login|api/login|_next/static|_next/image|icon.png|apple-icon.png).*)'],
 };
