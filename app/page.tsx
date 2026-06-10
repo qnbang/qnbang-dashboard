@@ -42,6 +42,13 @@ const WORK_TOOLS = [
     icon: '🔍',
     color: 'bg-emerald-50 text-emerald-600 border-emerald-200',
   },
+  {
+    name: 'SEO 상품 작명기',
+    desc: '네이버 쇼핑 데이터 기반 검색 최적화 상품명 생성',
+    href: 'https://qnbang-seo-namer.vercel.app',
+    icon: '✏️',
+    color: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+  },
 ];
 
 export default function Home() {
