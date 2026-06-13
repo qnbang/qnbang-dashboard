@@ -594,11 +594,18 @@ function ProjectsView() {
     })
     .sort((a, b) => {
       if (sortBy === 'startDate') {
-        return (b.startDate || '').localeCompare(a.startDate || '');
+        const timeA = a.startDate ? new Date(a.startDate + 'T00:00:00').getTime() : 0;
+        const timeB = b.startDate ? new Date(b.startDate + 'T00:00:00').getTime() : 0;
+        return timeB - timeA;
       } else {
-        return (b.pushedAt || '').localeCompare(a.pushedAt || '');
+        const timeA = a.pushedAt ? new Date(a.pushedAt).getTime() : 0;
+        const timeB = b.pushedAt ? new Date(b.pushedAt).getTime() : 0;
+        return timeB - timeA;
       }
     });
+
+  const daehengProjects = filteredProjects.filter((p) => p.category === '대행');
+  const jacheProjects = filteredProjects.filter((p) => p.category !== '대행');
 
   // 한 항목 저장 → GitHub 프로젝트.json + 로컬·카드 갱신
   const saveMeta = async (field: string, value: string | number) => {
@@ -896,33 +903,68 @@ function ProjectsView() {
         </div>
       </div>
 
-      {/* 프로젝트 목록 (게시판 형식) */}
-      <div className="rounded-2xl border border-slate-200 bg-white divide-y divide-slate-50 overflow-hidden shadow-sm">
-        {filteredProjects.map((p) => (
-          <button key={p.repo} onClick={() => openProject(p)}
-            className={`w-full text-left px-4 py-3 flex items-center gap-3 transition ${
-              selected?.repo === p.repo ? 'bg-indigo-50' : 'hover:bg-slate-50'
-            }`}>
-            {/* 대행/자체 */}
-            <span className={`text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center ${
-              p.category === '대행' ? 'bg-orange-100 text-orange-700' : p.category === '자체' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-400'
-            }`}>{p.category || '–'}</span>
-            {/* 이름 */}
-            <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
-            {/* 진행상태 */}
-            <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
-            {/* 금액 (대행인 경우에만 표시) */}
-            <span className="text-xs font-semibold text-slate-600 shrink-0 w-28 text-right hidden md:block">
-              {p.category === '대행' && p.amount ? (
-                <>{manShort(p.amount)}<span className="text-slate-400 font-normal"> / {manShort(p.paidAmount) || '0'}</span></>
-              ) : ''}
-            </span>
-            {/* 착수일 */}
-            <span className="text-xs text-slate-400 shrink-0 w-16 text-right">{p.startDate ? p.startDate.slice(2).replace(/-/g, '.') : ''}</span>
-          </button>
-        ))}
+      {/* 프로젝트 목록 (분류별로 묶어 게시판 형식으로 노출) */}
+      <div className="space-y-6">
+        {/* 대행 프로젝트 섹션 */}
+        {(filterCategory === 'all' || filterCategory === '대행') && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1 flex items-center gap-1.5">
+              <span>💼</span> 대행 프로젝트 ({daehengProjects.length})
+            </h3>
+            <div className="rounded-2xl border border-slate-200 bg-white divide-y divide-slate-50 overflow-hidden shadow-sm">
+              {daehengProjects.map((p) => (
+                <button key={p.repo} onClick={() => openProject(p)}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 transition ${
+                    selected?.repo === p.repo ? 'bg-indigo-50' : 'hover:bg-slate-50'
+                  }`}>
+                  <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-orange-100 text-orange-700">대행</span>
+                  <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
+                  <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
+                  <span className="text-xs font-semibold text-slate-600 shrink-0 w-28 text-right hidden md:block">
+                    {p.amount ? <>{manShort(p.amount)}<span className="text-slate-400 font-normal"> / {manShort(p.paidAmount) || '0'}</span></> : ''}
+                  </span>
+                  <span className="text-xs text-slate-400 shrink-0 w-16 text-right">{p.startDate ? p.startDate.slice(2).replace(/-/g, '.') : ''}</span>
+                </button>
+              ))}
+              {daehengProjects.length === 0 && (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  대행 프로젝트가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 자체 프로젝트 섹션 */}
+        {(filterCategory === 'all' || filterCategory === '자체') && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1 flex items-center gap-1.5">
+              <span>🚀</span> 자체 프로젝트 ({jacheProjects.length})
+            </h3>
+            <div className="rounded-2xl border border-slate-200 bg-white divide-y divide-slate-50 overflow-hidden shadow-sm">
+              {jacheProjects.map((p) => (
+                <button key={p.repo} onClick={() => openProject(p)}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 transition ${
+                    selected?.repo === p.repo ? 'bg-indigo-50' : 'hover:bg-slate-50'
+                  }`}>
+                  <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-violet-100 text-violet-700">자체</span>
+                  <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
+                  <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
+                  <span className="text-xs text-slate-400 shrink-0 w-16 text-right">{p.startDate ? p.startDate.slice(2).replace(/-/g, '.') : ''}</span>
+                </button>
+              ))}
+              {jacheProjects.length === 0 && (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  자체 프로젝트가 없습니다.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 결과가 모두 없을 때 */}
         {filteredProjects.length === 0 && (
-          <div className="text-center py-10 text-slate-400 text-sm">
+          <div className="text-center py-12 bg-white border border-slate-200 rounded-2xl text-slate-400 text-sm shadow-sm">
             조건에 맞는 프로젝트가 없습니다.
           </div>
         )}
