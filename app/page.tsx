@@ -319,7 +319,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 type ProjectRepo = {
-  repo: string; title: string; category?: string; startDate?: string; pushedAt: string; htmlUrl: string; driveFolderId?: string;
+  repo: string; title: string; category?: string; manager?: string; startDate?: string; pushedAt: string; htmlUrl: string; driveFolderId?: string;
   progressStatus?: string; contractStatus?: string; paymentStatus?: string; amount?: number; paidAmount?: number;
 };
 type Commit = { sha: string; message: string; date: string };
@@ -916,6 +916,7 @@ function ProjectsView() {
               <div className="w-full px-4 py-2 flex items-center gap-3 bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-400 select-none">
                 <span className="shrink-0 w-9 text-center">분류</span>
                 <span className="flex-1 min-w-0">프로젝트명</span>
+                <span className="shrink-0 w-14 text-center hidden sm:block">담당자</span>
                 <span className="shrink-0 hidden sm:block w-[76px] text-center">진행상태</span>
                 <span className="shrink-0 w-28 text-right hidden md:block">계약 / 입금액</span>
                 <span className="shrink-0 w-16 text-right">착수일</span>
@@ -929,6 +930,9 @@ function ProjectsView() {
                     }`}>
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-orange-100 text-orange-700">대행</span>
                     <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
+                    <span className="shrink-0 w-14 text-center hidden sm:block">
+                      {p.manager ? <span className="text-[11px] font-medium rounded-full bg-slate-100 text-slate-600 px-1.5 py-0.5">{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
+                    </span>
                     <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
                     <span className="text-xs font-semibold text-slate-600 shrink-0 w-28 text-right hidden md:block">
                       {p.amount ? <>{manShort(p.amount)}<span className="text-slate-400 font-normal"> / {manShort(p.paidAmount) || '0'}</span></> : '–'}
@@ -958,6 +962,7 @@ function ProjectsView() {
               <div className="w-full px-4 py-2 flex items-center gap-3 bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-400 select-none">
                 <span className="shrink-0 w-9 text-center">분류</span>
                 <span className="flex-1 min-w-0">프로젝트명</span>
+                <span className="shrink-0 w-14 text-center hidden sm:block">담당자</span>
                 <span className="shrink-0 hidden sm:block w-[76px] text-center">진행상태</span>
                 <span className="shrink-0 w-28 hidden md:block"></span> {/* 정렬 공간 정합용 공백 */}
                 <span className="shrink-0 w-16 text-right">착수일</span>
@@ -971,6 +976,9 @@ function ProjectsView() {
                     }`}>
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-violet-100 text-violet-700">자체</span>
                     <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
+                    <span className="shrink-0 w-14 text-center hidden sm:block">
+                      {p.manager ? <span className="text-[11px] font-medium rounded-full bg-slate-100 text-slate-600 px-1.5 py-0.5">{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
+                    </span>
                     <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
                     <span className="shrink-0 w-28 hidden md:block"></span>
                     <span className="text-xs text-slate-400 shrink-0 w-16 text-right">{p.startDate ? p.startDate.slice(2).replace(/-/g, '.') : '–'}</span>

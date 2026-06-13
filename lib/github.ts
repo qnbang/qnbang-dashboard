@@ -15,6 +15,7 @@ export interface ProjectRepo {
   repo: string;        // repo 이름 (slug)
   title: string;       // 화면 표시 이름 (프로젝트.json 이름 우선)
   category?: string;   // 대행 | 자체
+  manager?: string;    // 담당자
   startDate?: string;  // 착수일 (정렬용)
   pushedAt: string;    // 마지막 작업 시각
   htmlUrl: string;     // GitHub 페이지
@@ -30,6 +31,7 @@ export interface ProjectMeta {
   driveFolderId?: string;
   name?: string;            // 프로젝트 이름(폴더명 기준) — 표시용 정답
   category?: string;        // 대행 | 자체
+  manager?: string;         // 담당자
   progressStatus?: string;
   contractStatus?: string;
   paymentStatus?: string;
@@ -44,6 +46,7 @@ export interface ProjectMeta {
 export const META_KEYS: Record<string, string> = {
   name: '이름',
   category: '분류',
+  manager: '담당자',
   progressStatus: '진행상태',
   contractStatus: '계약상태',
   paymentStatus: '입금상태',
@@ -69,6 +72,7 @@ export async function getProjectMeta(repo: string): Promise<ProjectMeta> {
       driveFolderId: c.driveFolderId,
       name: c['이름'],
       category: c['분류'],
+      manager: c['담당자'],
       progressStatus: c['진행상태'],
       contractStatus: c['계약상태'],
       paymentStatus: c['입금상태'],
@@ -132,6 +136,7 @@ export async function listProjectRepos(): Promise<ProjectRepo[]> {
         repo: r.name,
         title,
         category: meta.category,
+        manager: meta.manager,
         startDate: meta.startDate,
         pushedAt: r.pushed_at,
         htmlUrl: r.html_url,
