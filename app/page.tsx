@@ -357,6 +357,18 @@ function StatusTag({ value }: { value?: string }) {
 const manwon = (n?: number) => (n && n > 0 ? `${(n / 10000).toLocaleString('ko-KR')}만원` : '');
 // 카드용 짧은 금액 (110만)
 const manShort = (n?: number) => (n && n > 0 ? `${(n / 10000).toLocaleString('ko-KR')}만` : '');
+// 담당자별 색 (이름 해시로 고정 색 배정)
+const MANAGER_PALETTE = [
+  'bg-rose-100 text-rose-700', 'bg-sky-100 text-sky-700', 'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700', 'bg-violet-100 text-violet-700', 'bg-cyan-100 text-cyan-700',
+  'bg-pink-100 text-pink-700', 'bg-lime-100 text-lime-700',
+];
+function managerColor(name?: string): string {
+  if (!name) return 'bg-slate-100 text-slate-400';
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return MANAGER_PALETTE[h % MANAGER_PALETTE.length];
+}
 // 마감까지 D-day
 function dday(end: string): string {
   const e = new Date(end + 'T00:00:00').getTime();
@@ -570,6 +582,7 @@ function ProjectsView() {
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterManager, setFilterManager] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('startDate');
   const [selected, setSelected] = useState<ProjectRepo | null>(null);
   const [workLog, setWorkLog] = useState<string | null>(null);
@@ -590,6 +603,7 @@ function ProjectsView() {
     .filter((p) => {
       if (filterStatus !== 'all' && p.progressStatus !== filterStatus) return false;
       if (filterCategory !== 'all' && p.category !== filterCategory) return false;
+      if (filterManager !== 'all' && p.manager !== filterManager) return false;
       return true;
     })
     .sort((a, b) => {
@@ -606,6 +620,7 @@ function ProjectsView() {
 
   const daehengProjects = filteredProjects.filter((p) => p.category === '대행');
   const jacheProjects = filteredProjects.filter((p) => p.category !== '대행');
+  const managers = Array.from(new Set(projects.map((p) => p.manager).filter(Boolean))) as string[];
 
   // 한 항목 저장 → GitHub 프로젝트.json + 로컬·카드 갱신
   const saveMeta = async (field: string, value: string | number) => {
@@ -888,6 +903,22 @@ function ProjectsView() {
               ))}
             </select>
           </div>
+          {/* 담당자 필터 */}
+          {managers.length > 0 && (
+            <div className="flex items-center gap-1.5 border-l border-slate-100 pl-4">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">담당자</span>
+              <select
+                value={filterManager}
+                onChange={(e) => setFilterManager(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 outline-none focus:border-indigo-500"
+              >
+                <option value="all">전체</option>
+                {managers.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         {/* 정렬 기준 */}
         <div className="flex items-center gap-1.5">
@@ -931,7 +962,7 @@ function ProjectsView() {
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-orange-100 text-orange-700">대행</span>
                     <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
                     <span className="shrink-0 w-14 text-center hidden sm:block">
-                      {p.manager ? <span className="text-[11px] font-medium rounded-full bg-slate-100 text-slate-600 px-1.5 py-0.5">{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
+                      {p.manager ? <span className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(p.manager)}`}>{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
                     </span>
                     <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
                     <span className="text-xs font-semibold text-slate-600 shrink-0 w-28 text-right hidden md:block">
@@ -977,7 +1008,7 @@ function ProjectsView() {
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-violet-100 text-violet-700">자체</span>
                     <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
                     <span className="shrink-0 w-14 text-center hidden sm:block">
-                      {p.manager ? <span className="text-[11px] font-medium rounded-full bg-slate-100 text-slate-600 px-1.5 py-0.5">{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
+                      {p.manager ? <span className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(p.manager)}`}>{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
                     </span>
                     <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
                     <span className="shrink-0 w-28 hidden md:block"></span>
