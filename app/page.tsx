@@ -730,7 +730,8 @@ function ProjectsView() {
       </div>
 
       {selected && (
-        <div className="space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-4" onClick={() => setSelected(null)}>
+        <div className="bg-white rounded-2xl w-full max-w-3xl mx-auto my-8 p-5 shadow-xl space-y-4" onClick={(e) => e.stopPropagation()}>
           {/* 상단: 제목 + 드라이브/깃 링크 */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-base font-bold text-slate-800">{selected.title}</h2>
@@ -870,6 +871,7 @@ function ProjectsView() {
               )}
             </>
           )}
+        </div>
         </div>
       )}
 
