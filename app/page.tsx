@@ -369,6 +369,10 @@ function managerColor(name?: string): string {
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return MANAGER_PALETTE[h % MANAGER_PALETTE.length];
 }
+// 담당자 칸은 여러 명일 수 있다(쉼표/、로 구분) → 개별 이름 배열로
+function managerList(s?: string): string[] {
+  return (s || '').split(/[,、]/).map((x) => x.trim()).filter(Boolean);
+}
 // 마감까지 D-day
 function dday(end: string): string {
   const e = new Date(end + 'T00:00:00').getTime();
@@ -562,6 +566,32 @@ function EditDate({ label, value, onChange }: { label: string; value?: string; o
   );
 }
 
+// 담당자 편집 — 조직 멤버를 칩으로 토글(여러 명 가능). 멤버에 없는 기존 이름도 칩으로 보여줌.
+function EditMembers({ label, value, members, onSave }: { label: string; value?: string; members: OrgMember[]; onSave: (v: string) => void }) {
+  const selected = managerList(value);
+  const toggle = (name: string) => {
+    const next = selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name];
+    onSave(next.join(', '));
+  };
+  const names = Array.from(new Set([...members.map((m) => m.login), ...selected]));
+  return (
+    <div className="flex flex-col gap-1 col-span-2 sm:col-span-3">
+      <span className="text-[11px] text-slate-400">{label} (여러 명 선택 가능)</span>
+      <div className="flex flex-wrap gap-1.5">
+        {names.length === 0 ? <span className="text-xs text-slate-300">멤버 없음</span> : names.map((n) => {
+          const on = selected.includes(n);
+          return (
+            <button key={n} type="button" onClick={() => toggle(n)}
+              className={`text-xs rounded-full px-2.5 py-1 border transition ${on ? 'border-indigo-300 bg-indigo-50 text-indigo-700 font-semibold' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}>
+              {on ? '✓ ' : ''}{n}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // 진행률 막대
 function ProgressBar({ done, total }: { done: number; total: number }) {
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -604,7 +634,7 @@ function ProjectsView() {
   const [docSaving, setDocSaving] = useState(false);
   const [docMsg, setDocMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   // 편집 가능한 계약 정보
-  const [meta, setMeta] = useState<{ progressStatus?: string; contractStatus?: string; paymentStatus?: string; amount?: number; paidAmount?: number; startDate?: string; endDate?: string; contractUrl?: string }>({});
+  const [meta, setMeta] = useState<{ manager?: string; progressStatus?: string; contractStatus?: string; paymentStatus?: string; amount?: number; paidAmount?: number; startDate?: string; endDate?: string; contractUrl?: string }>({});
   const [saved, setSaved] = useState(false);
   const [showContract, setShowContract] = useState(false);
 
@@ -612,7 +642,7 @@ function ProjectsView() {
     .filter((p) => {
       if (filterStatus !== 'all' && p.progressStatus !== filterStatus) return false;
       if (filterCategory !== 'all' && p.category !== filterCategory) return false;
-      if (filterManager !== 'all' && p.manager !== filterManager) return false;
+      if (filterManager !== 'all' && !managerList(p.manager).includes(filterManager)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -629,7 +659,7 @@ function ProjectsView() {
 
   const daehengProjects = filteredProjects.filter((p) => p.category === '대행');
   const jacheProjects = filteredProjects.filter((p) => p.category !== '대행');
-  const managers = Array.from(new Set(projects.map((p) => p.manager).filter(Boolean))) as string[];
+  const managers = Array.from(new Set(projects.flatMap((p) => managerList(p.manager))));
 
   // 한 항목 저장 → GitHub 프로젝트.json + 로컬·카드 갱신
   const saveMeta = async (field: string, value: string | number) => {
@@ -670,7 +700,7 @@ function ProjectsView() {
     setSelected(p);
     setWorkLog(null); setCommits([]); setDocs([]); setStatusBoard(null); setDriveFolderId(null);
     setShowFlow(false); setOpenDoc(null); setSaved(false); setShowContract(false);
-    setMeta({ progressStatus: p.progressStatus, contractStatus: p.contractStatus, paymentStatus: p.paymentStatus, amount: p.amount, paidAmount: p.paidAmount });
+    setMeta({ manager: p.manager, progressStatus: p.progressStatus, contractStatus: p.contractStatus, paymentStatus: p.paymentStatus, amount: p.amount, paidAmount: p.paidAmount });
     setDetailLoading(true);
     try {
       const r = await fetch(`/api/git-projects/${p.repo}`);
@@ -848,6 +878,7 @@ function ProjectsView() {
                 {showContract && (
                   <div className="px-5 pb-4 border-t border-slate-100 pt-3 space-y-4">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                      <EditMembers label="담당자" value={meta.manager} members={members} onSave={(v) => saveMeta('manager', v)} />
                       <EditSelect label="진행상태" value={meta.progressStatus} options={PROGRESS_OPTS} onChange={(v) => saveMeta('progressStatus', v)} />
                       <EditSelect label="계약상태" value={meta.contractStatus} options={CONTRACT_OPTS} onChange={(v) => saveMeta('contractStatus', v)} />
                       <EditSelect label="입금상태" value={meta.paymentStatus} options={PAYMENT_OPTS} onChange={(v) => saveMeta('paymentStatus', v)} />
@@ -1051,7 +1082,7 @@ function ProjectsView() {
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-orange-100 text-orange-700">대행</span>
                     <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
                     <span className="shrink-0 w-14 text-center hidden sm:block">
-                      {p.manager ? <span className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(p.manager)}`}>{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
+                      {managerList(p.manager).length ? <span className="flex flex-wrap gap-0.5 justify-center">{managerList(p.manager).map((m) => <span key={m} className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(m)}`}>{m}</span>)}</span> : <span className="text-slate-300 text-xs">–</span>}
                     </span>
                     <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
                     <span className="text-xs font-semibold text-slate-600 shrink-0 w-28 text-right hidden md:block">
@@ -1097,7 +1128,7 @@ function ProjectsView() {
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-violet-100 text-violet-700">자체</span>
                     <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
                     <span className="shrink-0 w-14 text-center hidden sm:block">
-                      {p.manager ? <span className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(p.manager)}`}>{p.manager}</span> : <span className="text-slate-300 text-xs">–</span>}
+                      {managerList(p.manager).length ? <span className="flex flex-wrap gap-0.5 justify-center">{managerList(p.manager).map((m) => <span key={m} className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(m)}`}>{m}</span>)}</span> : <span className="text-slate-300 text-xs">–</span>}
                     </span>
                     <span className="shrink-0 hidden sm:block"><StatusTag value={p.progressStatus} /></span>
                     <span className="shrink-0 w-28 hidden md:block"></span>
