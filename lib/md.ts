@@ -5,11 +5,20 @@
 const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// 링크 주소는 안전한 것만 허용(공개 페이지라 javascript: 등 위험 스킴 차단).
+// http(s)·mailto·앵커(#)·상대경로(/)만 통과, 나머지는 링크 없이 글자만 남긴다.
+function safeHref(url: string): string | null {
+  return /^(https?:\/\/|mailto:|\/|#)/i.test(url.trim()) ? url : null;
+}
+
 // 인라인 서식: 굵게 · 링크 · 코드 · 기울임
 function inline(s: string): string {
   s = esc(s);
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, url) => {
+    const href = safeHref(url);
+    return href ? `<a href="${href}">${text}</a>` : text;
+  });
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
   s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
   return s;
