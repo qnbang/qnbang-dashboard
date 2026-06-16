@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createProjectFolders } from '@/lib/drive';
 
-// POST /api/projects — 새 프로젝트 드라이브 폴더 생성 (소재/결과물/공유본)
+// POST /api/projects — 새 프로젝트 드라이브 폴더 생성 (루트 폴더만; 하위 분류는 로컬 구조 미러링이 만든다)
 // body: { name: string, type: '대행' | '자체' }
 export async function POST(req: Request) {
   try {

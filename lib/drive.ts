@@ -38,7 +38,7 @@ export async function listProjectFiles(folderId: string): Promise<DriveFile[]> {
   return (r.files || []) as DriveFile[];
 }
 
-// 새 프로젝트 폴더 생성 (번호.이름 + 소재/결과물/공유본). 번호는 Apps Script가 채번.
+// 새 프로젝트 폴더 생성 (YYMMDD_이름 루트 폴더). 하위 분류 폴더는 로컬 구조 미러링이 만든다.
 export async function createProjectFolders(
   name: string,
   type: '대행' | '자체'
