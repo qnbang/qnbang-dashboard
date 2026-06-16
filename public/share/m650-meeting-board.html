@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회의록 — M650 탄광문화축제</title>
+<style>
+  :root { --ink:#1f2328; --muted:#8a8a8a; --accent:#b8430f; --line:#ececec; --bg:#ffffff; --soft:#faf9f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif; line-height:1.7; font-size:16px; -webkit-text-size-adjust:100%; }
+  .wrap { max-width:820px; margin:0 auto; padding:0 24px 88px; }
+  .brandbar { display:flex; align-items:center; justify-content:space-between;
+    padding:26px 0 22px; margin-bottom:18px; border-bottom:1px solid var(--line); }
+  .brandbar img { height:30px; width:auto; display:block; }
+  .brandbar .role { font-size:12.5px; color:var(--muted); }
+  .back { display:inline-block; margin:0 0 14px; font-size:13.5px; color:var(--accent); text-decoration:none; }
+  .back:hover { text-decoration:underline; }
+  h1 { font-size:26px; letter-spacing:-0.5px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:14px; margin:0 0 22px; }
+  /* 게시판 목록 */
+  .board { border-top:2px solid var(--ink); }
+  .row { display:flex; align-items:center; gap:16px; text-decoration:none; color:var(--ink);
+    padding:16px 8px; border-bottom:1px solid var(--line); transition:.15s; }
+  .row:hover { background:var(--soft); }
+  .row .no { flex:none; width:30px; text-align:center; font-weight:700; color:var(--muted); font-size:14px; }
+  .row .body { flex:1; min-width:0; }
+  .row .title { font-weight:700; font-size:16.5px; letter-spacing:-0.2px; margin:0 0 3px; }
+  .row .title .tag { display:inline-block; background:var(--accent); color:#fff; font-size:10.5px; font-weight:700;
+    padding:1px 7px; border-radius:5px; margin-right:7px; vertical-align:2px; }
+  .row .desc { font-size:13.5px; color:#666; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .date { flex:none; font-size:13px; color:var(--muted); white-space:nowrap; }
+  .row .arrow { flex:none; color:#ccc; font-size:18px; }
+  .row:hover .arrow { color:var(--accent); }
+  .footer { margin-top:50px; padding-top:22px; border-top:1px solid var(--line); display:flex; gap:12px; align-items:center; }
+  .footer img { height:20px; opacity:.85; } .footer .meta { color:var(--muted); font-size:12.5px; margin:0; }
+  @media (max-width:520px){ .wrap{padding:0 16px 64px;} h1{font-size:22px;} .row .date{display:none;} }
+</style></head>
+<body><div class="wrap">
+
+<div class="brandbar"><img src="qn-logo.png" alt="큐앤뱅"><span class="role">회의록</span></div>
+<a class="back" href="m650-hub.html">← 프로젝트 관리로</a>
+
+<h1>회의록</h1>
+<p class="sub">M650 탄광문화축제 제안서 진행 회의 기록입니다. (최신순)</p>
+
+<div class="board">
+  <a class="row" href="m650-meeting-notes.html">
+    <span class="no">1</span>
+    <span class="body">
+      <p class="title"><span class="tag">회의록</span>제안서 디벨롭 방향 회의</p>
+      <p class="desc">스토리라인을 축으로 전체 재정리 · 챕터 하나 먼저 컨셉 확정 후 전개 · 내용 수정 중심</p>
+    </span>
+    <span class="date">2026. 06. 16</span>
+    <span class="arrow">›</span>
+  </a>
+  <!-- 새 회의가 생기면 이 위에 같은 형식으로 한 줄 추가 -->
+</div>
+
+<div class="footer"><img src="qn-logo.png" alt="큐앤뱅"><p class="meta">큐앤뱅(QN!) × 씨투아테크놀러지 · M650 탄광문화축제 · 2026.06</p></div>
+<script>
+  // 허브 모달(iframe) 안에서 열린 경우엔 '프로젝트 관리로' 링크를 숨긴다(닫기는 모달 X로). 직접 링크로 열면 보임.
+  if (window.self !== window.top) { var b = document.querySelector('.back'); if (b) b.style.display = 'none'; }
+</script>
+</div></body></html>

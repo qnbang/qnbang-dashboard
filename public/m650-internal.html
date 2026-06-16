@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M650 — 내부 할 일 (나만 보기)</title>
+<style>
+  :root { --ink:#1f2328; --muted:#8a8a8a; --accent:#b8430f; --line:#ececec; --done:#1a8a4a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#fff; color:var(--ink);
+    font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif; line-height:1.7; font-size:16px; }
+  .wrap { max-width:820px; margin:0 auto; padding:0 24px 88px; }
+  .lock { background:#1f2328; color:#fff; border-radius:12px; padding:13px 18px; margin:22px 0 8px; font-size:13.5px; }
+  .lock b { color:#ffd9a8; }
+  h1 { font-size:27px; letter-spacing:-0.5px; margin:18px 0 4px; }
+  .sub { color:var(--muted); font-size:14px; margin:0 0 18px; }
+  h2 { font-size:19px; margin:34px 0 12px; padding-bottom:7px; border-bottom:2px solid var(--ink); }
+  .who { font-weight:700; font-size:11.5px; padding:1px 7px; border-radius:5px; margin-right:6px; white-space:nowrap; }
+  .who.bot { background:#e7f0fb; color:#0a66c2; }   /* 클로드 */
+  .who.me  { background:#fdeee7; color:#b8430f; }   /* 대표 */
+  .who.co  { background:#eee; color:#666; }          /* 씨투아 */
+  ul.todo { list-style:none; padding:0; margin:8px 0 0; }
+  ul.todo li { display:flex; align-items:flex-start; gap:9px; padding:6px 0; border-top:1px dashed #eee; font-size:14.5px; }
+  ul.todo li:first-child { border-top:none; }
+  ul.todo input { margin-top:4px; width:17px; height:17px; accent-color:#b8430f; flex:none; cursor:pointer; }
+  ul.todo label { cursor:pointer; } ul.todo li.checked label { color:#aaa; text-decoration:line-through; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin:12px 0; }
+  .card h3 { margin:0 0 6px; font-size:16px; }
+  .footer { margin-top:46px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; }
+  a.back { font-size:13.5px; color:var(--accent); text-decoration:none; } a.back:hover{text-decoration:underline;}
+</style></head>
+<body><div class="wrap">
+
+<div class="lock">🔒 <b>내부 전용 문서</b> — 대시보드 로그인해야 열립니다. 씨투아엔 공유되지 않습니다(링크가 있어도 로그인 화면으로 막힘). 클라이언트 공유본은 <a href="/share/m650-hub.html" style="color:#9fd1ff">관리 허브</a>.</div>
+
+<h1>M650 — 내부 할 일 (클로드 / 대표 구분)</h1>
+<p class="sub">공유본에선 전부 '큐앤뱅'으로 보이지만, 실제로 <b>클로드(자동 처리)</b>와 <b>대표(직접 해야 할 일)</b>를 나눈 버전. 내가 뭘 챙겨야 하는지 여기서 확인.</p>
+
+<h2>역할 한눈에</h2>
+<div class="card">
+  <h3><span class="who bot">클로드</span>바로 할 수 있는 것 (글·구조 = 얼라인 본체)</h3>
+  <ul>
+    <li>게임형 챕터 스토리보드 → 각 장소 페이지 문구까지 전개</li>
+    <li>코멘트 텍스트 수정 전부 (뿌리관 정리·퍼레이드 재서술·던전 느낌 등)</li>
+    <li>페이지·프로그램 스토리 순서 재배치안 작성</li>
+    <li>오류·잔재 정리 (GKL·경기도·진행자·날짜/3일↔4일)</li>
+    <li>일정표·세부설명 톤앤매너 통일</li>
+    <li>개막식 아티스트 퍼포먼스 방향·문구, 갓챠·플리마켓 운영규칙 글</li>
+    <li>(원하면) PPT 텍스트 실제 수정 — `.tools/ppt읽기.py`</li>
+  </ul>
+</div>
+<div class="card">
+  <h3><span class="who me">대표</span>직접 해야 하는 것 (결정·외부확인·자료)</h3>
+  <ul>
+    <li>씨투아 컨펌 — 스토리 흐름 틀 + 선결 3사항(M650 시작/끝·감정순서·곁가지)</li>
+    <li>발주처 확인 — 확정 행사일(10/7~10 中 4일)</li>
+    <li>부장님 의도 — 플리마켓 운영 방향</li>
+    <li>실행 결정 — 여름 워터밤 사전이벤트 / 위령제 주민 공동 여부</li>
+    <li>섭외·자료 — 실제 아티스트팀·진행자, 갓챠 상품·이미지·선물 사진</li>
+  </ul>
+</div>
+<div class="card">
+  <h3><span class="who co">씨투아</span>고유영역 (우리가 안 건드림)</h3>
+  <ul><li>예산집행계획(Ⅳ) · 안전관리 · 인력투입/추진일정 본문 · 디자인 비주얼</li></ul>
+</div>
+
+<h2>단계별 내 체크리스트</h2>
+<ul class="todo">
+  <li><input type="checkbox" id="i1" checked><label for="i1"><span class="who bot">클로드</span>스토리보드 콘셉트 + 컨셉페이지 통일안 ✓</label></li>
+  <li><input type="checkbox" id="i2"><label for="i2"><span class="who me">대표</span>씨투아에 흐름 틀 + 선결 3사항 컨펌 받기</label></li>
+  <li><input type="checkbox" id="i3"><label for="i3"><span class="who me">대표</span>발주처에 확정 행사일 확인</label></li>
+  <li><input type="checkbox" id="i4"><label for="i4"><span class="who bot">클로드</span>코멘트 수정안 + 재배치안 + 오류 정리</label></li>
+  <li><input type="checkbox" id="i5"><label for="i5"><span class="who me">대표</span>플리마켓 방향 + 워터밤/위령제 결정</label></li>
+  <li><input type="checkbox" id="i6"><label for="i6"><span class="who bot">클로드</span>세부 프로그램 톤 통일 + 일정표·세부설명</label></li>
+  <li><input type="checkbox" id="i7"><label for="i7"><span class="who me">대표</span>아티스트팀·진행자·갓챠 자료 확보</label></li>
+  <li><input type="checkbox" id="i8"><label for="i8"><span class="who bot">클로드</span>개막식 아티스트 퍼포먼스 문구</label></li>
+</ul>
+
+<div class="footer">큐앤뱅 내부 전용 · M650 탄광문화축제 · 2026.06</div>
+
+<script>
+  (function(){
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('ul.todo input'));
+    function save(){ var s={}; boxes.forEach(function(b){s[b.id]=b.checked;}); localStorage.setItem('m650internal', JSON.stringify(s)); }
+    function paint(){ boxes.forEach(function(b){ b.closest('li').classList.toggle('checked', b.checked); }); }
+    try{ var v=JSON.parse(localStorage.getItem('m650internal')||'{}'); boxes.forEach(function(b){ if(b.id in v) b.checked=v[b.id]; }); }catch(e){}
+    boxes.forEach(function(b){ b.addEventListener('change', function(){ save(); paint(); }); });
+    paint();
+  })();
+</script>
+</div></body></html>
