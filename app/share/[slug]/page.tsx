@@ -40,7 +40,8 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
     const newPath = await findDocByName(entry.repo, base);
     if (newPath) {
       md = await getDoc(entry.repo, newPath);
-      if (md != null) healSharePath(entry.repo, entry.path, newPath).catch(() => {});
+      // 서버리스에선 응답 후 함수가 멈출 수 있어 fire-and-forget이 누락된다 → await로 확실히 저장.
+      if (md != null) await healSharePath(entry.repo, entry.path, newPath).catch(() => {});
     }
   }
   if (md == null) notFound();
