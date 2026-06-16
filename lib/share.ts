@@ -7,7 +7,7 @@
 // 이유: 코드 repo 에 두면 사람(로컬 커밋)과 서버(런타임 커밋)가 같은 repo 에 써서 갈래가
 // 벌어진다(diverge). 사람이 손대지 않는 별도 repo 에 두면 코드 repo 는 한 줄로 흐른다.
 
-import { randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 const TOKEN = process.env.GITHUB_TOKEN!;
 const OWNER = process.env.GITHUB_OWNER || 'qnbang';
@@ -75,13 +75,31 @@ export async function findShare(repo: string, path: string): Promise<ShareEntry 
   return entries.find((e) => e.repo === repo && e.path === path) || null;
 }
 
+// 읽기 쉬운·고정 슬러그: repo 이름의 핵심만 뽑아 사람이 알아보는 주소로.
+//  (예: qnbang-proj-geummundo-branding → geummundo)
+// 결정적이라 공유를 껐다 켜도 같은 주소가 유지된다. 같은 base가 다른 문서에 이미
+// 쓰였을 때만 경로 해시 4자리를 붙여 충돌을 막는다.
+function deriveSlug(repo: string, path: string, entries: ShareEntry[]): string {
+  let base = repo.toLowerCase()
+    .replace(/^qnbang-proj-/, '')
+    .replace(/^qnbang-/, '')
+    .replace(/-(branding|website|site|web|landing|dashboard)$/, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!base) base = 'doc';
+  const conflict = entries.some((e) => e.slug === base && !(e.repo === repo && e.path === path));
+  return conflict
+    ? `${base}-${createHash('sha1').update(`${repo}/${path}`).digest('hex').slice(0, 4)}`
+    : base;
+}
+
 // 공개 켜기 — 이미 공개면 기존 항목 그대로 반환(멱등). 새로면 slug 발급 후 기록.
 export async function enableShare(repo: string, path: string, title: string, nowIso: string): Promise<ShareEntry> {
   const { entries, sha } = await readRegistry();
   const existing = entries.find((e) => e.repo === repo && e.path === path);
   if (existing) return existing;
   const entry: ShareEntry = {
-    slug: randomBytes(8).toString('hex'), // 16자리 16진수 — 링크 모르면 못 찾음
+    slug: deriveSlug(repo, path, entries), // 읽기 쉬운 고정 주소 (예: geummundo)
     repo,
     path,
     title,
