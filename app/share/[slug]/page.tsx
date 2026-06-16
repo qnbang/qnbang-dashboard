@@ -46,7 +46,7 @@ const CSS = `
   .share-wrap { --ink:#1f2328; --muted:#8a8a8a; --accent:#b8430f; --line:#ececec;
     max-width:760px; margin:0 auto; padding:0 24px 88px; color:var(--ink);
     font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
-    line-height:1.75; font-size:16px; -webkit-text-size-adjust:100%; }
+    line-height:1.62; font-size:16px; -webkit-text-size-adjust:100%; }
   .share-wrap .brandbar { display:flex; align-items:center; justify-content:space-between;
     padding:26px 0 22px; margin-bottom:30px; border-bottom:1px solid var(--line); }
   .share-wrap .brandbar .logo { height:30px; width:auto; display:block; }
@@ -54,14 +54,14 @@ const CSS = `
   .share-wrap h1 { font-size:30px; line-height:1.3; letter-spacing:-0.5px; margin:0 0 6px; padding-bottom:18px; border-bottom:2.5px solid var(--ink); }
   .share-wrap h2 { font-size:21px; letter-spacing:-0.3px; margin:42px 0 12px; padding-top:6px; }
   .share-wrap h3 { font-size:17px; letter-spacing:-0.2px; margin:30px 0 8px; color:#111; }
-  .share-wrap p { margin:10px 0; }
+  .share-wrap p { margin:7px 0; }
   .share-wrap strong { color:var(--accent); font-weight:700; }
   .share-wrap a { color:#0a66c2; text-decoration:none; }
   .share-wrap a:hover { text-decoration:underline; }
   .share-wrap code { background:#f3f3f3; padding:1px 6px; border-radius:5px; font-size:0.88em;
     font-family:"SFMono-Regular",ui-monospace,monospace; }
   .share-wrap hr { border:none; border-top:1px solid var(--line); margin:34px 0; }
-  .share-wrap ul { margin:10px 0; padding-left:22px; } .share-wrap li { margin:5px 0; }
+  .share-wrap ul { margin:8px 0; padding-left:22px; } .share-wrap li { margin:2px 0; }
   .share-wrap blockquote { margin:18px 0; padding:14px 18px; background:#faf9f7; border-left:3px solid #c9742a;
     border-radius:0 8px 8px 0; color:#555; font-size:0.95em; }
   .share-wrap blockquote p { margin:4px 0; }
