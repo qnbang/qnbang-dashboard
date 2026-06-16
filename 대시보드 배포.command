@@ -24,6 +24,14 @@ else
   echo "· 바뀐 내용이 없어 저장은 건너뜁니다."
 fi
 
+# 2.5) GitHub(origin)에 백업 push — 코드 백업 + 로컬·원본 갈라짐 방지.
+#      (런타임 상태는 별도 repo qnbang-dashboard-data에 있어 이 repo는 코드만 → 안 갈라짐)
+if git push origin HEAD 2>/dev/null; then
+  echo "✓ GitHub에 백업(push)했습니다."
+else
+  echo "⚠️ GitHub push 실패 — origin이 앞서 있을 수 있어요. 'git pull' 후 다시 시도하세요(배포는 계속 진행)."
+fi
+
 # 3) 로컬에서 빌드 (Vercel 빌드 큐를 거치지 않아 더 안정적)
 echo "· 빌드 중… (잠시 걸립니다)"
 npx vercel build --prod
