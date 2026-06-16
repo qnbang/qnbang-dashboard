@@ -373,6 +373,17 @@ function managerColor(name?: string): string {
 function managerList(s?: string): string[] {
   return (s || '').split(/[,、]/).map((x) => x.trim()).filter(Boolean);
 }
+
+// 문서 그룹(폴더) 표시 순서·아이콘 — 폴더 표준 체계(받은것→작업→완성+회의·계약)와 맞춤.
+// 표준 외(제품명 등)는 뒤로.
+const DOC_GROUP_ORDER = ['회의', '클라이언트자료', '레퍼런스', '작업중', '디자인소스', '산출물', '계약'];
+const DOC_GROUP_ICON: Record<string, string> = {
+  회의: '🗓️', 클라이언트자료: '📥', 레퍼런스: '🔖', 작업중: '✍️', 디자인소스: '🎨', 산출물: '📦', 계약: '📑',
+};
+function docGroupRank(g: string): number {
+  const i = DOC_GROUP_ORDER.indexOf(g);
+  return i === -1 ? 99 : i;
+}
 // 마감까지 D-day
 function dday(end: string): string {
   const e = new Date(end + 'T00:00:00').getTime();
@@ -821,9 +832,12 @@ function ProjectsView() {
     );
   }
 
-  // 문서를 주제(그룹)별로 묶기
+  // 문서를 주제(그룹)별로 묶고, 폴더 표준 순서(회의→…→계약)로 정렬
   const grouped: Record<string, DocItem[]> = {};
   for (const d of docs) (grouped[d.group] ||= []).push(d);
+  const sortedGroups = Object.entries(grouped).sort(
+    (a, b) => docGroupRank(a[0]) - docGroupRank(b[0]) || a[0].localeCompare(b[0], 'ko')
+  );
   const entries = workLog ? parseWorkLog(workLog) : [];
   const status = statusBoard ? parseStatusBoard(statusBoard) : null;
 
@@ -971,9 +985,9 @@ function ProjectsView() {
               {docs.length > 0 && (
                 <Card title="📄 문서">
                   <div className="space-y-4">
-                    {Object.entries(grouped).map(([group, items]) => (
+                    {sortedGroups.map(([group, items]) => (
                       <div key={group}>
-                        <p className="text-xs font-semibold text-slate-400 mb-1">{group}</p>
+                        <p className="text-xs font-semibold text-slate-400 mb-1">{DOC_GROUP_ICON[group] ? `${DOC_GROUP_ICON[group]} ` : ''}{group}</p>
                         <div className="divide-y divide-slate-50">
                           {items.map((d) => (
                             <button key={d.path} onClick={() => readDoc(d)}
