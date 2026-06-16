@@ -6,9 +6,19 @@ import { notFound } from 'next/navigation';
 import { getShareBySlug } from '@/lib/share';
 import { getDoc } from '@/lib/github';
 import { mdToHtml } from '@/lib/md';
+import type { Metadata } from 'next';
 
 // 매 요청마다 최신 공유 상태를 반영(캐시 끔) → 토글이 즉시 적용된다.
 export const dynamic = 'force-dynamic';
+
+// 링크 미리보기·브라우저 탭 제목 = 그 공유 문서의 이름(레지스트리 title).
+// → 카톡/메신저에 링크 붙이면 "금문도 …"처럼 문서 이름이 뜬다. 모든 공유에 자동 적용(통일).
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const entry = await getShareBySlug(slug);
+  const title = entry?.title || '큐앤뱅 공유 문서';
+  return { title, openGraph: { title, siteName: '큐앤뱅' } };
+}
 
 export default async function SharePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
