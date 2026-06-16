@@ -1,14 +1,18 @@
 // 노션식 공유 토글의 백엔드 — "어떤 문서가 공개인지"를 GitHub 파일 하나(share-registry.json)에
-// slug 단위로 기록한다 (서버 전용). 대시보드 repo 루트에 둔 이 파일에 항목이 있으면 = 공개.
+// slug 단위로 기록한다 (서버 전용). 이 파일에 항목이 있으면 = 공개.
 // 토글 = 이 파일에 추가/제거하는 커밋 → 런타임에 no-store 로 읽으므로 배포 없이 즉시 반영된다.
 // 이미 동작 중인 GITHUB_TOKEN 쓰기 권한(lib/github.ts 의 PUT 패턴)을 그대로 재사용한다.
+//
+// ⚠️ 저장 위치 = 코드 repo 가 아니라 "상태 전용 repo"(qnbang-dashboard-data).
+// 이유: 코드 repo 에 두면 사람(로컬 커밋)과 서버(런타임 커밋)가 같은 repo 에 써서 갈래가
+// 벌어진다(diverge). 사람이 손대지 않는 별도 repo 에 두면 코드 repo 는 한 줄로 흐른다.
 
 import { randomBytes } from 'node:crypto';
 
 const TOKEN = process.env.GITHUB_TOKEN!;
 const OWNER = process.env.GITHUB_OWNER || 'qnbang';
-// 공유 기록 파일을 둘 곳 = 대시보드 자신의 repo (인프라 설정의 집)
-const REGISTRY_REPO = process.env.DASHBOARD_REPO || 'qnbang-dashboard';
+// 공유 기록 파일을 둘 곳 = 런타임 상태 전용 repo (사람은 안 만짐)
+const REGISTRY_REPO = process.env.DASHBOARD_DATA_REPO || 'qnbang-dashboard-data';
 const REGISTRY_PATH = 'share-registry.json';
 
 const headers = () => ({

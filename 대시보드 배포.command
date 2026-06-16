@@ -34,7 +34,7 @@ npx vercel deploy --prebuilt --prod --yes
 
 echo "════════════════════════════════════════"
 echo "  ✅ 배포 완료!"
-echo "  주소: https://qnbang-dashboard.vercel.app"
+echo "  주소: https://dashboard.qnbang.com"
 echo "════════════════════════════════════════"
 echo ""
 echo "이 창은 닫으셔도 됩니다."

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { findShare, enableShare, disableShare } from '@/lib/share';
 
-// 공유 링크 경로를 만든다 (요청 host 기준 → dashboard.qnbang.com 자동 반영)
-function shareUrl(req: Request, slug: string): string {
-  const origin = new URL(req.url).origin;
-  return `${origin}/share/${slug}`;
+// 공유 링크는 항상 우리 도메인으로 통일한다. (vercel.app 주소로 접속해 토글해도
+// 외부에 나가는 링크는 dashboard.qnbang.com 으로 고정 → 주소가 들쭉날쭉하지 않음)
+const SHARE_BASE = (process.env.SHARE_BASE_URL || 'https://dashboard.qnbang.com').replace(/\/$/, '');
+function shareUrl(slug: string): string {
+  return `${SHARE_BASE}/share/${slug}`;
 }
 
 // GET /api/share?repo=&path= — 이 문서가 지금 공개 중인지 조회
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       shared: !!entry,
-      url: entry ? shareUrl(req, entry.slug) : null,
+      url: entry ? shareUrl(entry.slug) : null,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, shared: false, url: null });
     }
     const entry = await enableShare(repo, path, title || path, new Date().toISOString());
-    return NextResponse.json({ ok: true, shared: true, url: shareUrl(req, entry.slug) });
+    return NextResponse.json({ ok: true, shared: true, url: shareUrl(entry.slug) });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }

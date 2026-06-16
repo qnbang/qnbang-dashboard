@@ -25,12 +25,16 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
       <style>{CSS}</style>
       <div className="share-wrap">
         <div className="brandbar">
-          <span className="wordmark">QN!</span>
+          {/* 로고는 이미 공개 경로인 /share/ 아래에 둠 → 외부 열람자도 보임 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="logo" src="/share/qn-logo.png" alt="큐앤뱅" />
           <span className="role">큐앤뱅 공유 문서</span>
         </div>
         <article dangerouslySetInnerHTML={{ __html: body }} />
         <div className="footer">
-          <span className="meta">큐앤뱅 · dashboard.qnbang.com</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="footer-logo" src="/share/qn-logo.png" alt="큐앤뱅" />
+          <span className="meta">큐앤뱅(QN!) · dashboard.qnbang.com</span>
         </div>
       </div>
     </div>
@@ -45,7 +49,7 @@ const CSS = `
     line-height:1.75; font-size:16px; -webkit-text-size-adjust:100%; }
   .share-wrap .brandbar { display:flex; align-items:center; justify-content:space-between;
     padding:26px 0 22px; margin-bottom:30px; border-bottom:1px solid var(--line); }
-  .share-wrap .wordmark { font-weight:800; font-size:22px; letter-spacing:-0.5px; color:var(--accent); }
+  .share-wrap .brandbar .logo { height:30px; width:auto; display:block; }
   .share-wrap .role { font-size:12.5px; color:var(--muted); letter-spacing:0.2px; }
   .share-wrap h1 { font-size:30px; line-height:1.3; letter-spacing:-0.5px; margin:0 0 6px; padding-bottom:18px; border-bottom:2.5px solid var(--ink); }
   .share-wrap h2 { font-size:21px; letter-spacing:-0.3px; margin:42px 0 12px; padding-top:6px; }
@@ -64,7 +68,9 @@ const CSS = `
   .share-wrap table { border-collapse:collapse; width:100%; margin:18px 0; font-size:0.92em; }
   .share-wrap th,.share-wrap td { border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top; }
   .share-wrap th { background:#f7f7f7; font-weight:700; }
-  .share-wrap .footer { margin-top:56px; padding-top:24px; border-top:1px solid var(--line); }
-  .share-wrap .footer .meta { color:var(--muted); font-size:12.5px; }
+  .share-wrap .footer { margin-top:56px; padding-top:24px; border-top:1px solid var(--line);
+    display:flex; align-items:center; gap:12px; }
+  .share-wrap .footer .footer-logo { height:20px; width:auto; opacity:0.85; }
+  .share-wrap .footer .meta { color:var(--muted); font-size:12.5px; margin:0; }
   @media (max-width:520px){ .share-wrap{padding:0 16px 64px;} .share-wrap h1{font-size:24px;} .share-wrap{font-size:15px;} }
 `;
