@@ -51,9 +51,9 @@ const CSS = `
     padding:26px 0 22px; margin-bottom:30px; border-bottom:1px solid var(--line); }
   .share-wrap .brandbar .logo { height:30px; width:auto; display:block; }
   .share-wrap .role { font-size:12.5px; color:var(--muted); letter-spacing:0.2px; }
-  .share-wrap h1 { font-size:30px; line-height:1.3; letter-spacing:-0.5px; margin:0 0 6px; padding-bottom:18px; border-bottom:2.5px solid var(--ink); }
-  .share-wrap h2 { font-size:21px; letter-spacing:-0.3px; margin:42px 0 12px; padding-top:6px; }
-  .share-wrap h3 { font-size:17px; letter-spacing:-0.2px; margin:30px 0 8px; color:#111; }
+  .share-wrap h1 { font-size:30px; font-weight:800; line-height:1.3; letter-spacing:-0.5px; margin:0 0 6px; padding-bottom:18px; border-bottom:2.5px solid var(--ink); }
+  .share-wrap h2 { font-size:21px; font-weight:800; letter-spacing:-0.3px; margin:42px 0 12px; padding-top:6px; }
+  .share-wrap h3 { font-size:17px; font-weight:700; letter-spacing:-0.2px; margin:30px 0 8px; color:#111; }
   .share-wrap p { margin:7px 0; }
   .share-wrap strong { color:var(--accent); font-weight:700; }
   .share-wrap a { color:#0a66c2; text-decoration:none; }
