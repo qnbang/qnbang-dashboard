@@ -592,8 +592,11 @@ function ProjectsView() {
   const [driveFolderId, setDriveFolderId] = useState<string | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [showFlow, setShowFlow] = useState(false);
-  const [openDoc, setOpenDoc] = useState<{ title: string; content: string } | null>(null);
+  const [openDoc, setOpenDoc] = useState<{ title: string; content: string; path: string } | null>(null);
   const [docLoading, setDocLoading] = useState(false);
+  // 열린 문서의 공유(외부 공개) 상태
+  const [share, setShare] = useState<{ loading: boolean; shared: boolean; url: string | null }>({ loading: false, shared: false, url: null });
+  const [copied, setCopied] = useState(false);
   // 편집 가능한 계약 정보
   const [meta, setMeta] = useState<{ progressStatus?: string; contractStatus?: string; paymentStatus?: string; amount?: number; paidAmount?: number; startDate?: string; endDate?: string; contractUrl?: string }>({});
   const [saved, setSaved] = useState(false);
@@ -682,14 +685,54 @@ function ProjectsView() {
   const readDoc = async (doc: DocItem) => {
     if (!selected) return;
     setDocLoading(true);
-    setOpenDoc({ title: doc.title, content: '' });
+    setCopied(false);
+    setShare({ loading: true, shared: false, url: null });
+    setOpenDoc({ title: doc.title, content: '', path: doc.path });
     try {
       const r = await fetch(`/api/git-projects/${selected.repo}/doc?path=${encodeURIComponent(doc.path)}`);
       const j = await r.json();
-      setOpenDoc({ title: doc.title, content: j.content || '내용을 불러오지 못했어요.' });
+      setOpenDoc({ title: doc.title, content: j.content || '내용을 불러오지 못했어요.', path: doc.path });
     } finally {
       setDocLoading(false);
     }
+    // 공유 상태 조회(문서 본문과 별개로 진행)
+    try {
+      const s = await fetch(`/api/share?repo=${encodeURIComponent(selected.repo)}&path=${encodeURIComponent(doc.path)}`);
+      const sj = await s.json();
+      setShare({ loading: false, shared: !!sj.shared, url: sj.url || null });
+    } catch {
+      setShare({ loading: false, shared: false, url: null });
+    }
+  };
+
+  // 공유 켜기/끄기 토글
+  const toggleShare = async () => {
+    if (!selected || !openDoc) return;
+    const turningOn = !share.shared;
+    setShare((s) => ({ ...s, loading: true }));
+    setCopied(false);
+    try {
+      const r = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo: selected.repo, path: openDoc.path, title: openDoc.title, action: turningOn ? 'on' : 'off' }),
+      });
+      const j = await r.json();
+      if (j.ok) setShare({ loading: false, shared: !!j.shared, url: j.url || null });
+      else setShare((s) => ({ ...s, loading: false }));
+    } catch {
+      setShare((s) => ({ ...s, loading: false }));
+    }
+  };
+
+  // 공유 링크 복사
+  const copyShareUrl = async () => {
+    if (!share.url) return;
+    try {
+      await navigator.clipboard.writeText(share.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* 무시 */ }
   };
 
   if (loading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
@@ -1042,8 +1085,28 @@ function ProjectsView() {
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-800">{openDoc.title}</h3>
-              <button onClick={() => setOpenDoc(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleShare}
+                  disabled={share.loading}
+                  className={`text-xs font-semibold rounded-full px-3 py-1 transition disabled:opacity-50 ${share.shared ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  {share.loading ? '처리 중…' : share.shared ? '🔗 공유 중 · 끄기' : '🔗 공유'}
+                </button>
+                <button onClick={() => setOpenDoc(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+              </div>
             </div>
+            {share.shared && share.url && (
+              <div className="flex items-center gap-2 px-5 py-2 bg-emerald-50 border-b border-emerald-100">
+                <span className="text-[11px] text-emerald-600 shrink-0">외부 공개 링크</span>
+                <input readOnly value={share.url} onFocus={(e) => e.target.select()}
+                  className="flex-1 min-w-0 text-xs text-slate-600 bg-white border border-emerald-200 rounded px-2 py-1" />
+                <button onClick={copyShareUrl}
+                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 shrink-0">
+                  {copied ? '복사됨 ✓' : '복사'}
+                </button>
+              </div>
+            )}
             <div className="overflow-y-auto px-5 py-4">
               {docLoading ? <p className="text-slate-400 text-sm text-center py-10">불러오는 중…</p> : renderMarkdown(openDoc.content)}
             </div>
