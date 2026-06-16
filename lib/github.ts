@@ -250,6 +250,46 @@ export async function getDoc(repo: string, docPath: string): Promise<string | nu
   return Buffer.from(json.content, 'base64').toString('utf8');
 }
 
+// 문서 내용 + sha 함께 (편집용 — 저장할 때 이 sha 로 충돌 검사)
+export async function getDocFull(repo: string, docPath: string): Promise<{ content: string; sha: string } | null> {
+  const encoded = docPath.split('/').map(encodeURIComponent).join('/');
+  const res = await fetch(
+    `https://api.github.com/repos/${OWNER}/${repo}/contents/${encoded}`,
+    { headers: headers(), cache: 'no-store' }
+  );
+  if (!res.ok) return null;
+  const json = await res.json();
+  if (!json.content || !json.sha) return null;
+  return { content: Buffer.from(json.content, 'base64').toString('utf8'), sha: json.sha };
+}
+
+// 문서 저장 (대시보드 편집) — Contents API PUT.
+// 반드시 불러올 때 받은 sha 를 넘긴다 → 그 사이 origin 이 바뀌었으면 GitHub 가 409 로 거절(=덮어쓰기 사고 방지).
+// 충돌이면 { conflict: true } 반환, 성공이면 새 sha 반환.
+export async function saveDoc(
+  repo: string,
+  docPath: string,
+  content: string,
+  sha: string
+): Promise<{ ok: true; sha: string } | { ok: false; conflict: boolean; error: string }> {
+  const encoded = docPath.split('/').map(encodeURIComponent).join('/');
+  const url = `https://api.github.com/repos/${OWNER}/${repo}/contents/${encoded}`;
+  const body = {
+    message: `대시보드에서 문서 편집: ${docPath}`,
+    content: Buffer.from(content, 'utf8').toString('base64'),
+    sha,
+  };
+  const put = await fetch(url, { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
+  if (put.ok) {
+    const j = await put.json();
+    return { ok: true, sha: j.content?.sha };
+  }
+  const text = await put.text();
+  // 409(Conflict) 또는 422(sha 불일치) = 그 사이 다른 곳에서 먼저 바뀜
+  const conflict = put.status === 409 || put.status === 422;
+  return { ok: false, conflict, error: `${put.status} ${text}` };
+}
+
 // 프로젝트 설정 — repo 루트의 프로젝트.json { driveFolderId } 을 읽는다 (없으면 null)
 export async function getDriveFolderId(repo: string): Promise<string | null> {
   const res = await fetch(

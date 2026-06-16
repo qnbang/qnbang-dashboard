@@ -597,6 +597,12 @@ function ProjectsView() {
   // 열린 문서의 공유(외부 공개) 상태
   const [share, setShare] = useState<{ loading: boolean; shared: boolean; url: string | null }>({ loading: false, shared: false, url: null });
   const [copied, setCopied] = useState(false);
+  // 문서 편집 상태 — sha 는 충돌 방지용(불러올 때 받아 저장 때 되돌려줌)
+  const [docSha, setDocSha] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [docSaving, setDocSaving] = useState(false);
+  const [docMsg, setDocMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   // 편집 가능한 계약 정보
   const [meta, setMeta] = useState<{ progressStatus?: string; contractStatus?: string; paymentStatus?: string; amount?: number; paidAmount?: number; startDate?: string; endDate?: string; contractUrl?: string }>({});
   const [saved, setSaved] = useState(false);
@@ -686,12 +692,14 @@ function ProjectsView() {
     if (!selected) return;
     setDocLoading(true);
     setCopied(false);
+    setEditing(false); setDraft(''); setDocSha(null); setDocMsg(null);
     setShare({ loading: true, shared: false, url: null });
     setOpenDoc({ title: doc.title, content: '', path: doc.path });
     try {
       const r = await fetch(`/api/git-projects/${selected.repo}/doc?path=${encodeURIComponent(doc.path)}`);
       const j = await r.json();
       setOpenDoc({ title: doc.title, content: j.content || '내용을 불러오지 못했어요.', path: doc.path });
+      setDocSha(j.sha || null); // sha 가 있으면 편집 가능(없으면 읽기 전용)
     } finally {
       setDocLoading(false);
     }
@@ -733,6 +741,42 @@ function ProjectsView() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch { /* 무시 */ }
+  };
+
+  // 편집 시작 — 지금 보이는 원문을 편집창에 넣는다
+  const startEdit = () => {
+    if (!openDoc || !docSha) return;
+    setDraft(openDoc.content);
+    setDocMsg(null);
+    setEditing(true);
+  };
+
+  // 저장 — sha 와 함께 PUT. 그 사이 바뀌었으면 서버가 409 로 거절 → 경고만 띄우고 안 덮음.
+  const saveDoc = async () => {
+    if (!selected || !openDoc || !docSha) return;
+    setDocSaving(true);
+    setDocMsg(null);
+    try {
+      const r = await fetch(`/api/git-projects/${selected.repo}/doc`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: openDoc.path, content: draft, sha: docSha }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setOpenDoc({ ...openDoc, content: draft });
+        setDocSha(j.sha || docSha);
+        setEditing(false);
+        setDocMsg({ kind: 'ok', text: '저장됐어요. (로컬 옵시디언에서 이어 작업하려면 먼저 git pull 하세요)' });
+        setTimeout(() => setDocMsg(null), 4000);
+      } else {
+        setDocMsg({ kind: 'error', text: j.error || '저장에 실패했어요.' });
+      }
+    } catch (e) {
+      setDocMsg({ kind: 'error', text: String(e) });
+    } finally {
+      setDocSaving(false);
+    }
   };
 
   if (loading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
@@ -1086,17 +1130,38 @@ function ProjectsView() {
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-800">{openDoc.title}</h3>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleShare}
-                  disabled={share.loading}
-                  className={`text-xs font-semibold rounded-full px-3 py-1 transition disabled:opacity-50 ${share.shared ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  {share.loading ? '처리 중…' : share.shared ? '🔗 공유 중 · 끄기' : '🔗 공유'}
-                </button>
-                <button onClick={() => setOpenDoc(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+                {editing ? (
+                  <>
+                    <button onClick={saveDoc} disabled={docSaving}
+                      className="text-xs font-semibold rounded-full px-3 py-1 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50">
+                      {docSaving ? '저장 중…' : '저장'}
+                    </button>
+                    <button onClick={() => { setEditing(false); setDocMsg(null); }} disabled={docSaving}
+                      className="text-xs font-semibold rounded-full px-3 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition disabled:opacity-50">
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {docSha && !docLoading && (
+                      <button onClick={startEdit}
+                        className="text-xs font-semibold rounded-full px-3 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">
+                        ✏️ 편집
+                      </button>
+                    )}
+                    <button
+                      onClick={toggleShare}
+                      disabled={share.loading}
+                      className={`text-xs font-semibold rounded-full px-3 py-1 transition disabled:opacity-50 ${share.shared ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      {share.loading ? '처리 중…' : share.shared ? '🔗 공유 중 · 끄기' : '🔗 공유'}
+                    </button>
+                    <button onClick={() => setOpenDoc(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+                  </>
+                )}
               </div>
             </div>
-            {share.shared && share.url && (
+            {share.shared && share.url && !editing && (
               <div className="flex items-center gap-2 px-5 py-2 bg-emerald-50 border-b border-emerald-100">
                 <span className="text-[11px] text-emerald-600 shrink-0">외부 공개 링크</span>
                 <input readOnly value={share.url} onFocus={(e) => e.target.select()}
@@ -1107,8 +1172,24 @@ function ProjectsView() {
                 </button>
               </div>
             )}
+            {docMsg && (
+              <div className={`px-5 py-2 text-xs border-b ${docMsg.kind === 'ok' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                {docMsg.text}
+              </div>
+            )}
             <div className="overflow-y-auto px-5 py-4">
-              {docLoading ? <p className="text-slate-400 text-sm text-center py-10">불러오는 중…</p> : renderMarkdown(openDoc.content)}
+              {docLoading ? (
+                <p className="text-slate-400 text-sm text-center py-10">불러오는 중…</p>
+              ) : editing ? (
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  spellCheck={false}
+                  className="w-full h-[60vh] resize-none rounded-lg border border-slate-200 p-3 font-mono text-[13px] leading-relaxed text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              ) : (
+                renderMarkdown(openDoc.content)
+              )}
             </div>
           </div>
         </div>
