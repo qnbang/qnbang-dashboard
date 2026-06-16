@@ -17,7 +17,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const entry = await getShareBySlug(slug);
   const title = entry?.title || '큐앤뱅 공유 문서';
-  return { title, openGraph: { title, siteName: '큐앤뱅' } };
+  const description = '큐앤뱅에서 공유드린 문서입니다. 눌러서 확인해 주세요.';
+  const image = 'https://dashboard.qnbang.com/share/qn-logo.png';
+  return {
+    title,
+    description,
+    openGraph: { title, description, siteName: '큐앤뱅', type: 'article', images: [image] },
+    twitter: { card: 'summary', title, description, images: [image] },
+  };
 }
 
 export default async function SharePage({ params }: { params: Promise<{ slug: string }> }) {
