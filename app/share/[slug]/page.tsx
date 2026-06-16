@@ -3,8 +3,8 @@
 //  ① 공유 기록에서 slug 확인 → ② 공개면 원본 MD 를 GitHub 에서 가져와 ③ 읽기 좋게 렌더,
 //  ④ 비공개(기록에 없음)면 404. 노션 "웹에 게시"와 같은 동작.
 import { notFound } from 'next/navigation';
-import { getShareBySlug } from '@/lib/share';
-import { getDoc } from '@/lib/github';
+import { getShareBySlug, healSharePath } from '@/lib/share';
+import { getDoc, findDocByName } from '@/lib/github';
 import { mdToHtml } from '@/lib/md';
 import type { Metadata } from 'next';
 
@@ -32,7 +32,17 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
   const entry = await getShareBySlug(slug);
   if (!entry) notFound();
 
-  const md = await getDoc(entry.repo, entry.path);
+  // 저장된 경로로 먼저 시도. 폴더 이동 등으로 못 찾으면(=null) 파일명으로 새 위치를 찾아 복구하고,
+  // 기록의 경로도 새 위치로 고쳐둔다(slug=링크는 그대로라 이미 보낸 링크가 안 깨진다).
+  let md = await getDoc(entry.repo, entry.path);
+  if (md == null) {
+    const base = entry.path.split('/').pop() || '';
+    const newPath = await findDocByName(entry.repo, base);
+    if (newPath) {
+      md = await getDoc(entry.repo, newPath);
+      if (md != null) healSharePath(entry.repo, entry.path, newPath).catch(() => {});
+    }
+  }
   if (md == null) notFound();
 
   const body = mdToHtml(md);

@@ -109,6 +109,17 @@ export async function enableShare(repo: string, path: string, title: string, now
   return entry;
 }
 
+// 공유 중인 문서가 폴더 이동 등으로 경로가 바뀌었을 때, 기록의 경로만 새 경로로 고친다.
+// slug(링크 주소)는 그대로라 이미 보낸 링크가 안 깨진다. (공유 페이지가 자동 복구할 때 호출)
+export async function healSharePath(repo: string, oldPath: string, newPath: string): Promise<void> {
+  if (oldPath === newPath) return;
+  const { entries, sha } = await readRegistry();
+  const e = entries.find((x) => x.repo === repo && x.path === oldPath);
+  if (!e) return;
+  e.path = newPath;
+  await writeRegistry(entries, sha, `공유 경로 자동 정정: ${oldPath} → ${newPath}`);
+}
+
 // 공개 끄기 — 해당 문서 항목 제거. 원래 공개 아니었으면 아무 일도 안 함.
 export async function disableShare(repo: string, path: string): Promise<void> {
   const { entries, sha } = await readRegistry();

@@ -250,6 +250,21 @@ export async function getDoc(repo: string, docPath: string): Promise<string | nu
   return Buffer.from(json.content, 'base64').toString('utf8');
 }
 
+// repo 트리에서 파일명(basename)이 일치하는 문서 경로를 찾는다.
+// 폴더를 옮긴 뒤 공유 링크가 안 깨지게 자동 복구하는 용도. 정확히 하나일 때만 반환(0개·중복이면 null — 오인 방지).
+export async function findDocByName(repo: string, baseName: string): Promise<string | null> {
+  const res = await fetch(
+    `https://api.github.com/repos/${OWNER}/${repo}/git/trees/main?recursive=1`,
+    { headers: headers(), cache: 'no-store' }
+  );
+  if (!res.ok) return null;
+  const json = await res.json();
+  const matches = ((json.tree || []) as { path: string; type: string }[])
+    .filter((t) => t.type === 'blob' && t.path.split('/').pop() === baseName)
+    .map((t) => t.path);
+  return matches.length === 1 ? matches[0] : null;
+}
+
 // 문서 내용 + sha 함께 (편집용 — 저장할 때 이 sha 로 충돌 검사)
 export async function getDocFull(repo: string, docPath: string): Promise<{ content: string; sha: string } | null> {
   const encoded = docPath.split('/').map(encodeURIComponent).join('/');
