@@ -21,6 +21,7 @@ function doPost(e) {
       case 'list':          return _json(list(body));
       case 'trash':         return _json(trash(body));
       case 'rename':        return _json(rename(body));
+      case 'move':          return _json(move(body));
       default:              return _json({ ok: false, error: '알 수 없는 action: ' + body.action });
     }
   } catch (err) {
@@ -51,6 +52,14 @@ function createProject(body) {
 // 폴더 이름 변경 {id, name}
 function rename(body) {
   DriveApp.getFolderById(body.id).setName(body.name);
+  return { ok: true };
+}
+
+// 파일/폴더를 다른 폴더 안으로 이동 {id, toFolderId}. (드라이브 정리·폴더 합치기용)
+function move(body) {
+  var dest = DriveApp.getFolderById(body.toFolderId);
+  try { DriveApp.getFolderById(body.id).moveTo(dest); }   // 폴더면 폴더 이동
+  catch (e) { DriveApp.getFileById(body.id).moveTo(dest); } // 아니면 파일 이동
   return { ok: true };
 }
 
