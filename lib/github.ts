@@ -121,6 +121,8 @@ const AUTOMATED_COMMIT_PATTERNS = [
   /작업\s*동기화/i,
   /대시보드에서\s*프로젝트\s*정보\s*수정/i,
   /드라이브\s*연결을\s*공식\s*폴더로/i,
+  /데일리\s*자동발행/i,
+  /자동\s*발행/i,
 ];
 
 // 프로젝트 repo 목록 — repo 전체를 받아 'qnbang-project' 토픽으로 거른다.
