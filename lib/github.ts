@@ -114,6 +114,15 @@ export interface Commit {
   date: string;
 }
 
+const AUTOMATED_COMMIT_PATTERNS = [
+  /산출물\s*정정/i,
+  /폴더\s*정리/i,
+  /폴더\s*구조/i,
+  /작업\s*동기화/i,
+  /대시보드에서\s*프로젝트\s*정보\s*수정/i,
+  /드라이브\s*연결을\s*공식\s*폴더로/i,
+];
+
 // 프로젝트 repo 목록 — repo 전체를 받아 'qnbang-project' 토픽으로 거른다.
 // (검색 API는 색인 지연이 있어, 새 repo가 즉시 안 잡힘 → 목록 API로 즉시 반영)
 export async function listProjectRepos(): Promise<ProjectRepo[]> {
@@ -132,13 +141,31 @@ export async function listProjectRepos(): Promise<ProjectRepo[]> {
       const meta = await getProjectMeta(r.name);
       // 이름은 프로젝트.json '이름'이 정답 → 없으면 작업로그 H1 → 그것도 없으면 slug
       const title = meta.name || (await getWorkLogTitle(r.name)) || r.name;
+
+      // 1안. 깃허브 커밋 메시지 필터링으로 최근작업일 보정
+      let updatedAt = r.pushed_at;
+      try {
+        const commits = await getCommits(r.name, 10);
+        const realCommit = commits.find((c) => {
+          const msg = c.message;
+          const isAutomated = AUTOMATED_COMMIT_PATTERNS.some((pattern) => pattern.test(msg));
+          return !isAutomated;
+        });
+        if (realCommit) {
+          updatedAt = realCommit.date;
+        }
+      } catch (e) {
+        // 에러 시 기존 pushed_at으로 안전하게 대체
+        console.error(`Failed to fetch commits or filter for ${r.name}:`, e);
+      }
+
       return {
         repo: r.name,
         title,
         category: meta.category,
         manager: meta.manager,
         startDate: meta.startDate,
-        pushedAt: r.pushed_at,
+        pushedAt: updatedAt,
         htmlUrl: r.html_url,
         driveFolderId: meta.driveFolderId,
         progressStatus: meta.progressStatus,
