@@ -5,8 +5,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 
-type Section = { id: string; html: string };
-type Item = { confirmed: boolean; comment: string };
+type Section = { id: string; html: string; raw: string };
+type Item = { confirmed: boolean; comment: string; edit: string };
 
 export default function ReviewPage() {
   const { key } = useParams<{ key: string }>();
@@ -34,13 +34,17 @@ export default function ReviewPage() {
       .finally(() => setLoading(false));
   }, [key]);
 
-  const get = (id: string): Item => items[id] || { confirmed: false, comment: '' };
+  const get = (id: string): Item => items[id] || { confirmed: false, comment: '', edit: '' };
   const toggleConfirm = (id: string) => {
     setItems((m) => ({ ...m, [id]: { ...get(id), confirmed: !get(id).confirmed } }));
     setDirty(true);
   };
   const setComment = (id: string, comment: string) => {
     setItems((m) => ({ ...m, [id]: { ...get(id), comment } }));
+    setDirty(true);
+  };
+  const setEdit = (id: string, edit: string) => {
+    setItems((m) => ({ ...m, [id]: { ...get(id), edit } }));
     setDirty(true);
   };
 
@@ -108,13 +112,35 @@ export default function ReviewPage() {
                 </button>
               </div>
               <div className="reviewdoc px-5 py-4" dangerouslySetInnerHTML={{ __html: s.html }} />
-              <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100">
-                <textarea
-                  value={it.comment}
-                  onChange={(e) => setComment(s.id, e.target.value)}
-                  placeholder="코멘트 (예: 태백 상징은 ○○로 바꿔 / 갓챠 가격은 빼줘) — 비워두면 이대로 진행"
-                  className="w-full min-h-[56px] resize-y rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                />
+              <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100 space-y-3">
+                {/* 코멘트 — 클로드에게 할 말 */}
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-400">💬 클로드에게 할 말</label>
+                  <textarea
+                    value={it.comment}
+                    onChange={(e) => setComment(s.id, e.target.value)}
+                    placeholder="예: 태백 상징은 ○○로 바꿔 / 갓챠 가격은 빼줘 — 비우면 이대로 진행"
+                    className="mt-1 w-full min-h-[52px] resize-y rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  />
+                </div>
+                {/* 직접 고치기 — 사장이 쓴 문구 그대로 반영 */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-slate-400">✍️ 직접 고치기 <span className="font-normal text-slate-300">(여기 쓴 문구는 그대로 반영)</span></label>
+                    {!it.edit && (
+                      <button onClick={() => setEdit(s.id, s.raw)} className="text-[11px] font-medium text-indigo-500 hover:text-indigo-700">
+                        ↧ 개선안 불러와 고치기
+                      </button>
+                    )}
+                  </div>
+                  <textarea
+                    value={it.edit}
+                    onChange={(e) => setEdit(s.id, e.target.value)}
+                    placeholder="직접 고칠 때만 사용 — '개선안 불러와 고치기'를 누르면 위 내용이 여기로 들어옵니다."
+                    className="mt-1 w-full resize-y rounded-lg border border-slate-200 p-2.5 font-mono text-[13px] leading-relaxed text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                    style={{ minHeight: it.edit ? '180px' : '44px' }}
+                  />
+                </div>
               </div>
             </section>
           );

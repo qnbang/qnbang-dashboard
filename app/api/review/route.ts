@@ -34,7 +34,12 @@ function splitSections(md: string): { intro: string; sections: { id: string; htm
   if (cur) sections.push(cur);
   return {
     intro: mdToHtml(intro.join('\n')),
-    sections: sections.map((s) => ({ id: s.id, html: mdToHtml(`## ${s.id}\n${s.body.join('\n')}`) })),
+    // html = 읽기용 렌더, raw = '직접 고치기' 불러오기용 원문(헤더 포함)
+    sections: sections.map((s) => ({
+      id: s.id,
+      html: mdToHtml(`## ${s.id}\n${s.body.join('\n')}`),
+      raw: `## ${s.id}\n${s.body.join('\n')}`.trim(),
+    })),
   };
 }
 
@@ -60,12 +65,13 @@ export async function POST(req: Request) {
     const { key, items } = await req.json();
     if (!key || !SOURCES[key]) return NextResponse.json({ ok: false, error: '알 수 없는 검토 대상입니다.' }, { status: 400 });
     if (!items || typeof items !== 'object') return NextResponse.json({ ok: false, error: 'items가 필요합니다.' }, { status: 400 });
-    // 들어온 값만 정제 — 확정 여부 + 코멘트
+    // 들어온 값만 정제 — 확정 여부 + 코멘트 + 직접 수정
     const clean: Record<string, ReviewItem> = {};
     for (const [id, v] of Object.entries(items as Record<string, ReviewItem>)) {
       const confirmed = !!v?.confirmed;
       const comment = typeof v?.comment === 'string' ? v.comment.slice(0, 5000) : '';
-      if (confirmed || comment) clean[id] = { confirmed, comment };
+      const edit = typeof v?.edit === 'string' ? v.edit.slice(0, 20000) : '';
+      if (confirmed || comment || edit) clean[id] = { confirmed, comment, edit };
     }
     const saved = await saveReview(key, clean, new Date().toISOString());
     return NextResponse.json({ ok: true, review: saved });

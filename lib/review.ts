@@ -13,11 +13,13 @@ const headers = () => ({
   'X-GitHub-Api-Version': '2022-11-28',
 });
 
-// 한 장표(섹션)에 대한 사장님의 검토 = 확정 여부 + 코멘트
-// confirmed: 이 장표를 다 봤다(확정). 다시 손볼 수 있게 해제 가능. comment: 자유 지시(고칠 것·뺄 것 등).
+// 한 장표(섹션)에 대한 사장님의 검토.
+// confirmed: 이 장표 확정(다시 손볼 수 있게 해제 가능)
+// comment: 클로드에게 할 말(방향 지시) / edit: 사장님이 직접 고쳐 쓴 최종 문구(있으면 그대로 반영)
 export interface ReviewItem {
   confirmed: boolean;
   comment: string;
+  edit: string;
 }
 export interface ReviewData {
   items: Record<string, ReviewItem>; // 섹션 id → 검토
