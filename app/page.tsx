@@ -29,8 +29,23 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 const TABS = [
   { key: 'projects', label: '프로젝트', ready: true },
   { key: 'shares', label: '공유된 문서', ready: true },
+  { key: 'hubs', label: '협업 허브', ready: true },
   { key: 'finance', label: '정산', ready: true },
   { key: 'tools', label: '업무툴', ready: true },
+];
+
+// 협업 허브 — 협업사·클라이언트에게 건네는 "프로젝트 진행 공유 창구" 모음.
+// 각 허브는 그 프로젝트의 종합 공유 페이지(진행 체크리스트 + 공유 문서 + 디자인 시안 묶음).
+// 새 협업 프로젝트가 생기면 허브 페이지를 만들어 여기에 한 줄 추가하면 됩니다.
+const COLLAB_HUBS = [
+  {
+    project: 'M650 탄광문화축제',
+    client: '강원랜드 · 씨투아 협업',
+    desc: '제안서 디벨롭 — 석탄이 스토리라인 정렬, 진행 체크리스트·공유 문서·디자인 시안을 한 곳에서.',
+    url: 'https://dashboard.qnbang.com/share/m650-hub.html',
+    emoji: '⛏️',
+    color: 'bg-amber-50 text-amber-600 border-amber-200',
+  },
 ];
 
 // 업무에 쓰는 외부 도구 목록 — 새 도구가 생기면 여기에 한 줄 추가하면 됩니다.
@@ -114,6 +129,7 @@ export default function Home() {
         {tab === 'projects' && <ProjectsView />}
         {tab === 'finance' && <FinanceView data={data} loading={loading} error={error} />}
         {tab === 'shares' && <SharesView />}
+        {tab === 'hubs' && <HubsView />}
         {tab === 'tools' && <ToolsView />}
       </main>
     </div>
@@ -265,6 +281,51 @@ function ExpenseView({ data }: { data: DashboardData }) {
           </table>
         </div>
       </Card>
+    </div>
+  );
+}
+
+// 협업 허브 탭 — 협업사에 건네는 프로젝트별 공유 창구를 카드로 모아본다.
+function HubsView() {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = async (url: string) => {
+    try { await navigator.clipboard.writeText(url); setCopied(url); setTimeout(() => setCopied(null), 1500); } catch { /* 무시 */ }
+  };
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">
+        협업사·클라이언트에게 건네는 <b className="text-slate-700">프로젝트 진행 공유 창구</b>입니다. 카드를 누르면 외부 공개 허브가 열려요. 링크를 복사해 상대에게 보내면, 그 안에서 진행상황·문서·시안을 함께 봅니다.
+      </p>
+      {COLLAB_HUBS.length === 0 ? (
+        <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl text-slate-400 text-sm shadow-sm">
+          아직 만든 협업 허브가 없어요.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {COLLAB_HUBS.map((h) => (
+            <div key={h.url} className="group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col transition hover:shadow-md hover:-translate-y-0.5">
+              <a href={h.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3">
+                <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center text-xl shrink-0 ${h.color}`}>{h.emoji}</div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 group-hover:text-indigo-600 leading-snug">{h.project}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{h.client}</p>
+                </div>
+              </a>
+              <p className="mt-3 text-xs text-slate-500 leading-relaxed flex-1">{h.desc}</p>
+              <div className="mt-4 flex items-center gap-2">
+                <a href={h.url} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 text-center text-xs font-semibold rounded-lg px-3 py-1.5 bg-indigo-600 text-white hover:bg-indigo-700 transition">
+                  허브 열기
+                </a>
+                <button onClick={() => copy(h.url)}
+                  className="text-xs font-semibold rounded-lg px-3 py-1.5 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">
+                  {copied === h.url ? '복사됨 ✓' : '링크 복사'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
