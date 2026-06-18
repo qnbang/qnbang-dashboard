@@ -28,8 +28,8 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
   { key: 'projects', label: '프로젝트', ready: true },
+  { key: 'shares', label: '공유된 문서', ready: true },
   { key: 'finance', label: '정산', ready: true },
-  { key: 'shares', label: '공유 관리', ready: true },
   { key: 'tools', label: '업무툴', ready: true },
 ];
 
@@ -298,8 +298,8 @@ function ToolsView() {
   );
 }
 
-// 공유 관리 탭 — 지금 외부 공개(공유 ON)인 문서를 한 곳에 모아 관리한다.
-// 용도: 클라이언트 보여주기가 아니라 "어떤 문서가 공개 중인지" 내부 점검·정리.
+// 공유된 문서 탭 — 지금 외부 공개(공유 ON)인 문서를 한 곳에 모아 관리한다.
+// 용도: 클라이언트 보여주기가 아니라 "어떤 문서가 공개 중인지" 내부 점검·정리·바로 편집.
 type ShareRow = { slug: string; repo: string; path: string; title: string; sharedAt: string; url: string };
 
 function SharesView() {
@@ -308,6 +308,17 @@ function SharesView() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+
+  // 열린 문서(모달) — 읽기/편집을 한 곳에서
+  const [open, setOpen] = useState<ShareRow | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
+  const [content, setContent] = useState('');
+  const [docSha, setDocSha] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [modalCopied, setModalCopied] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -332,7 +343,7 @@ function SharesView() {
   };
 
   // 공유 끄기 — 레지스트리에서 항목 제거 후 목록 갱신
-  const turnOff = async (s: ShareRow) => {
+  const turnOff = async (s: ShareRow, closeModal = false) => {
     if (!confirm(`"${s.title}" 공유를 끌까요?\n끄면 외부 링크가 더 이상 열리지 않습니다.`)) return;
     setBusy(s.slug);
     try {
@@ -342,10 +353,60 @@ function SharesView() {
         body: JSON.stringify({ repo: s.repo, path: s.path, action: 'off' }),
       });
       const j = await r.json();
-      if (j.ok) setShares((list) => list.filter((x) => x.slug !== s.slug));
+      if (j.ok) {
+        setShares((list) => list.filter((x) => x.slug !== s.slug));
+        if (closeModal) setOpen(null);
+      }
     } finally {
       setBusy(null);
     }
+  };
+
+  // 문서 열기 — 본문 + sha(편집용) 불러오기
+  const openDoc = async (s: ShareRow) => {
+    setOpen(s);
+    setEditing(false); setDraft(''); setMsg(null); setContent(''); setDocSha(null); setModalCopied(false);
+    setDocLoading(true);
+    try {
+      const r = await fetch(`/api/git-projects/${s.repo}/doc?path=${encodeURIComponent(s.path)}`);
+      const j = await r.json();
+      setContent(j.content || '내용을 불러오지 못했어요.');
+      setDocSha(j.sha || null);
+    } catch (e) {
+      setContent('내용을 불러오지 못했어요: ' + String(e));
+    } finally {
+      setDocLoading(false);
+    }
+  };
+
+  // 저장 — sha 와 함께 PUT (그 사이 바뀌었으면 서버가 거절 → 안 덮음)
+  const saveDoc = async () => {
+    if (!open || !docSha) return;
+    setSaving(true); setMsg(null);
+    try {
+      const r = await fetch(`/api/git-projects/${open.repo}/doc`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: open.path, content: draft, sha: docSha }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setContent(draft); setDocSha(j.sha || docSha); setEditing(false);
+        setMsg({ kind: 'ok', text: '저장됐어요. (로컬 옵시디언에서 이어 작업하려면 먼저 git pull 하세요)' });
+        setTimeout(() => setMsg(null), 4000);
+      } else {
+        setMsg({ kind: 'error', text: j.error || '저장에 실패했어요.' });
+      }
+    } catch (e) {
+      setMsg({ kind: 'error', text: String(e) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyModal = async () => {
+    if (!open) return;
+    try { await navigator.clipboard.writeText(open.url); setModalCopied(true); setTimeout(() => setModalCopied(false), 1500); } catch { /* 무시 */ }
   };
 
   if (loading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
@@ -355,7 +416,7 @@ function SharesView() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
-          지금 외부에 공개(공유 ON)된 문서 <b className="text-slate-700">{shares.length}</b>건입니다. 링크를 복사해 보내거나, 끝난 건 공유를 꺼서 정리하세요.
+          지금 외부에 공개(공유 ON)된 문서 <b className="text-slate-700">{shares.length}</b>건입니다. 제목을 누르면 바로 보고·편집할 수 있어요.
         </p>
         <button onClick={load} className="text-xs text-slate-400 hover:text-slate-600 shrink-0">↻ 새로고침</button>
       </div>
@@ -371,31 +432,99 @@ function SharesView() {
           <div className="w-full px-4 py-2 flex items-center gap-3 bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-400 select-none">
             <span className="flex-1 min-w-0">문서</span>
             <span className="shrink-0 w-24 text-right hidden sm:block">공유 시작</span>
-            <span className="shrink-0 w-[150px] text-right">링크 / 관리</span>
+            <span className="shrink-0 w-[180px] text-right">관리</span>
           </div>
           <div className="divide-y divide-slate-50">
             {shares.map((s) => (
               <div key={s.slug} className="px-4 py-3 flex items-center gap-3 hover:bg-slate-50 transition">
-                <div className="flex-1 min-w-0">
-                  <a href={s.url} target="_blank" rel="noreferrer"
-                     className="text-sm font-semibold text-slate-800 hover:text-indigo-600 truncate block">
+                <button onClick={() => openDoc(s)} className="flex-1 min-w-0 text-left">
+                  <span className="text-sm font-semibold text-slate-800 hover:text-indigo-600 truncate block">
                     {s.title}
-                  </a>
-                  <p className="text-[11px] text-slate-400 truncate">{s.repo} · /share/{s.slug}</p>
-                </div>
+                  </span>
+                  <span className="text-[11px] text-slate-400 truncate block">{s.repo} · /share/{s.slug}</span>
+                </button>
                 <span className="shrink-0 w-24 text-right text-xs text-slate-400 hidden sm:block">{timeAgo(s.sharedAt)}</span>
-                <div className="shrink-0 w-[150px] flex items-center justify-end gap-1.5">
+                <div className="shrink-0 w-[180px] flex items-center justify-end gap-1.5">
+                  <button onClick={() => openDoc(s)}
+                    className="text-[11px] font-medium rounded-lg px-2 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">
+                    ✏️ 편집
+                  </button>
                   <button onClick={() => copy(s.url)}
                     className="text-[11px] font-medium rounded-lg px-2 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">
-                    {copied === s.url ? '복사됨 ✓' : '복사'}
+                    {copied === s.url ? '복사됨 ✓' : '링크'}
                   </button>
                   <button onClick={() => turnOff(s)} disabled={busy === s.slug}
                     className="text-[11px] font-medium rounded-lg px-2 py-1 bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50">
-                    {busy === s.slug ? '…' : '공유 끄기'}
+                    {busy === s.slug ? '…' : '끄기'}
                   </button>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 문서 모달 — 읽기 / 편집 / 링크복사 / 공유끄기 한 곳에서 */}
+      {open && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setOpen(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 truncate pr-3">{open.title}</h3>
+              <div className="flex items-center gap-2 shrink-0">
+                {editing ? (
+                  <>
+                    <button onClick={saveDoc} disabled={saving}
+                      className="text-xs font-semibold rounded-full px-3 py-1 bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50">
+                      {saving ? '저장 중…' : '저장'}
+                    </button>
+                    <button onClick={() => { setEditing(false); setMsg(null); }} disabled={saving}
+                      className="text-xs font-semibold rounded-full px-3 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition disabled:opacity-50">
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {docSha && !docLoading && (
+                      <button onClick={() => { setDraft(content); setMsg(null); setEditing(true); }}
+                        className="text-xs font-semibold rounded-full px-3 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">
+                        ✏️ 편집
+                      </button>
+                    )}
+                    <button onClick={() => turnOff(open, true)} disabled={busy === open.slug}
+                      className="text-xs font-semibold rounded-full px-3 py-1 bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50">
+                      🔗 공유 끄기
+                    </button>
+                    <button onClick={() => setOpen(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* 공유 링크 줄 */}
+            {!editing && (
+              <div className="flex items-center gap-2 px-5 py-2 bg-emerald-50 border-b border-emerald-100">
+                <span className="text-[11px] text-emerald-600 shrink-0">외부 공개 링크</span>
+                <input readOnly value={open.url} onFocus={(e) => e.target.select()}
+                  className="flex-1 min-w-0 text-xs text-slate-600 bg-white border border-emerald-200 rounded px-2 py-1" />
+                <button onClick={copyModal} className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 shrink-0">
+                  {modalCopied ? '복사됨 ✓' : '복사'}
+                </button>
+              </div>
+            )}
+            {msg && (
+              <div className={`px-5 py-2 text-xs border-b ${msg.kind === 'ok' ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                {msg.text}
+              </div>
+            )}
+            <div className="overflow-y-auto px-5 py-4">
+              {docLoading ? (
+                <p className="text-slate-400 text-sm text-center py-10">불러오는 중…</p>
+              ) : editing ? (
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false}
+                  className="w-full h-[60vh] resize-none rounded-lg border border-slate-200 p-3 font-mono text-[13px] leading-relaxed text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+              ) : (
+                renderMarkdown(content)
+              )}
+            </div>
           </div>
         </div>
       )}
