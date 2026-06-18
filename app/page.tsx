@@ -42,7 +42,7 @@ const COLLAB_HUBS = [
     project: 'M650 탄광문화축제',
     client: '강원랜드 · 씨투아 협업',
     desc: '제안서 디벨롭 — 석탄이 스토리라인 정렬, 진행 체크리스트·공유 문서·디자인 시안을 한 곳에서.',
-    url: 'https://dashboard.qnbang.com/share/m650-hub.html',
+    url: 'https://dashboard.qnbang.com/hub/m650',
     reviewKey: 'm650', // 내부 검토(장표별 개선안에 코멘트 달기) — 로그인 필요
     emoji: '⛏️',
     color: 'bg-amber-50 text-amber-600 border-amber-200',
