@@ -60,12 +60,12 @@ export async function POST(req: Request) {
     const { key, items } = await req.json();
     if (!key || !SOURCES[key]) return NextResponse.json({ ok: false, error: '알 수 없는 검토 대상입니다.' }, { status: 400 });
     if (!items || typeof items !== 'object') return NextResponse.json({ ok: false, error: 'items가 필요합니다.' }, { status: 400 });
-    // 들어온 값만 정제(허용 상태값 외엔 빈값)
+    // 들어온 값만 정제 — 확정 여부 + 코멘트
     const clean: Record<string, ReviewItem> = {};
     for (const [id, v] of Object.entries(items as Record<string, ReviewItem>)) {
-      const status = ['ok', 'fix', 'drop'].includes(v?.status) ? v.status : '';
+      const confirmed = !!v?.confirmed;
       const comment = typeof v?.comment === 'string' ? v.comment.slice(0, 5000) : '';
-      if (status || comment) clean[id] = { status, comment };
+      if (confirmed || comment) clean[id] = { confirmed, comment };
     }
     const saved = await saveReview(key, clean, new Date().toISOString());
     return NextResponse.json({ ok: true, review: saved });

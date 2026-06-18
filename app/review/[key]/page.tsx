@@ -1,19 +1,12 @@
 'use client';
 
-// 장표별 개선안 검토 페이지 — 사장님이 각 장표에 상태(OK/고쳐/빼) + 코멘트를 달고 저장.
+// 장표별 개선안 검토 페이지 — 사장님이 각 장표를 확정(✓)하고 코멘트를 단다.
 // 저장값은 GitHub(qnbang-dashboard-data/reviews/<key>.json)에 남아 클로드가 읽어 반영한다.
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 type Section = { id: string; html: string };
-type Status = '' | 'ok' | 'fix' | 'drop';
-type Item = { status: Status; comment: string };
-
-const STATUS_OPTS: { v: Status; label: string; on: string; off: string }[] = [
-  { v: 'ok', label: '✅ OK', on: 'bg-emerald-600 text-white border-emerald-600', off: 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50' },
-  { v: 'fix', label: '✏️ 고쳐', on: 'bg-amber-500 text-white border-amber-500', off: 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50' },
-  { v: 'drop', label: '❌ 빼', on: 'bg-red-500 text-white border-red-500', off: 'bg-white text-red-600 border-red-200 hover:bg-red-50' },
-];
+type Item = { confirmed: boolean; comment: string };
 
 export default function ReviewPage() {
   const { key } = useParams<{ key: string }>();
@@ -41,9 +34,9 @@ export default function ReviewPage() {
       .finally(() => setLoading(false));
   }, [key]);
 
-  const get = (id: string): Item => items[id] || { status: '', comment: '' };
-  const setStatus = (id: string, status: Status) => {
-    setItems((m) => ({ ...m, [id]: { ...get(id), status: get(id).status === status ? '' : status } }));
+  const get = (id: string): Item => items[id] || { confirmed: false, comment: '' };
+  const toggleConfirm = (id: string) => {
+    setItems((m) => ({ ...m, [id]: { ...get(id), confirmed: !get(id).confirmed } }));
     setDirty(true);
   };
   const setComment = (id: string, comment: string) => {
@@ -66,8 +59,7 @@ export default function ReviewPage() {
     finally { setSaving(false); }
   };
 
-  // 진행 현황 — 상태를 정한 장표 수
-  const decided = sections.filter((s) => get(s.id).status).length;
+  const confirmedCount = sections.filter((s) => get(s.id).confirmed).length;
 
   if (loading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
   if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
@@ -81,7 +73,7 @@ export default function ReviewPage() {
           <div className="min-w-0">
             <h1 className="text-sm font-bold text-slate-800 truncate">{title}</h1>
             <p className="text-[11px] text-slate-400">
-              검토 {decided}/{sections.length} 장표
+              확정 {confirmedCount}/{sections.length} 장표
               {savedAt && <span> · 마지막 저장 {new Date(savedAt).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>}
             </p>
           </div>
@@ -89,6 +81,10 @@ export default function ReviewPage() {
             className={`shrink-0 text-sm font-semibold rounded-lg px-4 py-2 transition ${dirty ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 text-slate-400'} disabled:opacity-60`}>
             {saving ? '저장 중…' : dirty ? '저장' : '저장됨 ✓'}
           </button>
+        </div>
+        {/* 진행 막대 */}
+        <div className="h-1 bg-slate-100">
+          <div className="h-full bg-emerald-500 transition-all" style={{ width: sections.length ? `${(confirmedCount / sections.length) * 100}%` : '0%' }} />
         </div>
       </header>
 
@@ -100,23 +96,24 @@ export default function ReviewPage() {
         {sections.map((s) => {
           const it = get(s.id);
           return (
-            <section key={s.id} className={`rounded-2xl border bg-white shadow-sm overflow-hidden ${it.status === 'ok' ? 'border-emerald-200' : it.status === 'fix' ? 'border-amber-200' : it.status === 'drop' ? 'border-red-200' : 'border-slate-200'}`}>
-              <div className="reviewdoc px-5 py-4 border-b border-slate-100" dangerouslySetInnerHTML={{ __html: s.html }} />
-              <div className="px-5 py-3 bg-slate-50/60">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span className="text-[11px] font-semibold text-slate-400 mr-1">내 판단:</span>
-                  {STATUS_OPTS.map((o) => (
-                    <button key={o.v} onClick={() => setStatus(s.id, o.v)}
-                      className={`text-xs font-semibold rounded-full px-3 py-1 border transition ${it.status === o.v ? o.on : o.off}`}>
-                      {o.label}
-                    </button>
-                  ))}
-                </div>
+            <section key={s.id} className={`rounded-2xl border bg-white shadow-sm overflow-hidden transition ${it.confirmed ? 'border-emerald-300' : 'border-slate-200'}`}>
+              {/* 확정 토글 바 (장표 위) */}
+              <div className={`flex items-center justify-between px-5 py-2 border-b transition ${it.confirmed ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                <span className={`text-[11px] font-semibold ${it.confirmed ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {it.confirmed ? '확정됨' : '검토 전'}
+                </span>
+                <button onClick={() => toggleConfirm(s.id)}
+                  className={`text-xs font-semibold rounded-full px-3 py-1 border transition ${it.confirmed ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700' : 'bg-white text-slate-500 border-slate-300 hover:bg-slate-100'}`}>
+                  {it.confirmed ? '✓ 확정됨 (해제)' : '확정'}
+                </button>
+              </div>
+              <div className="reviewdoc px-5 py-4" dangerouslySetInnerHTML={{ __html: s.html }} />
+              <div className="px-5 py-3 bg-slate-50/60 border-t border-slate-100">
                 <textarea
                   value={it.comment}
                   onChange={(e) => setComment(s.id, e.target.value)}
-                  placeholder="이 장표에 대한 코멘트 (예: 태백 상징은 ○○로, 갓챠 가격은 빼고…)"
-                  className="w-full min-h-[60px] resize-y rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                  placeholder="코멘트 (예: 태백 상징은 ○○로 바꿔 / 갓챠 가격은 빼줘) — 비워두면 이대로 진행"
+                  className="w-full min-h-[56px] resize-y rounded-lg border border-slate-200 p-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                 />
               </div>
             </section>

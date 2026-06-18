@@ -13,9 +13,10 @@ const headers = () => ({
   'X-GitHub-Api-Version': '2022-11-28',
 });
 
-// 한 장표(섹션)에 대한 사장님의 검토 = 상태 + 코멘트
+// 한 장표(섹션)에 대한 사장님의 검토 = 확정 여부 + 코멘트
+// confirmed: 이 장표를 다 봤다(확정). 다시 손볼 수 있게 해제 가능. comment: 자유 지시(고칠 것·뺄 것 등).
 export interface ReviewItem {
-  status: '' | 'ok' | 'fix' | 'drop'; // 미정 / OK / 고쳐 / 빼
+  confirmed: boolean;
   comment: string;
 }
 export interface ReviewData {
