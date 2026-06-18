@@ -29,6 +29,7 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 const TABS = [
   { key: 'projects', label: '프로젝트', ready: true },
   { key: 'finance', label: '정산', ready: true },
+  { key: 'shares', label: '공유 관리', ready: true },
   { key: 'tools', label: '업무툴', ready: true },
 ];
 
@@ -112,6 +113,7 @@ export default function Home() {
       <main className="max-w-5xl mx-auto px-4 py-6">
         {tab === 'projects' && <ProjectsView />}
         {tab === 'finance' && <FinanceView data={data} loading={loading} error={error} />}
+        {tab === 'shares' && <SharesView />}
         {tab === 'tools' && <ToolsView />}
       </main>
     </div>
@@ -292,6 +294,111 @@ function ToolsView() {
           </a>
         ))}
       </div>
+    </div>
+  );
+}
+
+// 공유 관리 탭 — 지금 외부 공개(공유 ON)인 문서를 한 곳에 모아 관리한다.
+// 용도: 클라이언트 보여주기가 아니라 "어떤 문서가 공개 중인지" 내부 점검·정리.
+type ShareRow = { slug: string; repo: string; path: string; title: string; sharedAt: string; url: string };
+
+function SharesView() {
+  const [shares, setShares] = useState<ShareRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    fetch('/api/share?all=1')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) setShares(j.shares || []);
+        else setError(j.error || '공유 목록을 불러오지 못했어요.');
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  const copy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(url);
+      setTimeout(() => setCopied(null), 1500);
+    } catch { /* 무시 */ }
+  };
+
+  // 공유 끄기 — 레지스트리에서 항목 제거 후 목록 갱신
+  const turnOff = async (s: ShareRow) => {
+    if (!confirm(`"${s.title}" 공유를 끌까요?\n끄면 외부 링크가 더 이상 열리지 않습니다.`)) return;
+    setBusy(s.slug);
+    try {
+      const r = await fetch('/api/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo: s.repo, path: s.path, action: 'off' }),
+      });
+      const j = await r.json();
+      if (j.ok) setShares((list) => list.filter((x) => x.slug !== s.slug));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (loading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
+  if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">
+          지금 외부에 공개(공유 ON)된 문서 <b className="text-slate-700">{shares.length}</b>건입니다. 링크를 복사해 보내거나, 끝난 건 공유를 꺼서 정리하세요.
+        </p>
+        <button onClick={load} className="text-xs text-slate-400 hover:text-slate-600 shrink-0">↻ 새로고침</button>
+      </div>
+
+      {shares.length === 0 ? (
+        <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl text-slate-400 text-sm shadow-sm">
+          아직 공유 켜진 문서가 없어요.<br />
+          <span className="text-xs">프로젝트 탭 → 문서 열기 → 🔗 공유 를 누르면 여기 모입니다.</span>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+          {/* 헤더 */}
+          <div className="w-full px-4 py-2 flex items-center gap-3 bg-slate-50 border-b border-slate-100 text-[11px] font-semibold text-slate-400 select-none">
+            <span className="flex-1 min-w-0">문서</span>
+            <span className="shrink-0 w-24 text-right hidden sm:block">공유 시작</span>
+            <span className="shrink-0 w-[150px] text-right">링크 / 관리</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {shares.map((s) => (
+              <div key={s.slug} className="px-4 py-3 flex items-center gap-3 hover:bg-slate-50 transition">
+                <div className="flex-1 min-w-0">
+                  <a href={s.url} target="_blank" rel="noreferrer"
+                     className="text-sm font-semibold text-slate-800 hover:text-indigo-600 truncate block">
+                    {s.title}
+                  </a>
+                  <p className="text-[11px] text-slate-400 truncate">{s.repo} · /share/{s.slug}</p>
+                </div>
+                <span className="shrink-0 w-24 text-right text-xs text-slate-400 hidden sm:block">{timeAgo(s.sharedAt)}</span>
+                <div className="shrink-0 w-[150px] flex items-center justify-end gap-1.5">
+                  <button onClick={() => copy(s.url)}
+                    className="text-[11px] font-medium rounded-lg px-2 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">
+                    {copied === s.url ? '복사됨 ✓' : '복사'}
+                  </button>
+                  <button onClick={() => turnOff(s)} disabled={busy === s.slug}
+                    className="text-[11px] font-medium rounded-lg px-2 py-1 bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50">
+                    {busy === s.slug ? '…' : '공유 끄기'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
