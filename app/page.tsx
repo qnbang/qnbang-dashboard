@@ -28,8 +28,8 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
   { key: 'projects', label: '프로젝트', ready: true },
-  { key: 'shares', label: '공유된 문서', ready: true },
   { key: 'hubs', label: '협업 허브', ready: true },
+  { key: 'shares', label: '공유된 문서', ready: true },
   { key: 'finance', label: '정산', ready: true },
   { key: 'tools', label: '업무툴', ready: true },
 ];
