@@ -25,7 +25,9 @@ export interface OfficeData {
   rooms: OfficeRoom[];
   가동률: Record<string, number>;
   과업수: number;
-  source: 'sheet' | 'seed';   // 데이터 출처(디버그·배지용)
+  // 데이터 출처 — 정직한 신뢰(P1): sheet=실데이터 / seed=로컬 미리보기(시트 미설정) / unavailable=설정됐으나 못읽음(빈화면)
+  source: 'sheet' | 'seed' | 'unavailable';
+  syncedAt: string;   // 이 화면을 만든(=시트를 읽은) 시각(KST). "지금 보는 게 언제 것"인지.
 }
 
 const ROOMS = [
@@ -95,7 +97,7 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
         project: get(ci.project),
         task: get(ci.task),
         owner: get(ci.owner),
-        ball: POS2BALL[get(ci.pos)] || 'mywork',
+        ball: POS2BALL[get(ci.pos)] || 'unset',   // 빈 공위치는 'mywork' 가장(假裝) 금지 → '미정'으로 드러냄(P1)
         due: get(ci.due),
         money: get(ci.money) || '매출',
         customer: get(ci.customer),
@@ -109,9 +111,20 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
 }
 
 export async function buildOffice(): Promise<OfficeData> {
-  const fromSheet = await fetchTasksFromSheet();
-  const source: 'sheet' | 'seed' = fromSheet ? 'sheet' : 'seed';
-  const src: Seed[] = fromSheet ?? (seed as Seed[]);
+  // 정직한 신뢰(P1): 시트 미설정=seed 미리보기 / 설정됐는데 못읽음=unavailable(빈화면, 박제 안 보여줌) / 정상=sheet
+  let source: 'sheet' | 'seed' | 'unavailable';
+  let src: Seed[];
+  if (!SHEET_URL || !SHEET_KEY) {
+    source = 'seed';
+    src = seed as Seed[];
+  } else {
+    const fromSheet = await fetchTasksFromSheet();
+    if (fromSheet) { source = 'sheet'; src = fromSheet; }
+    else { source = 'unavailable'; src = []; }   // 시트 연결 끊김 → 빈 화면으로 정직하게(seed 박제 금지)
+  }
+  const syncedAt = new Date().toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short',
+  });
 
   const 가동률: Record<string, number> = {};
   const tasks: OfficeTask[] = src.map((s) => {
@@ -131,5 +144,5 @@ export async function buildOffice(): Promise<OfficeData> {
     tasks: tasks.filter((t) => roomOf(t) === r.key),
   }));
 
-  return { rooms, 가동률, 과업수: tasks.length, source };
+  return { rooms, 가동률, 과업수: tasks.length, source, syncedAt };
 }

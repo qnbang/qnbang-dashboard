@@ -10,14 +10,14 @@ type Task = {
   urgent: boolean; todos: string[];
 };
 type Room = { key: string; name: string; hint: string; tasks: Task[] };
-type Office = { rooms: Room[]; 가동률: Record<string, number>; 과업수: number };
+type Office = { rooms: Room[]; 가동률: Record<string, number>; 과업수: number; source?: string; syncedAt?: string };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number };
 
 const BALL: Record<string, string> = {
-  start: '🌱', mywork: '🛠️', myreply: '📤', client: '📥', hold: '⏸️', done: '✅', urgent: '‼️',
+  start: '🌱', mywork: '🛠️', myreply: '📤', client: '📥', hold: '⏸️', done: '✅', urgent: '‼️', unset: '⬜',
 };
 const BALL_TXT: Record<string, string> = {
-  start: '시작 전', mywork: '내 작업', myreply: '내 회신', client: '고객 대기', hold: '보류', done: '완수',
+  start: '시작 전', mywork: '내 작업', myreply: '내 회신', client: '고객 대기', hold: '보류', done: '완수', unset: '공위치 미정',
 };
 const MONEY_CLS: Record<string, string> = {
   매출: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -81,6 +81,19 @@ export default function OfficeView() {
         <Scorecard label="가동률 (담당 과업)" value={가동텍스트} sub={`진행 중 과업 ${office.과업수}개`} />
       </section>
 
+      {/* 정직한 신뢰(P1): 지금 보는 게 언제·어디 데이터인지 명시 */}
+      <div className="text-[11px]">
+        {office.source === 'sheet' && (
+          <span className="text-slate-400">✓ 시트 동기화 · {office.syncedAt} 기준</span>
+        )}
+        {office.source === 'seed' && (
+          <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">⚠️ 미리보기 시드(실데이터 아님) — 시트 미설정 상태</span>
+        )}
+        {office.source === 'unavailable' && (
+          <span className="px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 font-medium">⛔ 사무실 데이터를 불러오지 못했어요 — 시트 연결을 확인하세요. 옛 데이터를 보여주지 않으려고 비워둡니다.</span>
+        )}
+      </div>
+
       <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
         <span className="font-medium text-slate-600">지금 공(다음 차례)이 누구에게 — 과업 단위</span>
         <span className="text-[11px] px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">📤 내 회신</span>
@@ -114,7 +127,7 @@ export default function OfficeView() {
                     {next && <div className="text-[11px] text-slate-500 mt-0.5 truncate">▸ {next}</div>}
                     <div className="flex items-center gap-1 mt-1.5 flex-wrap">
                       <span className={`text-[11px] px-1.5 py-0.5 rounded border ${MONEY_CLS[t.money] || MONEY_CLS.운영}`}>{t.money}</span>
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{BALL[t.ball]} {BALL_TXT[t.ball]}</span>
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded ${t.ball === 'unset' ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-slate-100 text-slate-500'}`}>{BALL[t.ball]} {BALL_TXT[t.ball]}</span>
                       {dt && (
                         <span className={`text-[11px] px-1.5 py-0.5 rounded ${t.dday !== null && t.dday <= 3 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{dt}</span>
                       )}
