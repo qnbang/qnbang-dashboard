@@ -4,16 +4,20 @@ import { useEffect, useState } from 'react';
 
 const won = (n: number) => `${(n || 0).toLocaleString('ko-KR')}원`;
 
-type Card = {
-  project: string; owner: string; money: string; ball: string;
-  progressStatus: string; dday: number | null; urgent: boolean;
+type Task = {
+  id: string; project: string; task: string; owner: string;
+  money: string; ball: string; due: string; dday: number | null;
+  urgent: boolean; todos: string[];
 };
-type Room = { key: string; name: string; hint: string; cards: Card[] };
-type Office = { rooms: Room[]; 가동률: Record<string, number>; 프로젝트수: number };
+type Room = { key: string; name: string; hint: string; tasks: Task[] };
+type Office = { rooms: Room[]; 가동률: Record<string, number>; 과업수: number };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number };
 
 const BALL: Record<string, string> = {
-  start: '🌱', mywork: '🛠️', myreply: '📤', client: '📥', done: '✅', hold: '⏸️', urgent: '‼️',
+  start: '🌱', mywork: '🛠️', myreply: '📤', client: '📥', hold: '⏸️', done: '✅', urgent: '‼️',
+};
+const BALL_TXT: Record<string, string> = {
+  start: '시작 전', mywork: '내 작업', myreply: '내 회신', client: '고객 대기', hold: '보류', done: '완수',
 };
 const MONEY_CLS: Record<string, string> = {
   매출: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -70,50 +74,49 @@ export default function OfficeView() {
 
   return (
     <div className="space-y-5">
-      {/* 스코어카드 */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Scorecard label="순매출 누계" value={won(money?.순매출누계 ?? 0)} sub={`계약 ${money?.계약건수 ?? 0}건`} tone="text-emerald-600" />
         <Scorecard label="미수금 ●" value={won(money?.미수금합 ?? 0)} sub="계약금액 − 입금액" tone="text-rose-600" />
         <Scorecard label="월 고정비" value={won(money?.고정비월합 ?? 0)} sub="매달 나가는 돈" tone="text-slate-700" />
-        <Scorecard label="가동률 (담당 프로젝트)" value={가동텍스트} sub={`살아있는 프로젝트 ${가동.reduce((s, [, v]) => s + v, 0)}개`} />
+        <Scorecard label="가동률 (담당 과업)" value={가동텍스트} sub={`진행 중 과업 ${office.과업수}개`} />
       </section>
 
-      {/* 안내 */}
       <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
-        <span className="font-medium text-slate-600">지금 공(다음 차례)이 누구에게 —</span>
-        <span className="text-[11px] px-2 py-0.5 rounded bg-rose-50 text-rose-600 border border-rose-200">‼️ 급함</span>
+        <span className="font-medium text-slate-600">지금 공(다음 차례)이 누구에게 — 과업 단위</span>
+        <span className="text-[11px] px-2 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200">📤 내 회신</span>
         <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">🛠️ 내 작업</span>
         <span className="text-[11px] px-2 py-0.5 rounded bg-sky-50 text-sky-600 border border-sky-200">📥 고객 대기</span>
         <span className="text-[11px] px-2 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-200">🌱 시작 전</span>
-        <span className="text-[11px] text-slate-400">· 프로젝트 단위 (과업 단위는 다음 단계)</span>
       </div>
 
-      {/* 6방 */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {office.rooms.map((room) => (
           <div key={room.key} className={`rounded-xl border p-3 min-h-[120px] ${ROOM_CLS[room.key]}`}>
             <div className="flex items-baseline justify-between mb-2">
               <div className="font-bold text-sm">{room.name}</div>
-              <div className="text-[11px] text-slate-400">{room.hint} · {room.cards.length}</div>
+              <div className="text-[11px] text-slate-400">{room.hint} · {room.tasks.length}</div>
             </div>
             <div className="space-y-2">
-              {room.cards.length === 0 && <div className="text-xs text-slate-300 py-3 text-center">비어 있음</div>}
-              {room.cards.map((c, i) => {
-                const dt = ddayText(c.dday);
+              {room.tasks.length === 0 && <div className="text-xs text-slate-300 py-3 text-center">비어 있음</div>}
+              {room.tasks.map((t) => {
+                const dt = ddayText(t.dday);
+                const next = t.todos?.[0];
                 return (
-                  <div key={i} className="bg-white rounded-lg border border-slate-200 px-3 py-2.5">
+                  <div key={t.id} className="bg-white rounded-lg border border-slate-200 px-3 py-2.5">
                     <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                      <span>{c.urgent ? '‼️' : BALL[c.ball] || ''}</span>
-                      <span className="truncate">{c.progressStatus}</span>
-                    </div>
-                    <div className="text-[13px] font-bold text-slate-800 leading-snug mt-0.5">{c.project}</div>
-                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded border ${MONEY_CLS[c.money] || MONEY_CLS.운영}`}>{c.money}</span>
-                      {dt && (
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded ${c.dday !== null && c.dday <= 3 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{dt}</span>
+                      <span>{t.urgent ? '‼️' : BALL[t.ball] || ''}</span>
+                      <span className="truncate">{t.project}</span>
+                      {t.owner && t.owner !== '신종호' && (
+                        <span className="ml-auto text-pink-500">{t.owner}</span>
                       )}
-                      {c.owner && c.owner !== '신종호' && (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-pink-100 text-pink-600">{c.owner}</span>
+                    </div>
+                    <div className="text-[13px] font-bold text-slate-800 leading-snug mt-0.5">{t.task}</div>
+                    {next && <div className="text-[11px] text-slate-500 mt-0.5 truncate">▸ {next}</div>}
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded border ${MONEY_CLS[t.money] || MONEY_CLS.운영}`}>{t.money}</span>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{BALL[t.ball]} {BALL_TXT[t.ball]}</span>
+                      {dt && (
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded ${t.dday !== null && t.dday <= 3 ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>{dt}</span>
                       )}
                     </div>
                   </div>

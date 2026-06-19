@@ -1,0 +1,20 @@
+[
+  { "id": "t1", "project": "소리쉼", "task": "명함·원고 마무리", "owner": "신종호", "ball": "mywork", "due": "2026-07-04", "money": "매출", "customer": "소리쉼", "todos": ["명함 디자인 수정", "원고 기획"] },
+  { "id": "t2", "project": "소리쉼", "task": "잔금 청구 (110만)", "owner": "신종호", "ball": "myreply", "due": "", "money": "매출", "customer": "소리쉼", "todos": ["세금계산서 발행·청구"] },
+  { "id": "t3", "project": "M650 탄광문화축제", "task": "제안서 디벨롭", "owner": "신종호", "ball": "mywork", "due": "2026-06-30", "money": "매출", "customer": "씨투아", "todos": ["석탄 스토리라인 정렬", "장표 코멘트 반영"] },
+  { "id": "t4", "project": "베스트구조", "task": "외주 자동화 검수", "owner": "신종호", "ball": "mywork", "due": "", "money": "매출", "customer": "베스트구조", "todos": ["개발자 자료요청서 전달", "EXE 결과 해부"] },
+  { "id": "t5", "project": "모호소 건축사", "task": "시안 피드백 받기", "owner": "신종호", "ball": "client", "due": "", "money": "매출", "customer": "모호소", "todos": [] },
+  { "id": "t6", "project": "제주 보름 혼술바", "task": "브랜딩 진행", "owner": "신종호", "ball": "mywork", "due": "", "money": "매출", "customer": "제주보름", "todos": [] },
+  { "id": "t7", "project": "망원 야간보물찾기", "task": "행사 기획", "owner": "신종호", "ball": "mywork", "due": "", "money": "매출", "customer": "망원상점가", "todos": [] },
+  { "id": "t8", "project": "괜찮아 상담소", "task": "블로그 대행", "owner": "신종호", "ball": "mywork", "due": "", "money": "매출", "customer": "괜찮아 회복심리상담소", "todos": [] },
+  { "id": "t9", "project": "금문도 브랜딩", "task": "브랜딩 디자인", "owner": "김지영", "ball": "mywork", "due": "", "money": "매출", "customer": "금문도", "todos": [] },
+  { "id": "t10", "project": "한솔홀딩스 ESG", "task": "보고서 디자인", "owner": "김지영", "ball": "mywork", "due": "2026-07-31", "money": "매출", "customer": "한솔홀딩스", "todos": [] },
+  { "id": "t11", "project": "한솔제지 ESG", "task": "보고서 디자인", "owner": "김지영", "ball": "mywork", "due": "2026-07-31", "money": "매출", "customer": "한솔제지", "todos": [] },
+  { "id": "t12", "project": "롯데웰푸드", "task": "경영보고서 디자인", "owner": "김지영", "ball": "mywork", "due": "2026-06-30", "money": "매출", "customer": "롯데웰푸드", "todos": [] },
+  { "id": "t13", "project": "큐앤뱅 서비스개발", "task": "대시보드 세팅", "owner": "신종호", "ball": "mywork", "due": "", "money": "투자", "customer": "", "todos": ["검색광고 API 키", "팝빌 정보"] },
+  { "id": "t14", "project": "큐앤뱅 AI마케팅팀", "task": "콘텐츠 루프 구축", "owner": "신종호", "ball": "mywork", "due": "", "money": "투자", "customer": "", "todos": [] },
+  { "id": "t15", "project": "매크로 투자 브리핑", "task": "자동발행 운영", "owner": "신종호", "ball": "mywork", "due": "", "money": "투자", "customer": "", "todos": [] },
+  { "id": "t16", "project": "촌캉스 빈집사업", "task": "사업 기획", "owner": "신종호", "ball": "start", "due": "", "money": "투자", "customer": "", "todos": [] },
+  { "id": "t17", "project": "솔로비티", "task": "제품 기획 (종사싣 통합)", "owner": "신종호", "ball": "start", "due": "", "money": "투자", "customer": "", "todos": [] },
+  { "id": "t18", "project": "밝은재가복지센터", "task": "블로그 마케팅", "owner": "신종호", "ball": "hold", "due": "", "money": "매출", "customer": "밝은재가", "todos": [] }
+]

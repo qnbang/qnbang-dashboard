@@ -928,6 +928,7 @@ function ProjectsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [members, setMembers] = useState<OrgMember[]>([]);
+  const [officeTasks, setOfficeTasks] = useState<string[]>([]); // 과업들의 프로젝트명 (프로젝트↔과업 연결용)
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterManager, setFilterManager] = useState<string>('all');
@@ -1012,7 +1013,27 @@ function ProjectsView() {
         if (j.ok) setMembers(j.members || []);
       })
       .catch(() => {});
+
+    // 사무실(과업) 데이터 → 프로젝트별 과업 수 연결
+    fetch('/api/office')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.ok) {
+          const names: string[] = [];
+          for (const room of j.office.rooms) for (const t of room.tasks) names.push(t.project);
+          setOfficeTasks(names);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  // 프로젝트명 ↔ 과업 매칭 (공백제거 포함관계)
+  const squashName = (s: string) => (s || '').replace(/\s+/g, '');
+  const taskCount = (title: string) => {
+    const t = squashName(title);
+    if (!t) return 0;
+    return officeTasks.filter((p) => { const q = squashName(p); return q && (q.includes(t) || t.includes(q)); }).length;
+  };
 
   const openProject = async (p: ProjectRepo) => {
     setSelected(p);
@@ -1401,7 +1422,7 @@ function ProjectsView() {
                       selected?.repo === p.repo ? 'bg-indigo-50' : 'hover:bg-slate-50'
                     }`}>
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-orange-100 text-orange-700">대행</span>
-                    <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
+                    <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}{taskCount(p.title) > 0 && <span className="ml-1.5 text-[10px] font-medium rounded px-1 py-0.5 bg-indigo-50 text-indigo-600 align-middle">과업 {taskCount(p.title)}</span>}</span>
                     <span className="shrink-0 w-14 text-center hidden sm:block">
                       {managerList(p.manager).length ? <span className="flex flex-wrap gap-0.5 justify-center">{managerList(p.manager).map((m) => <span key={m} className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(m)}`}>{m}</span>)}</span> : <span className="text-slate-300 text-xs">–</span>}
                     </span>
@@ -1447,7 +1468,7 @@ function ProjectsView() {
                       selected?.repo === p.repo ? 'bg-indigo-50' : 'hover:bg-slate-50'
                     }`}>
                     <span className="text-[11px] font-medium rounded px-1.5 py-0.5 shrink-0 w-9 text-center bg-violet-100 text-violet-700">자체</span>
-                    <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}</span>
+                    <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{p.title}{taskCount(p.title) > 0 && <span className="ml-1.5 text-[10px] font-medium rounded px-1 py-0.5 bg-indigo-50 text-indigo-600 align-middle">과업 {taskCount(p.title)}</span>}</span>
                     <span className="shrink-0 w-14 text-center hidden sm:block">
                       {managerList(p.manager).length ? <span className="flex flex-wrap gap-0.5 justify-center">{managerList(p.manager).map((m) => <span key={m} className={`text-[11px] font-medium rounded-full px-1.5 py-0.5 ${managerColor(m)}`}>{m}</span>)}</span> : <span className="text-slate-300 text-xs">–</span>}
                     </span>

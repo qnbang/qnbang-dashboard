@@ -1,90 +1,73 @@
-// 사무실뷰 — 기존 프로젝트 repo(lib/github.ts)를 "공이 누구에게" 6방에 배치한다.
-// 1차는 프로젝트 단위(진행상태→공위치 추론). 과업 단위 세분화는 다음 단계.
-// 공위치: start🌱 시작전 / mywork🛠️ 내작업 / client📥 고객대기 / done✅ 완수 / urgent‼️ 급함
+// 사무실뷰 — 과업 단위. "공이 누구에게" 6방에 과업을 배치한다.
+// 과업 데이터는 lib/seed-tasks.json(미리보기 시드). 추후 구글시트 "과업" 탭으로 이전(편집·라크쓰기 가능).
+// 공위치: start🌱 시작전 / mywork🛠️ 내작업 / myreply📤 내회신 / client📥 고객대기 / hold⏸️ 보류 / done✅ 완수
 
-import { listProjectRepos } from '@/lib/github';
+import seed from '@/lib/seed-tasks.json';
 
 const OWNER_ME = '신종호';
-const MONEY: Record<string, string> = { 대행: '매출', 자체: '투자' };
 
-export interface OfficeCard {
-  project: string; owner: string; money: string; ball: string;
-  progressStatus: string; dday: number | null; urgent: boolean;
+export interface OfficeTask {
+  id: string; project: string; task: string; owner: string;
+  money: string; ball: string; due: string; dday: number | null;
+  urgent: boolean; todos: string[];
 }
-export interface OfficeRoom { key: string; name: string; hint: string; cards: OfficeCard[]; }
+export interface OfficeRoom { key: string; name: string; hint: string; tasks: OfficeTask[]; }
 export interface OfficeData {
   rooms: OfficeRoom[];
   가동률: Record<string, number>;
-  프로젝트수: number;
+  과업수: number;
 }
 
-const ROOMS: { key: string; name: string; hint: string }[] = [
-  { key: 'boss', name: '🏛️ 사장실', hint: '급한·내 결정' },
+const ROOMS = [
+  { key: 'boss', name: '🏛️ 사장실', hint: '내 회신·급함' },
   { key: 'work', name: '🖥️ 작업 구역', hint: '내 작업 차례' },
   { key: 'lobby', name: '🚪 로비', hint: '고객 답 대기' },
   { key: 'team', name: '🧑‍🤝‍🧑 팀원 방', hint: '팀원 담당' },
   { key: 'idea', name: '💡 아이디어 보드', hint: '착수 전' },
-  { key: 'store', name: '📚 자료실', hint: '중단·완수' },
+  { key: 'store', name: '📚 자료실', hint: '보류·완수' },
 ];
 
-function dday(endDate?: string): number | null {
-  if (!endDate) return null;
-  const m = endDate.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+function dday(due?: string): number | null {
+  if (!due) return null;
+  const m = due.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
   if (!m) return null;
-  const due = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((due.getTime() - today.getTime()) / 86400000);
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - t.getTime()) / 86400000);
 }
 
-// 진행상태 → 공위치
-function ball(status: string, urgent: boolean): string {
-  if (urgent) return 'urgent';
-  if (status === '시작 전' || status === '시작전') return 'start';
-  if (status === '피드백 대기') return 'client';
-  if (status === '완료' || status === '완수') return 'done';
-  if (status === '중단' || status === '보류') return 'hold';
-  return 'mywork'; // 진행 중 등
+function roomOf(t: OfficeTask): string {
+  if (t.owner && t.owner !== OWNER_ME) return 'team';
+  if (t.ball === 'hold' || t.ball === 'done') return 'store';
+  if (t.ball === 'start') return 'idea';
+  if (t.urgent || t.ball === 'myreply') return 'boss';
+  if (t.ball === 'client') return 'lobby';
+  return 'work'; // mywork
 }
 
-function roomOf(c: OfficeCard, owner: string): string {
-  if (owner && owner !== OWNER_ME) return 'team';
-  if (c.ball === 'hold' || c.ball === 'done') return 'store';
-  if (c.ball === 'start') return 'idea';
-  if (c.urgent) return 'boss';
-  if (c.ball === 'client') return 'lobby';
-  return 'work';
-}
+type Seed = {
+  id: string; project: string; task: string; owner: string;
+  ball: string; due: string; money: string; customer: string; todos: string[];
+};
 
 export async function buildOffice(): Promise<OfficeData> {
-  const projects = await listProjectRepos();
   const 가동률: Record<string, number> = {};
-  const cards: { card: OfficeCard; room: string }[] = [];
-
-  for (const p of projects) {
-    const status = p.progressStatus || '진행 중';
-    const owner = p.manager || OWNER_ME;
-    const dd = dday(p.endDate);
-    // 살아있는 일만 가동률 카운트(중단·완료 제외)
-    const alive = status !== '완료' && status !== '완수' && status !== '중단' && status !== '보류';
-    const urgent = alive && dd !== null && dd <= 7 && dd >= 0;
-    const card: OfficeCard = {
-      project: p.title,
-      owner,
-      money: MONEY[p.category || ''] || '운영',
-      ball: ball(status, urgent),
-      progressStatus: status,
-      dday: dd,
-      urgent,
+  const tasks: OfficeTask[] = (seed as Seed[]).map((s) => {
+    const dd = dday(s.due);
+    const alive = s.ball !== 'hold' && s.ball !== 'done';
+    const urgent = alive && dd !== null && dd >= 0 && dd <= 7;
+    if (alive) 가동률[s.owner] = (가동률[s.owner] || 0) + 1;
+    return {
+      id: s.id, project: s.project, task: s.task, owner: s.owner,
+      money: s.money, ball: s.ball, due: s.due, dday: dd, urgent,
+      todos: s.todos || [],
     };
-    if (alive) 가동률[owner] = (가동률[owner] || 0) + 1;
-    cards.push({ card, room: roomOf(card, owner) });
-  }
+  });
 
   const rooms = ROOMS.map((r) => ({
     ...r,
-    cards: cards.filter((c) => c.room === r.key).map((c) => c.card),
+    tasks: tasks.filter((t) => roomOf(t) === r.key),
   }));
 
-  return { rooms, 가동률, 프로젝트수: projects.length };
+  return { rooms, 가동률, 과업수: tasks.length };
 }
