@@ -19,6 +19,12 @@ export interface OfficeTask {
   id: string; project: string; task: string; owner: string;
   money: string; ball: string; due: string; dday: number | null;
   urgent: boolean; todos: string[];
+  status: string;          // 현재상태(지금 무슨 상황) — 시트 칸
+  nextStep: string;        // 다음할일(다음 한 수) — 시트 칸, 없으면 todos[0]
+  reason: string;          // 판정근거(공위치 왜) — P6가 채움
+  updatedAt: string;       // 갱신일(원본)
+  staleDays: number | null; // 마지막 갱신 후 며칠(노화)
+  stale: boolean;          // 공위치별 임계 넘겨 "썩는 공"인가
 }
 export interface OfficeRoom { key: string; name: string; hint: string; tasks: OfficeTask[]; }
 export interface OfficeData {
@@ -54,6 +60,17 @@ function dday(due?: string): number | null {
   const [ty, tm, td] = kstYMD(new Date());
   return Math.round((Date.UTC(y, m - 1, dd) - Date.UTC(ty, tm - 1, td)) / 86400000);
 }
+// 갱신일로부터 며칠 지났나(노화). 미래/오늘=0, 과거=양수. (P2)
+function daysSince(d?: string): number | null {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  const [y, m, dd] = kstYMD(dt);
+  const [ty, tm, td] = kstYMD(new Date());
+  return Math.max(0, Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, dd)) / 86400000));
+}
+// 공위치별 "이만큼 안 움직이면 썩는 공" 임계(일). 로비/내회신=빨리, 작업=느긋, 미정=즉시. hold/done은 노화 안 봄.
+const STALE_DAYS: Record<string, number> = { client: 7, myreply: 7, mywork: 14, unset: 3, start: 30 };
 
 function roomOf(t: OfficeTask): string {
   if (t.owner && t.owner !== OWNER_ME) return 'team';
@@ -67,6 +84,7 @@ function roomOf(t: OfficeTask): string {
 type Seed = {
   id: string; project: string; task: string; owner: string;
   ball: string; due: string; money: string; customer: string; todos: string[];
+  status?: string; nextStep?: string; reason?: string; updatedAt?: string;
 };
 
 // 과업 시트 탭 → Seed[] 로 정규화. 못 읽으면 null(→ 폴백).
@@ -84,6 +102,7 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
       id: col('id'), project: col('프로젝트'), task: col('과업명'), owner: col('담당자'),
       pos: col('공위치'), due: col('기한'), money: col('돈종류'),
       customer: col('고객'), todos: col('할일'),
+      status: col('현재상태'), nextStep: col('다음할일'), reason: col('판정근거'), updatedAt: col('갱신일'),
     };
 
     const out: Seed[] = [];
@@ -102,6 +121,10 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
         money: get(ci.money) || '매출',
         customer: get(ci.customer),
         todos: todosRaw ? todosRaw.split(/\s*;\s*/).filter(Boolean) : [],
+        status: get(ci.status),
+        nextStep: get(ci.nextStep),
+        reason: get(ci.reason),
+        updatedAt: get(ci.updatedAt),
       });
     }
     return out.length ? out : null;
@@ -131,12 +154,26 @@ export async function buildOffice(): Promise<OfficeData> {
     const dd = dday(s.due);
     const alive = s.ball !== 'hold' && s.ball !== 'done';
     const urgent = alive && dd !== null && dd >= 0 && dd <= 7;
+    const staleDays = daysSince(s.updatedAt);
+    const stale = alive && staleDays !== null && staleDays >= (STALE_DAYS[s.ball] ?? Infinity);
     if (alive) 가동률[s.owner] = (가동률[s.owner] || 0) + 1;
     return {
       id: s.id, project: s.project, task: s.task, owner: s.owner,
       money: s.money, ball: s.ball, due: s.due, dday: dd, urgent,
       todos: s.todos || [],
+      status: s.status || '',
+      nextStep: s.nextStep || (s.todos && s.todos[0]) || '',
+      reason: s.reason || '',
+      updatedAt: s.updatedAt || '',
+      staleDays, stale,
     };
+  });
+
+  // 방 안 정렬: 급함 > 썩는 공(노화) > 기한 가까움. (기한 없으면 뒤로) — "뭐 먼저?"에 답.
+  tasks.sort((a, b) => {
+    if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
+    if (a.stale !== b.stale) return a.stale ? -1 : 1;
+    return (a.dday ?? 9999) - (b.dday ?? 9999);
   });
 
   const rooms = ROOMS.map((r) => ({
