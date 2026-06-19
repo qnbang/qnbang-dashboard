@@ -156,7 +156,8 @@ export async function buildOffice(): Promise<OfficeData> {
     const urgent = alive && dd !== null && dd >= 0 && dd <= 7;
     const staleDays = daysSince(s.updatedAt);
     const stale = alive && staleDays !== null && staleDays >= (STALE_DAYS[s.ball] ?? Infinity);
-    if (alive) 가동률[s.owner] = (가동률[s.owner] || 0) + 1;
+    // 미정(unset)은 "진행 중 과업"이 아니라 분류 대기 → 가동률에서 제외(감시 견제1)
+    if (alive && s.ball !== 'unset') 가동률[s.owner] = (가동률[s.owner] || 0) + 1;
     return {
       id: s.id, project: s.project, task: s.task, owner: s.owner,
       money: s.money, ball: s.ball, due: s.due, dday: dd, urgent,
@@ -171,6 +172,8 @@ export async function buildOffice(): Promise<OfficeData> {
 
   // 방 안 정렬: 급함 > 썩는 공(노화) > 기한 가까움. (기한 없으면 뒤로) — "뭐 먼저?"에 답.
   tasks.sort((a, b) => {
+    const au = a.ball === 'unset', bu = b.ball === 'unset';
+    if (au !== bu) return au ? -1 : 1;   // 미정=분류 필요 → 방 맨 위로 부상(감시 견제1)
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
     if (a.stale !== b.stale) return a.stale ? -1 : 1;
     return (a.dday ?? 9999) - (b.dday ?? 9999);
