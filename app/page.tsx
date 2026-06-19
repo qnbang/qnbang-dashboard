@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MonthlyBar, CategoryPie } from './components/charts';
+import OfficeView from './components/OfficeView';
 
 type Expense = {
   month: number;
@@ -27,6 +28,7 @@ type DashboardData = {
 const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
+  { key: 'office', label: '🏢 사무실', ready: true },
   { key: 'projects', label: '프로젝트', ready: true },
   { key: 'hubs', label: '협업 허브', ready: true },
   { key: 'shares', label: '공유된 문서', ready: true },
@@ -72,7 +74,7 @@ export default function Home() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState('projects');
+  const [tab, setTab] = useState('office');
 
   useEffect(() => {
     fetch('/api/data')
@@ -127,6 +129,7 @@ export default function Home() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
+        {tab === 'office' && <OfficeView />}
         {tab === 'projects' && <ProjectsView />}
         {tab === 'finance' && <FinanceView data={data} loading={loading} error={error} />}
         {tab === 'shares' && <SharesView />}

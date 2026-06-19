@@ -17,6 +17,7 @@ export interface ProjectRepo {
   category?: string;   // 대행 | 자체
   manager?: string;    // 담당자
   startDate?: string;  // 착수일 (정렬용)
+  endDate?: string;    // 마감일 (D-day 계산용)
   pushedAt: string;    // 마지막 작업 시각
   htmlUrl: string;     // GitHub 페이지
   driveFolderId?: string;   // 연결된 드라이브 폴더 (있으면)
@@ -167,6 +168,7 @@ export async function listProjectRepos(): Promise<ProjectRepo[]> {
         category: meta.category,
         manager: meta.manager,
         startDate: meta.startDate,
+        endDate: meta.endDate,
         pushedAt: updatedAt,
         htmlUrl: r.html_url,
         driveFolderId: meta.driveFolderId,
