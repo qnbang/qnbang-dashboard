@@ -56,7 +56,7 @@ export default function OfficeView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const load = () => {
     fetch('/api/office')
       .then((r) => r.json())
       .then((j) => {
@@ -65,7 +65,27 @@ export default function OfficeView() {
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(() => { load(); }, []);
+
+  // 빠른추가(P3a): 한 줄 입력 → /api/office/add → 시트 기록 → 다시 로드
+  const [addLine, setAddLine] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addMsg, setAddMsg] = useState('');
+  const addTask = async () => {
+    if (!addLine.trim() || adding) return;
+    setAdding(true); setAddMsg('');
+    try {
+      const r = await fetch('/api/office/add', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ line: addLine }),
+      });
+      const j = await r.json();
+      if (j.ok) { setAddLine(''); setAddMsg(`✓ 추가됨: ${j.행.프로젝트} · ${j.행.과업명 || ''} (${j.행.공위치}${j.행.기한 ? ', ' + j.행.기한 : ''})`); load(); }
+      else setAddMsg('⚠️ ' + (j.error || '추가 실패'));
+    } catch (e) { setAddMsg('⚠️ ' + String(e)); }
+    finally { setAdding(false); }
+  };
 
   if (loading) return <p className="text-slate-400 text-center py-20">사무실 불러오는 중…</p>;
   if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
@@ -95,6 +115,23 @@ export default function OfficeView() {
           <span className="px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 font-medium">⛔ 사무실 데이터를 불러오지 못했어요 — 시트 연결을 확인하세요. 옛 데이터를 보여주지 않으려고 비워둡니다.</span>
         )}
       </div>
+
+      {/* 빠른추가(P3a): 라크 안 거치고 여기서 한 줄로 과업 투입 */}
+      <div className="flex items-center gap-2">
+        <input
+          value={addLine}
+          onChange={(e) => setAddLine(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') addTask(); }}
+          placeholder="과업 한 줄 추가 — 예: 소리쉼 시안확정 고객대기 6/25"
+          className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:outline-none"
+        />
+        <button
+          onClick={addTask}
+          disabled={adding || !addLine.trim()}
+          className="text-sm px-3 py-2 rounded-lg bg-emerald-500 text-white font-medium disabled:opacity-40"
+        >{adding ? '추가 중…' : '+ 추가'}</button>
+      </div>
+      {addMsg && <div className={`text-[11px] ${addMsg.startsWith('⚠️') ? 'text-rose-500' : 'text-emerald-600'}`}>{addMsg}</div>}
 
       <div className="flex items-center gap-2 flex-wrap text-sm text-slate-500">
         <span className="font-medium text-slate-600">지금 공(다음 차례)이 누구에게 — 과업 단위</span>
