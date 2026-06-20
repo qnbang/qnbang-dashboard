@@ -168,16 +168,98 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
         </>
       )}
 
-      {sub === 'revenue' && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-400">
-          <p className="text-lg">📈 매출</p>
-          <p className="text-sm mt-2">매출 입력·집계는 준비 중이에요.</p>
-          <p className="text-xs mt-4 text-slate-300">
-            계획: 프로젝트 계약금액과 연동 → 매출 자동 집계 →<br />
-            세금(부가세·소득세) 차감한 <b>순매출</b>까지 자동 계산
-          </p>
-        </div>
-      )}
+      {sub === 'revenue' && <RevenueView data={data} />}
+    </div>
+  );
+}
+
+function Scorecard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
+      <div className="text-xs text-slate-400 mb-1">{label}</div>
+      <div className={`text-2xl font-bold ${tone || 'text-slate-800'}`}>{value}</div>
+      {sub && <div className="text-[11px] text-slate-400 mt-1">{sub}</div>}
+    </div>
+  );
+}
+
+// 정산 매출 화면(P4) — money 데이터(계약목록·미수금·월별)로 스코어카드+손익+월별차트+미수금 계약테이블.
+// 미수금↔과업 연결: 각 미수 계약에 그 돈 받을 과업이 사무실에 있는지 매칭해 보여줌.
+type RevContract = {
+  계약일: string; 계약명: string; 클라이언트: string;
+  계약금액: number; 입금액: number; 미수금: number; 입금상태: string; 순매출: number;
+};
+type RevMoney = {
+  순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number;
+  월별: { 월: string; 순매출: number; 계약액: number; 실현: number }[];
+  계약목록: RevContract[];
+};
+function RevenueView({ data }: { data: DashboardData | null }) {
+  const [money, setMoney] = useState<RevMoney | null>(null);
+  const [tasks, setTasks] = useState<{ project: string; task: string; ball: string }[]>([]);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    fetch('/api/office').then((r) => r.json()).then((j) => {
+      if (j.ok) {
+        setMoney(j.money);
+        setTasks((j.office?.rooms || []).flatMap((r: { tasks: { project: string; task: string; ball: string }[] }) => r.tasks));
+      } else setErr(j.error || '불러오기 실패');
+    }).catch((e) => setErr(String(e)));
+  }, []);
+  if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
+  if (!money) return <p className="text-slate-400 text-center py-10">매출 불러오는 중…</p>;
+
+  const 미수 = money.계약목록.filter((c) => c.미수금 > 0).sort((a, b) => b.미수금 - a.미수금);
+  const 지출연 = data?.yearTotal ?? 0;
+  const 손익 = money.순매출누계 - 지출연;
+  const bars = money.월별.filter((m) => m.월).map((m) => ({ month: m.월.slice(2), total: m.순매출 }));
+  // 미수금↔과업 매칭은 클라이언트명 양방향 부분일치로만(계약명 단어 매칭은 '디자인/보고서' 같은
+  // 일반어로 오매칭되므로 제외). 클라이언트=프로젝트가 서로 포함하거나 과업명에 들어가면 그 과업.
+  const matchTask = (c: RevContract) => {
+    const cli = (c.클라이언트 || '').trim();
+    if (!cli) return undefined;
+    return tasks.find((t) => {
+      const proj = (t.project || '').trim();
+      return (proj && (proj.includes(cli) || cli.includes(proj))) || (t.task || '').includes(cli);
+    });
+  };
+
+  return (
+    <div className="space-y-5">
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Scorecard label="순매출 누계" value={won(money.순매출누계)} sub={`계약 ${money.계약건수}건`} tone="text-emerald-600" />
+        <Scorecard label="미수금 ●" value={won(money.미수금합)} sub={`${미수.length}건 미입금`} tone="text-rose-600" />
+        <Scorecard label="올해 지출" value={won(지출연)} sub="지출 탭 합계" tone="text-slate-700" />
+        <Scorecard label="손익 (순매출−지출)" value={won(손익)} sub={손익 >= 0 ? '흑자' : '적자'} tone={손익 >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
+      </section>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="text-sm font-medium text-slate-600 mb-2">월별 순매출(계약일 기준)</div>
+        <MonthlyBar data={bars} />
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="text-sm font-medium text-slate-600 mb-3">미수금 — 받을 돈 (큰 순) · 받을 과업 연결</div>
+        {미수.length === 0 ? (
+          <p className="text-sm text-slate-400 py-4 text-center">미수금 없음 — 다 입금됐어요 👍</p>
+        ) : (
+          <div className="space-y-1.5">
+            {미수.map((c, i) => {
+              const mt = matchTask(c);
+              return (
+                <div key={i} className="flex items-center gap-2 text-sm border-b border-slate-100 pb-1.5">
+                  <span className="font-medium text-slate-700 truncate flex-1">{c.클라이언트 || c.계약명}</span>
+                  <span className="text-rose-600 font-semibold tabular-nums">{won(c.미수금)}</span>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">{c.입금상태 || '입금대기'}</span>
+                  <span className="text-[11px] shrink-0 w-40 text-right truncate">
+                    {mt ? <span className="text-emerald-600">▸ {mt.task}</span> : <span className="text-amber-500">⚠️ 받을 과업 없음</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
