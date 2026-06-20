@@ -200,10 +200,14 @@ const STAGE_META = [
 const 금액텍스트 = (v: number | null) => (v === null ? '협의 전' : won(v));
 const 접촉텍스트 = (d: number | null) => (d === null ? '' : d === 0 ? '오늘' : `${d}일 전`);
 
-function LeadCard({ l }: { l: Lead }) {
+function LeadCard({ l, onWin, winning }: { l: Lead; onWin: (id: string, 대상: string) => void; winning: boolean }) {
   return (
     <div className={`bg-white rounded-lg px-3 py-2.5 border ${l.stale ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'}`}>
-      <div className="text-[13px] font-bold text-slate-800 leading-snug">{l.대상}</div>
+      <div className="flex items-center gap-1">
+        <div className="text-[13px] font-bold text-slate-800 leading-snug flex-1 truncate">{l.대상}</div>
+        <button onClick={() => onWin(l.id, l.대상)} disabled={winning} title="계약 완료 → 사무실 과업 + 매출 등록"
+          className="text-[11px] px-1.5 py-0.5 rounded bg-emerald-500 text-white shrink-0 disabled:opacity-40">계약✓</button>
+      </div>
       {l.다음액션 && <div className="text-[12px] text-slate-700 font-medium mt-0.5 truncate">▸ {l.다음액션}</div>}
       <div className="flex items-center gap-1 mt-1.5 flex-wrap">
         <span className={`text-[11px] px-1.5 py-0.5 rounded border ${l.예상금액 === null ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>{금액텍스트(l.예상금액)}</span>
@@ -225,6 +229,16 @@ function SalesView() {
     .then((j) => { if (j.ok) setSales(j.sales); else setErr(j.error || '불러오기 실패'); })
     .catch((e) => setErr(String(e)));
   useEffect(() => { load(); }, []);
+  const [winning, setWinning] = useState('');
+  const win = async (id: string, 대상: string) => {
+    if (winning || !confirm(`"${대상}" 계약 완료? → 사무실 과업 + 매출 원장에 등록되고 영업 보드에서 빠집니다.`)) return;
+    setWinning(id); setMsg('');
+    try {
+      const r = await fetch('/api/sales/win', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+      const j = await r.json();
+      if (j.ok) { setMsg('🎉 ' + j.msg); load(); } else setMsg('⚠️ ' + (j.error || '실패'));
+    } catch (e) { setMsg('⚠️ ' + String(e)); } finally { setWinning(''); }
+  };
   const add = async () => {
     if (!addLine.trim() || adding) return;
     setAdding(true); setMsg('');
@@ -280,7 +294,7 @@ function SalesView() {
               </div>
               <div className="space-y-2">
                 {items.length === 0 && <div className="text-xs text-slate-300 py-3 text-center">비어 있음</div>}
-                {items.map((l) => <LeadCard key={l.id} l={l} />)}
+                {items.map((l) => <LeadCard key={l.id} l={l} onWin={win} winning={winning === l.id} />)}
               </div>
             </div>
           );
