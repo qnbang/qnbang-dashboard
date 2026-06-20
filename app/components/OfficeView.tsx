@@ -87,6 +87,21 @@ export default function OfficeView() {
     finally { setAdding(false); }
   };
 
+  // 완료(P5): 과업을 완수 처리 → 아카이브 탭으로 이동 → 다시 로드
+  const [completing, setCompleting] = useState('');
+  const complete = async (id: string) => {
+    if (completing) return;
+    setCompleting(id);
+    try {
+      const r = await fetch('/api/office/complete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }),
+      });
+      const j = await r.json();
+      if (j.ok) load(); else setAddMsg('⚠️ 완료 실패: ' + (j.error || ''));
+    } catch (e) { setAddMsg('⚠️ ' + String(e)); }
+    finally { setCompleting(''); }
+  };
+
   if (loading) return <p className="text-slate-400 text-center py-20">사무실 불러오는 중…</p>;
   if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
   if (!office) return null;
@@ -159,8 +174,14 @@ export default function OfficeView() {
                       <span>{t.urgent ? '‼️' : BALL[t.ball] || ''}</span>
                       <span className="truncate">{t.project}</span>
                       {t.owner && t.owner !== '신종호' && (
-                        <span className="ml-auto text-pink-500">{t.owner}</span>
+                        <span className="text-pink-500">{t.owner}</span>
                       )}
+                      <button
+                        onClick={() => complete(t.id)}
+                        disabled={completing === t.id}
+                        title="완료 → 아카이브로 이동"
+                        className="ml-auto text-slate-300 hover:text-emerald-500 disabled:opacity-40"
+                      >{completing === t.id ? '…' : '✓'}</button>
                     </div>
                     <div className="text-[13px] font-bold text-slate-800 leading-snug mt-0.5">{t.task}</div>
                     {t.status && <div className="text-[11px] text-slate-500 mt-0.5 truncate">{t.status}</div>}
