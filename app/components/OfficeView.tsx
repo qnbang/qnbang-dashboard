@@ -12,7 +12,7 @@ type Task = {
   staleDays?: number | null; stale?: boolean;
 };
 type Room = { key: string; name: string; hint: string; tasks: Task[] };
-type Office = { rooms: Room[]; 가동률: Record<string, number>; 과업수: number; source?: string; syncedAt?: string };
+type Office = { rooms: Room[]; 가동률: Record<string, number>; 과업수: number; source?: string; syncedAt?: string; 언젠가?: Task[] };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number };
 
 const BALL: Record<string, string> = {
@@ -147,6 +147,15 @@ export default function OfficeView() {
     finally { setSaving(false); }
   };
 
+  // 언젠가(보류) 접힌 칸 + 되살리기
+  const [somedayOpen, setSomedayOpen] = useState(false);
+  const setPos = async (id: string, label: string) => {
+    try {
+      const r = await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, patch: { 공위치: label } }) });
+      const j = await r.json(); if (j.ok) load();
+    } catch (e) { setAddMsg('⚠️ ' + String(e)); }
+  };
+
   if (loading) return <p className="text-slate-400 text-center py-20">사무실 불러오는 중…</p>;
   if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
   if (!office) return null;
@@ -272,6 +281,29 @@ export default function OfficeView() {
           </div>
         ))}
       </section>
+
+      {/* 언젠가(보류) — 메인서 빼둔 아이디어. 접힘. 오래되면(30일+) 빨강으로 "할까/접을까" 떠오름 */}
+      {office.언젠가 && office.언젠가.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <button onClick={() => setSomedayOpen(!somedayOpen)} className="text-sm font-medium text-slate-500 flex items-center gap-2">
+            💡 언젠가 <span className="text-slate-400">{office.언젠가.length}개</span>
+            {office.언젠가.some((t) => (t.staleDays ?? 0) >= 30) && <span className="text-[11px] text-rose-500">· 오래된 것 있음</span>}
+            <span className="text-[11px] text-slate-400">{somedayOpen ? '접기 ▲' : '펼쳐보기 ▼'}</span>
+          </button>
+          {somedayOpen && (
+            <div className="space-y-1.5 mt-2">
+              {office.언젠가.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 text-sm bg-white rounded-lg border border-slate-200 px-3 py-2">
+                  <span className="font-medium text-slate-700 truncate">{t.project}</span>
+                  <span className="text-slate-400 text-xs truncate flex-1">{t.status || t.task}</span>
+                  {(t.staleDays ?? 0) >= 30 && <span className="text-[11px] text-rose-500 shrink-0">{t.staleDays}일째 — 할까/접을까?</span>}
+                  <button onClick={() => setPos(t.id, '내작업')} className="text-[11px] px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 shrink-0">▶ 되살리기</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

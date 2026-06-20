@@ -35,6 +35,7 @@ export interface OfficeData {
   // 데이터 출처 — 정직한 신뢰(P1): sheet=실데이터 / seed=로컬 미리보기(시트 미설정) / unavailable=설정됐으나 못읽음(빈화면)
   source: 'sheet' | 'seed' | 'unavailable';
   syncedAt: string;   // 이 화면을 만든(=시트를 읽은) 시각(KST). "지금 보는 게 언제 것"인지.
+  언젠가: OfficeTask[];   // 보류=언제 할지 모르는 아이디어. 메인서 빼고 따로(접힘). 오래되면 resurface.
 }
 
 const ROOMS = [
@@ -43,8 +44,8 @@ const ROOMS = [
   { key: 'lobby', name: '🚪 로비', hint: '고객 답 대기' },
   { key: 'team', name: '🧑‍🤝‍🧑 팀원 방', hint: '팀원 담당' },
   { key: 'idea', name: '💡 아이디어 보드', hint: '착수 전' },
-  { key: 'store', name: '📚 자료실', hint: '보류·완수' },
 ];
+// 보류(언젠가)·완수는 메인 6방에서 빼서 따로 — 보류=언젠가 칸(접힘), 완수=아카이브(complete가 이동).
 
 // 기한 D-day. 시트 export는 ISO UTC(예 2026-07-03T15:00:00Z=KST 7/4)라 정규식 자르기 금지.
 // new Date()로 파싱 후 양쪽을 KST 자정 기준으로 환산해 일수 차를 구한다.
@@ -75,7 +76,6 @@ const STALE_DAYS: Record<string, number> = { client: 7, myreply: 7, mywork: 14, 
 
 function roomOf(t: OfficeTask): string {
   if (t.owner && t.owner !== OWNER_ME) return 'team';
-  if (t.ball === 'hold' || t.ball === 'done') return 'store';
   if (t.ball === 'start') return 'idea';
   if (t.urgent || t.ball === 'myreply') return 'boss';
   if (t.ball === 'client') return 'lobby';
@@ -179,10 +179,14 @@ export async function buildOffice(): Promise<OfficeData> {
     return (a.dday ?? 9999) - (b.dday ?? 9999);
   });
 
+  // 보류(언젠가)·완수는 메인서 제외. 언젠가=따로 칸, 완수=아카이브로 이미 빠짐.
+  const 활성 = tasks.filter((t) => t.ball !== 'hold' && t.ball !== 'done');
   const rooms = ROOMS.map((r) => ({
     ...r,
-    tasks: tasks.filter((t) => roomOf(t) === r.key),
+    tasks: 활성.filter((t) => roomOf(t) === r.key),
   }));
+  const 언젠가 = tasks.filter((t) => t.ball === 'hold')
+    .sort((a, b) => (b.staleDays ?? 0) - (a.staleDays ?? 0)); // 오래된 것 먼저(resurface)
 
-  return { rooms, 가동률, 과업수: tasks.length, source, syncedAt };
+  return { rooms, 가동률, 과업수: 활성.length, source, syncedAt, 언젠가 };
 }
