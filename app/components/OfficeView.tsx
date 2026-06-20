@@ -87,6 +87,8 @@ export default function OfficeView() {
     finally { setAdding(false); }
   };
 
+  // 과업 클릭 상세(P7): 카드 펼쳐 할일 체크리스트·전체정보
+  const [openId, setOpenId] = useState('');
   // 완료(P5): 과업을 완수 처리 → 아카이브 탭으로 이동 → 다시 로드
   const [completing, setCompleting] = useState('');
   const complete = async (id: string) => {
@@ -169,7 +171,11 @@ export default function OfficeView() {
                 const dt = ddayText(t.dday);
                 const next = t.nextStep || t.todos?.[0];
                 return (
-                  <div key={t.id} className={`bg-white rounded-lg px-3 py-2.5 border ${t.stale ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'}`}>
+                  <div
+                    key={t.id}
+                    onClick={() => setOpenId(openId === t.id ? '' : t.id)}
+                    className={`bg-white rounded-lg px-3 py-2.5 border cursor-pointer ${t.stale ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'}`}
+                  >
                     <div className="flex items-center gap-1 text-[11px] text-slate-400">
                       <span>{t.urgent ? '‼️' : BALL[t.ball] || ''}</span>
                       <span className="truncate">{t.project}</span>
@@ -177,7 +183,7 @@ export default function OfficeView() {
                         <span className="text-pink-500">{t.owner}</span>
                       )}
                       <button
-                        onClick={() => complete(t.id)}
+                        onClick={(e) => { e.stopPropagation(); complete(t.id); }}
                         disabled={completing === t.id}
                         title="완료 → 아카이브로 이동"
                         className="ml-auto text-slate-300 hover:text-emerald-500 disabled:opacity-40"
@@ -197,6 +203,16 @@ export default function OfficeView() {
                       )}
                     </div>
                     {t.reason && <div className="text-[10px] text-slate-400 mt-1 truncate">↳ {t.reason}</div>}
+                    {openId === t.id && (
+                      <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                        {t.status && <div className="text-[11px] text-slate-500">현재: {t.status}</div>}
+                        {t.dday !== null && t.dday !== undefined && <div className="text-[11px] text-slate-500">기한: {ddayText(t.dday)}</div>}
+                        <div className="text-[11px] text-slate-400">할일 체크리스트</div>
+                        {t.todos && t.todos.length > 0 ? (
+                          t.todos.map((td, i) => <div key={i} className="text-[11px] text-slate-600">☐ {td}</div>)
+                        ) : <div className="text-[11px] text-slate-300">— 등록된 할일 없음</div>}
+                      </div>
+                    )}
                   </div>
                 );
               })}
