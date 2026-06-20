@@ -6,7 +6,6 @@
 import seed from '@/lib/seed-tasks.json';
 import { getSheets } from './sheetCache';
 
-const OWNER_ME = '신종호';
 const SHEET_URL = process.env.SHEET_URL;
 const SHEET_KEY = process.env.SHEET_KEY;
 
@@ -42,7 +41,6 @@ const ROOMS = [
   { key: 'boss', name: '🏛️ 사장실', hint: '내 회신·급함' },
   { key: 'work', name: '🖥️ 작업 구역', hint: '내 작업 차례' },
   { key: 'lobby', name: '🚪 로비', hint: '고객 답 대기' },
-  { key: 'team', name: '🧑‍🤝‍🧑 팀원 방', hint: '팀원 담당' },
   { key: 'idea', name: '💡 아이디어 보드', hint: '착수 전' },
 ];
 // 보류(언젠가)·완수는 메인 6방에서 빼서 따로 — 보류=언젠가 칸(접힘), 완수=아카이브(complete가 이동).
@@ -75,7 +73,7 @@ function daysSince(d?: string): number | null {
 const STALE_DAYS: Record<string, number> = { client: 7, myreply: 7, mywork: 14, unset: 3, start: 30 };
 
 function roomOf(t: OfficeTask): string {
-  if (t.owner && t.owner !== OWNER_ME) return 'team';
+  // 공위치 우선 배치(담당자는 카드 태그로만). 팀원 일도 공위치대로 — 김지영 고객대기면 로비에 '김지영' 태그.
   if (t.ball === 'start') return 'idea';
   if (t.urgent || t.ball === 'myreply') return 'boss';
   if (t.ball === 'client') return 'lobby';
