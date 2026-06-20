@@ -21,6 +21,11 @@ const BALL: Record<string, string> = {
 const BALL_TXT: Record<string, string> = {
   start: '시작 전', mywork: '내 작업', myreply: '내 회신', client: '고객 대기', hold: '보류', done: '완수', unset: '공위치 미정',
 };
+// 시트 공위치 라벨(편집 select용, 공백 없는 시트값과 일치). ball 코드 → 라벨.
+const POS_LABELS = ['시작전', '내작업', '내회신', '고객대기', '보류', '완수'];
+const BALL2LABEL: Record<string, string> = {
+  start: '시작전', mywork: '내작업', myreply: '내회신', client: '고객대기', hold: '보류', done: '완수', unset: '',
+};
 const MONEY_CLS: Record<string, string> = {
   매출: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   영업: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -104,6 +109,44 @@ export default function OfficeView() {
     finally { setCompleting(''); }
   };
 
+  // 수정/삭제(P9): 펼친 카드에서 공위치·현재상태·다음할일·기한 편집, 삭제
+  const [edit, setEdit] = useState<{ 공위치: string; 현재상태: string; 다음할일: string; 기한: string }>({ 공위치: '', 현재상태: '', 다음할일: '', 기한: '' });
+  const [saving, setSaving] = useState(false);
+  const openCard = (t: Task) => {
+    const willOpen = openId !== t.id;
+    setOpenId(willOpen ? t.id : '');
+    if (willOpen) {
+      const 기한 = t.due ? new Date(t.due).toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }) : '';
+      setEdit({ 공위치: BALL2LABEL[t.ball] || '', 현재상태: t.status || '', 다음할일: t.nextStep || '', 기한: isNaN(Date.parse(t.due)) ? '' : 기한 });
+    }
+  };
+  const save = async (id: string) => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const r = await fetch('/api/office/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, patch: edit }),
+      });
+      const j = await r.json();
+      if (j.ok) { setOpenId(''); load(); } else setAddMsg('⚠️ 저장 실패: ' + (j.error || ''));
+    } catch (e) { setAddMsg('⚠️ ' + String(e)); }
+    finally { setSaving(false); }
+  };
+  const remove = async (id: string, name: string) => {
+    if (saving || !confirm(`"${name}" 과업을 삭제할까요?`)) return;
+    setSaving(true);
+    try {
+      const r = await fetch('/api/office/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, delete: true }),
+      });
+      const j = await r.json();
+      if (j.ok) { setOpenId(''); load(); } else setAddMsg('⚠️ 삭제 실패: ' + (j.error || ''));
+    } catch (e) { setAddMsg('⚠️ ' + String(e)); }
+    finally { setSaving(false); }
+  };
+
   if (loading) return <p className="text-slate-400 text-center py-20">사무실 불러오는 중…</p>;
   if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
   if (!office) return null;
@@ -173,7 +216,7 @@ export default function OfficeView() {
                 return (
                   <div
                     key={t.id}
-                    onClick={() => setOpenId(openId === t.id ? '' : t.id)}
+                    onClick={() => openCard(t)}
                     className={`bg-white rounded-lg px-3 py-2.5 border cursor-pointer ${t.stale ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'}`}
                   >
                     <div className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -204,13 +247,22 @@ export default function OfficeView() {
                     </div>
                     {t.reason && <div className="text-[10px] text-slate-400 mt-1 truncate">↳ {t.reason}</div>}
                     {openId === t.id && (
-                      <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
-                        {t.status && <div className="text-[11px] text-slate-500">현재: {t.status}</div>}
-                        {t.dday !== null && t.dday !== undefined && <div className="text-[11px] text-slate-500">기한: {ddayText(t.dday)}</div>}
-                        <div className="text-[11px] text-slate-400">할일 체크리스트</div>
-                        {t.todos && t.todos.length > 0 ? (
-                          t.todos.map((td, i) => <div key={i} className="text-[11px] text-slate-600">☐ {td}</div>)
-                        ) : <div className="text-[11px] text-slate-300">— 등록된 할일 없음</div>}
+                      <div className="mt-2 pt-2 border-t border-slate-100 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <select value={edit.공위치} onChange={(e) => setEdit({ ...edit, 공위치: e.target.value })} className="text-[11px] border border-slate-200 rounded px-1.5 py-1">
+                            <option value="">공위치…</option>
+                            {POS_LABELS.map((p) => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                          <input type="date" value={edit.기한} onChange={(e) => setEdit({ ...edit, 기한: e.target.value })} className="text-[11px] border border-slate-200 rounded px-1.5 py-1" />
+                        </div>
+                        <input value={edit.현재상태} onChange={(e) => setEdit({ ...edit, 현재상태: e.target.value })} placeholder="현재상태 (지금 무슨 상황)" className="w-full text-[11px] border border-slate-200 rounded px-1.5 py-1" />
+                        <input value={edit.다음할일} onChange={(e) => setEdit({ ...edit, 다음할일: e.target.value })} placeholder="다음할일 (다음 한 수)" className="w-full text-[11px] border border-slate-200 rounded px-1.5 py-1" />
+                        {t.todos && t.todos.length > 0 && <div className="text-[10px] text-slate-400">할일: {t.todos.map((td) => `☐ ${td}`).join('  ')}</div>}
+                        <div className="flex gap-1.5 items-center">
+                          <button onClick={() => save(t.id)} disabled={saving} className="text-[11px] px-2 py-1 rounded bg-emerald-500 text-white font-medium disabled:opacity-40">저장</button>
+                          <button onClick={() => complete(t.id)} disabled={completing === t.id} className="text-[11px] px-2 py-1 rounded bg-slate-100 text-slate-600">✓ 완료</button>
+                          <button onClick={() => remove(t.id, t.task || t.project)} disabled={saving} className="text-[11px] px-2 py-1 rounded bg-rose-50 text-rose-600 border border-rose-200 ml-auto">삭제</button>
+                        </div>
                       </div>
                     )}
                   </div>
