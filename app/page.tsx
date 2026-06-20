@@ -29,6 +29,7 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
   { key: 'office', label: '🏢 사무실', ready: true },
+  { key: 'sales', label: '📣 영업', ready: true },
   { key: 'projects', label: '프로젝트', ready: true },
   { key: 'hubs', label: '협업 허브', ready: true },
   { key: 'shares', label: '공유된 문서', ready: true },
@@ -130,6 +131,7 @@ export default function Home() {
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         {tab === 'office' && <OfficeView />}
+        {tab === 'sales' && <SalesView />}
         {tab === 'projects' && <ProjectsView />}
         {tab === 'finance' && <FinanceView data={data} loading={loading} error={error} />}
         {tab === 'shares' && <SharesView />}
@@ -179,6 +181,112 @@ function Scorecard({ label, value, sub, tone }: { label: string; value: string; 
       <div className="text-xs text-slate-400 mb-1">{label}</div>
       <div className={`text-2xl font-bold ${tone || 'text-slate-800'}`}>{value}</div>
       {sub && <div className="text-[11px] text-slate-400 mt-1">{sub}</div>}
+    </div>
+  );
+}
+
+// 영업 보드(P8) — 3단계 파이프라인 + 무응답 노화. "물어보고 까먹음"을 빨강으로 잡아줌.
+type Lead = {
+  id: string; 대상: string; 단계: string; 다음액션: string;
+  예상금액: number | null; 마지막접촉일: string; 비고: string;
+  staleDays: number | null; stale: boolean;
+};
+type SalesD = { leads: Lead[]; followups: Lead[]; 예상매출: number; 협의전: number; 단계수: Record<string, number>; source: string };
+const STAGE_META = [
+  { key: '접촉', label: '🌱 접촉', hint: '문의·첫연락', cls: 'border-violet-200 bg-violet-50' },
+  { key: '제안', label: '📤 제안', hint: '견적 보냄', cls: 'border-sky-200 bg-sky-50' },
+  { key: '계약대기', label: '✍️ 계약대기', hint: '사인·착수금', cls: 'border-amber-200 bg-amber-50' },
+];
+const 금액텍스트 = (v: number | null) => (v === null ? '협의 전' : won(v));
+const 접촉텍스트 = (d: number | null) => (d === null ? '' : d === 0 ? '오늘' : `${d}일 전`);
+
+function LeadCard({ l }: { l: Lead }) {
+  return (
+    <div className={`bg-white rounded-lg px-3 py-2.5 border ${l.stale ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'}`}>
+      <div className="text-[13px] font-bold text-slate-800 leading-snug">{l.대상}</div>
+      {l.다음액션 && <div className="text-[12px] text-slate-700 font-medium mt-0.5 truncate">▸ {l.다음액션}</div>}
+      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+        <span className={`text-[11px] px-1.5 py-0.5 rounded border ${l.예상금액 === null ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>{금액텍스트(l.예상금액)}</span>
+        {l.stale
+          ? <span className="text-[11px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-medium">🔴 {l.staleDays}일째 무응답</span>
+          : <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{접촉텍스트(l.staleDays)}</span>}
+      </div>
+    </div>
+  );
+}
+
+function SalesView() {
+  const [sales, setSales] = useState<SalesD | null>(null);
+  const [err, setErr] = useState('');
+  const [addLine, setAddLine] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = () => fetch('/api/sales').then((r) => r.json())
+    .then((j) => { if (j.ok) setSales(j.sales); else setErr(j.error || '불러오기 실패'); })
+    .catch((e) => setErr(String(e)));
+  useEffect(() => { load(); }, []);
+  const add = async () => {
+    if (!addLine.trim() || adding) return;
+    setAdding(true); setMsg('');
+    try {
+      const r = await fetch('/api/sales/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ line: addLine }) });
+      const j = await r.json();
+      if (j.ok) { setAddLine(''); setMsg(`✓ 추가: ${j.행.대상} (${j.행.단계})`); load(); } else setMsg('⚠️ ' + (j.error || '실패'));
+    } catch (e) { setMsg('⚠️ ' + String(e)); } finally { setAdding(false); }
+  };
+  if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
+  if (!sales) return <p className="text-slate-400 text-center py-10">영업 불러오는 중…</p>;
+  const 총 = sales.leads.length;
+
+  return (
+    <div className="space-y-5">
+      <section className="grid grid-cols-3 gap-3">
+        <Scorecard label="영업 중" value={`${총}건`} sub={STAGE_META.map((s) => `${s.key.replace('계약대기', '계약')} ${sales.단계수[s.key] || 0}`).join(' · ')} />
+        <Scorecard label="🔴 지금 팔로업" value={`${sales.followups.length}건`} sub="무응답 임계 넘음" tone="text-rose-600" />
+        <Scorecard label="예상 매출(영업 중)" value={won(sales.예상매출)} sub={sales.협의전 ? `+ 협의전 ${sales.협의전}건` : '가격 정해진 것만'} tone="text-emerald-600" />
+      </section>
+
+      {sales.followups.length > 0 && (
+        <section className="bg-rose-50 border border-rose-200 rounded-xl p-3">
+          <div className="text-sm font-bold text-rose-700 mb-2">🔴 지금 한 번 더 찌를 대상 (먼저 보세요)</div>
+          <div className="space-y-1.5">
+            {sales.followups.map((l) => (
+              <div key={l.id} className="flex items-center gap-2 text-sm bg-white rounded-lg px-3 py-2 border border-rose-200">
+                <span className="font-medium flex-1 truncate">{l.대상} <span className="text-slate-400 text-xs">· {l.단계}</span></span>
+                <span className="text-emerald-600 text-xs shrink-0">{금액텍스트(l.예상금액)}</span>
+                <span className="text-[11px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-medium shrink-0">{l.staleDays}일째</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input value={addLine} onChange={(e) => setAddLine(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+          placeholder="영업 대상 추가 — 예: 망원카페 브랜딩 제안 200만 (금액 빼면 협의전)"
+          className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 focus:border-emerald-300 focus:outline-none" />
+        <button onClick={add} disabled={adding || !addLine.trim()} className="text-sm px-3 py-2 rounded-lg bg-emerald-500 text-white font-medium disabled:opacity-40">{adding ? '추가 중…' : '+ 추가'}</button>
+      </div>
+      {msg && <div className={`text-[11px] ${msg.startsWith('⚠️') ? 'text-rose-500' : 'text-emerald-600'}`}>{msg}</div>}
+
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {STAGE_META.map((st) => {
+          const items = sales.leads.filter((l) => l.단계 === st.key);
+          return (
+            <div key={st.key} className={`rounded-xl border p-3 min-h-[160px] ${st.cls}`}>
+              <div className="flex items-baseline justify-between mb-2">
+                <div className="font-bold text-sm">{st.label}</div>
+                <div className="text-[11px] text-slate-400">{st.hint} · {items.length}</div>
+              </div>
+              <div className="space-y-2">
+                {items.length === 0 && <div className="text-xs text-slate-300 py-3 text-center">비어 있음</div>}
+                {items.map((l) => <LeadCard key={l.id} l={l} />)}
+              </div>
+            </div>
+          );
+        })}
+      </section>
+      <div className="text-[11px] text-slate-400 text-center">계약+착수금 들어오면 사무실(대행 과업)으로 옮기고 매출 원장에 등록하세요. (자동 전환은 다음 단계)</div>
     </div>
   );
 }
