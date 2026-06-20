@@ -11,7 +11,7 @@ const WRITE_URL = process.env.SHEET_WRITE_URL
   || 'https://script.google.com/macros/s/AKfycbxPt24eFUbUP1cPwsv5Gspc3pak_hvqIdGf7T4cbvqJSxKkKimCdEhxdSll0yMPJ5dPAw/exec';
 const KEY = process.env.SHEET_KEY || 'qnbang2026';
 const HEADER = ['id', '프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일',
-  '기한', '고객', '돈종류', '할일', '판정근거', '갱신일', '출처'];
+  '기한', '고객', '돈종류', '할일', '판정근거', '갱신일', '출처', '계약여부'];
 const 공위치_LIST = ['시작전', '내작업', '내회신', '고객대기', '보류', '완수'];
 const 돈종류_LIST = ['매출', '투자'];
 

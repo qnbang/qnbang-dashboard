@@ -51,31 +51,31 @@ export async function buildCRM(): Promise<CRMData> {
   const 계약of = (name: string) => 매출.filter((c) => same(name, c['클라이언트'] || c['계약명']))
     .reduce((s, c) => s + num(c['계약금액']), 0);
 
-  // 진행중: 보류·완수 아닌 과업을 고객(없으면 프로젝트)으로 묶음
-  const 진행: Record<string, CRMClient> = {};
+  // 활성 과업을 '고객(회사)' 기준으로 묶고, 계약여부로 진행/영업 구분.
+  const byClient: Record<string, CRMClient & { _진행?: boolean }> = {};
   for (const t of 과업) {
     const 공 = t['공위치'];
     if (공 === '보류' || 공 === '완수') continue;
-    if (t['돈종류'] === '투자') continue;   // 내부(자체) 프로젝트는 고객 아님 → CRM 제외
+    if (t['돈종류'] === '투자' || t['계약여부'] === '내부') continue;   // 내부는 고객 아님
     const key = (t['고객'] || t['프로젝트'] || '').trim();
     if (!key) continue;
-    const c = (진행[key] ||= { 고객: key, 과업수: 0, 공위치: [], 담당: [] });
+    const c = (byClient[key] ||= { 고객: key, 과업수: 0, 공위치: [], 담당: [], _진행: false });
     c.과업수! += 1;
     if (공 && !c.공위치!.includes(공)) c.공위치!.push(공);
     const o = t['담당자']; if (o && !c.담당!.includes(o)) c.담당!.push(o);
+    if (t['계약여부'] === '진행' || t['계약여부'] === '완료') c._진행 = true;  // 한 건이라도 계약됐으면 진행
   }
-  // 계약 여부 = 매출 원장에 계약이 있나. 있으면 '계약 진행중', 없으면 아직 '영업'(제안 단계).
-  const 계약됨 = (name: string) => 계약of(name) > 0;
   const 진행중: CRMClient[] = [];
-  const 과업영업: CRMClient[] = [];   // 과업은 있는데 계약 전(금문도·제주 등)
-  for (const c of Object.values(진행)) {
-    if (계약됨(c.고객)) 진행중.push({ ...c, 계약금액: 계약of(c.고객), 미수: 미수of(c.고객) });
-    else 과업영업.push({ 고객: c.고객, 단계: (c.공위치 && c.공위치[0]) || '진행', 예상금액: null, 담당: c.담당 });
+  const 과업영업: CRMClient[] = [];
+  for (const c of Object.values(byClient)) {
+    const { _진행, ...rest } = c;
+    if (_진행) 진행중.push({ ...rest, 계약금액: 계약of(c.고객), 미수: 미수of(c.고객) });
+    else 과업영업.push({ 고객: c.고객, 단계: (c.공위치 && c.공위치[0]) || '제안', 예상금액: null, 담당: c.담당 });
   }
   진행중.sort((a, b) => (b.미수 ?? 0) - (a.미수 ?? 0));
   const 진행keys = new Set(진행중.map((c) => c.고객));
 
-  // 영업중 = 영업 보드 리드 + 계약 전 과업(금문도·제주). 진행중에 이미 있으면 제외.
+  // 영업중 = 영업 보드 리드 + 계약여부=영업인 과업(금문도·제주). 진행중과 중복 제외.
   const 영업리드 = 영업.filter((l) => ['접촉', '제안', '계약대기'].includes(l['단계']))
     .filter((l) => ![...진행keys].some((k) => same(k, l['대상'])))
     .map((l) => ({ 고객: l['대상'], 단계: l['단계'], 예상금액: l['예상금액'] ? num(l['예상금액']) : null, staleDays: null as number | null }));
