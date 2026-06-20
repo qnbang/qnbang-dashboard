@@ -306,6 +306,7 @@ function RevenueView({ data }: { data: DashboardData | null }) {
   const [money, setMoney] = useState<RevMoney | null>(null);
   const [tasks, setTasks] = useState<{ project: string; task: string; ball: string }[]>([]);
   const [err, setErr] = useState('');
+  const [listView, setListView] = useState<'due' | 'all'>('due');
   useEffect(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
       if (j.ok) {
@@ -347,26 +348,47 @@ function RevenueView({ data }: { data: DashboardData | null }) {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="text-sm font-medium text-slate-600 mb-3">미수금 — 받을 돈 (큰 순) · 받을 과업 연결</div>
-        {미수.length === 0 ? (
-          <p className="text-sm text-slate-400 py-4 text-center">미수금 없음 — 다 입금됐어요 👍</p>
-        ) : (
-          <div className="space-y-1.5">
-            {미수.map((c, i) => {
-              const mt = matchTask(c);
-              return (
-                <div key={i} className="flex items-center gap-2 text-sm border-b border-slate-100 pb-1.5">
-                  <span className="font-medium text-slate-700 truncate flex-1">{c.클라이언트 || c.계약명}</span>
-                  <span className="text-rose-600 font-semibold tabular-nums">{won(c.미수금)}</span>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">{c.입금상태 || '입금대기'}</span>
-                  <span className="text-[11px] shrink-0 w-40 text-right truncate">
-                    {mt ? <span className="text-emerald-600">▸ {mt.task}</span> : <span className="text-amber-500">⚠️ 받을 과업 없음</span>}
-                  </span>
-                </div>
-              );
-            })}
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-medium text-slate-600">계약 내역 · 받을 과업 연결</div>
+          <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs">
+            <button onClick={() => setListView('due')} className={`px-2.5 py-1 rounded-md font-medium ${listView === 'due' ? 'bg-rose-500 text-white' : 'text-slate-500'}`}>미수만 {미수.length}</button>
+            <button onClick={() => setListView('all')} className={`px-2.5 py-1 rounded-md font-medium ${listView === 'all' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}>전체 {money.계약목록.length}</button>
           </div>
-        )}
+        </div>
+        {(() => {
+          const list = listView === 'due' ? 미수
+            : [...money.계약목록].sort((a, b) => (b.미수금 - a.미수금) || (a.계약일 < b.계약일 ? 1 : -1));
+          if (list.length === 0) return <p className="text-sm text-slate-400 py-4 text-center">미수금 없음 — 다 입금됐어요 👍</p>;
+          return (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[11px] text-slate-400 text-left border-b border-slate-100">
+                    <th className="py-1 font-normal">클라이언트</th><th className="font-normal">계약</th>
+                    <th className="font-normal text-right">계약금액</th><th className="font-normal text-right">입금</th>
+                    <th className="font-normal text-right">미수</th><th className="font-normal pl-2">상태</th><th className="font-normal pl-2">받을 과업</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.map((c, i) => {
+                    const mt = c.미수금 > 0 ? matchTask(c) : undefined;
+                    return (
+                      <tr key={i} className={`border-b border-slate-50 ${c.미수금 > 0 ? '' : 'text-slate-400'}`}>
+                        <td className="py-1.5 font-medium truncate max-w-[7rem]">{c.클라이언트 || '—'}</td>
+                        <td className="text-[12px] truncate max-w-[11rem]">{c.계약명}</td>
+                        <td className="text-right tabular-nums">{won(c.계약금액)}</td>
+                        <td className="text-right tabular-nums text-slate-400">{won(c.입금액)}</td>
+                        <td className={`text-right tabular-nums ${c.미수금 > 0 ? 'text-rose-600 font-semibold' : ''}`}>{c.미수금 > 0 ? won(c.미수금) : '–'}</td>
+                        <td className="pl-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 whitespace-nowrap">{c.입금상태 || '–'}</span></td>
+                        <td className="pl-2 text-[11px]">{c.미수금 > 0 ? (mt ? <span className="text-emerald-600">▸ {mt.task}</span> : <span className="text-amber-500">⚠️ 없음</span>) : ''}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
