@@ -3,8 +3,7 @@
 // 탭 헤더: 매출=[계약일,계약명,클라이언트,계약금액,부가세,입금상태,입금일,입금액,순매출,비고]
 //          고정비=[항목,금액,주기,납부일,종류,할부종료월,활성]
 
-const SHEET_URL = process.env.SHEET_URL!;
-const SHEET_KEY = process.env.SHEET_KEY!;
+import { getSheets } from './sheetCache';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
 const ym = (v: unknown) => {
@@ -38,9 +37,7 @@ function rows(sheet: unknown[][] | undefined): Record<string, unknown>[] {
 }
 
 export async function fetchMoneyData(): Promise<MoneyData> {
-  const res = await fetch(`${SHEET_URL}?key=${encodeURIComponent(SHEET_KEY)}`, { cache: 'no-store' });
-  const json = await res.json();
-  const sheets: Record<string, unknown[][]> = json.sheets || {};
+  const sheets = await getSheets();
 
   // 매출(계약 원장)
   const 계약목록: Contract[] = rows(sheets['매출']).map((r) => {

@@ -1,8 +1,7 @@
 // 구글 시트(Apps Script 웹앱)에서 지출 데이터를 읽어 대시보드용으로 가공한다.
 // 이 파일은 서버에서만 실행되므로 비밀번호(SHEET_KEY)가 브라우저에 노출되지 않는다.
 
-const SHEET_URL = process.env.SHEET_URL!;
-const SHEET_KEY = process.env.SHEET_KEY!;
+import { getSheets } from './sheetCache';
 
 export interface Expense {
   month: number;      // 1~12
@@ -37,11 +36,7 @@ function formatDate(raw: string): string {
 }
 
 export async function fetchExpenseData(): Promise<DashboardData> {
-  const res = await fetch(`${SHEET_URL}?key=${encodeURIComponent(SHEET_KEY)}`, {
-    cache: 'no-store',
-  });
-  const json = await res.json();
-  const sheets: Record<string, unknown[][]> = json.sheets || {};
+  const sheets = await getSheets();
 
   const expenses: Expense[] = [];
   for (let m = 1; m <= 12; m++) {

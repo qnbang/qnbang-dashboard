@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { invalidateSheets } from '@/lib/sheetCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
     const r1 = await postSheet({ key: KEY, 종류: '과업', 헤더: HEADER, 행들: active, 드롭다운: { 공위치: 공위치_LIST, 돈종류: 돈종류_LIST }, 덮어쓰기: true });
     const r2 = await postSheet({ key: KEY, 종류: '아카이브', 헤더: HEADER, 행: done });
     if (!r1.ok || !r2.ok) return NextResponse.json({ ok: false, error: '이동 실패', r1, r2 }, { status: 502 });
+    invalidateSheets(); // 이동 즉시 반영
     return NextResponse.json({ ok: true, archived: done['과업명'] || done['프로젝트'], 과업남음: active.length });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

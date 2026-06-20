@@ -4,6 +4,7 @@
 // 공위치: start🌱 시작전 / mywork🛠️ 내작업 / myreply📤 내회신 / client📥 고객대기 / hold⏸️ 보류 / done✅ 완수
 
 import seed from '@/lib/seed-tasks.json';
+import { getSheets } from './sheetCache';
 
 const OWNER_ME = '신종호';
 const SHEET_URL = process.env.SHEET_URL;
@@ -91,9 +92,8 @@ type Seed = {
 async function fetchTasksFromSheet(): Promise<Seed[] | null> {
   if (!SHEET_URL || !SHEET_KEY) return null;
   try {
-    const res = await fetch(`${SHEET_URL}?key=${encodeURIComponent(SHEET_KEY)}`, { cache: 'no-store' });
-    const json = await res.json();
-    const rows: unknown[][] = json?.sheets?.['과업'];
+    const sheets = await getSheets();
+    const rows: unknown[][] = sheets?.['과업'];
     if (!Array.isArray(rows) || rows.length < 2) return null;
 
     const head = (rows[0] as unknown[]).map((h) => String(h));

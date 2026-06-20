@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { invalidateSheets } from '@/lib/sheetCache';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
     });
     const out = await res.json().catch(() => ({}));
     if (!out.ok) return NextResponse.json({ ok: false, error: out.error || '기록 실패', 행 }, { status: 502 });
+    invalidateSheets(); // 방금 쓴 게 바로 보이게 캐시 무효화
     return NextResponse.json({ ok: true, 행 });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
