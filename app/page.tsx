@@ -29,6 +29,7 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
   { key: 'office', label: '🏢 사무실', ready: true },
+  { key: 'crm', label: '👥 고객', ready: true },
   { key: 'sales', label: '📣 영업', ready: true },
   { key: 'projects', label: '프로젝트', ready: true },
   { key: 'hubs', label: '협업 허브', ready: true },
@@ -131,6 +132,7 @@ export default function Home() {
 
       <main className="max-w-5xl mx-auto px-4 py-6">
         {tab === 'office' && <OfficeView />}
+        {tab === 'crm' && <CRMView />}
         {tab === 'sales' && <SalesView />}
         {tab === 'projects' && <ProjectsView />}
         {tab === 'finance' && <FinanceView data={data} loading={loading} error={error} />}
@@ -301,6 +303,54 @@ function SalesView() {
         })}
       </section>
       <div className="text-[11px] text-slate-400 text-center">계약+착수금 들어오면 사무실(대행 과업)으로 옮기고 매출 원장에 등록하세요. (자동 전환은 다음 단계)</div>
+    </div>
+  );
+}
+
+// 고객 관리 CRM(#5) — 영업/과업/매출을 고객 기준으로 묶은 생애주기 overview(읽기 중심).
+type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number };
+type CRMD = { 영업중: CRMClient[]; 진행중: CRMClient[]; 완수: CRMClient[]; source: string };
+function CRMView() {
+  const [crm, setCrm] = useState<CRMD | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    fetch('/api/crm').then((r) => r.json()).then((j) => { if (j.ok) setCrm(j.crm); else setErr(j.error || '불러오기 실패'); }).catch((e) => setErr(String(e)));
+  }, []);
+  if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
+  if (!crm) return <p className="text-slate-400 text-center py-10">고객 불러오는 중…</p>;
+  const cols = [
+    { key: 'lead', label: '📣 영업 대기중', hint: '계약 전', cls: 'border-sky-200 bg-sky-50', items: crm.영업중 },
+    { key: 'active', label: '🔨 계약 진행중', hint: '납품 중', cls: 'border-emerald-200 bg-emerald-50', items: crm.진행중 },
+    { key: 'done', label: '✅ 완수 고객', hint: '끝난 고객', cls: 'border-slate-200 bg-slate-50', items: crm.완수 },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="text-sm text-slate-500">고객 생애주기 — 영업 대기 → 계약 진행 → 완수. <span className="text-slate-400">(리드 추가·계약처리는 📣영업 탭에서, 여기선 한눈에)</span></div>
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {cols.map((c) => (
+          <div key={c.key} className={`rounded-xl border p-3 min-h-[160px] ${c.cls}`}>
+            <div className="flex items-baseline justify-between mb-2"><div className="font-bold text-sm">{c.label}</div><div className="text-[11px] text-slate-400">{c.hint} · {c.items.length}</div></div>
+            <div className="space-y-2">
+              {c.items.length === 0 && <div className="text-xs text-slate-300 py-3 text-center">없음</div>}
+              {c.items.map((x, i) => (
+                <div key={i} className="bg-white rounded-lg border border-slate-200 px-3 py-2">
+                  <div className="text-[13px] font-bold text-slate-800 truncate">{x.고객}</div>
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    {x.단계 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-600">{x.단계}</span>}
+                    {x.예상금액 != null && <span className="text-[11px] text-emerald-600">{won(x.예상금액)}</span>}
+                    {x.예상금액 === null && x.단계 && <span className="text-[11px] text-amber-500">협의전</span>}
+                    {x.과업수 != null && x.과업수 > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">과업 {x.과업수}</span>}
+                    {x.공위치 && x.공위치.map((p) => <span key={p} className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{p}</span>)}
+                    {x.미수 != null && x.미수 > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-medium">미수 {won(x.미수)}</span>}
+                    {c.key === 'done' && x.계약금액 != null && x.계약금액 > 0 && <span className="text-[11px] text-slate-400">{won(x.계약금액)}</span>}
+                    {x.담당 && x.담당.filter((o) => o && o !== '신종호').map((o) => <span key={o} className="text-[11px] text-pink-500">{o}</span>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
