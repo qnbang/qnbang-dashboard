@@ -8,6 +8,7 @@ type Task = {
   id: string; project: string; task: string; owner: string;
   money: string; ball: string; due: string; dday: number | null;
   urgent: boolean; todos: string[];
+  client?: string;
   status?: string; nextStep?: string; reason?: string;
   staleDays?: number | null; stale?: boolean;
 };
@@ -230,7 +231,10 @@ export default function OfficeView() {
                   >
                     <div className="flex items-center gap-1 text-[11px] text-slate-400">
                       <span>{t.urgent ? '‼️' : BALL[t.ball] || ''}</span>
-                      <span className="truncate">{t.project}</span>
+                      <span className="truncate font-medium text-slate-500">{t.client || t.project}</span>
+                      {t.client && t.project && t.client !== t.project && (
+                        <span className="text-slate-300 truncate">· {t.project}</span>
+                      )}
                       {t.owner && t.owner !== '신종호' && (
                         <span className="text-pink-500">{t.owner}</span>
                       )}

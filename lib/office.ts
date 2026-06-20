@@ -17,6 +17,7 @@ const POS2BALL: Record<string, string> = {
 
 export interface OfficeTask {
   id: string; project: string; task: string; owner: string;
+  client: string;          // 고객(회사) — 프로젝트와 구분. 카드 상단에 표시.
   money: string; ball: string; due: string; dday: number | null;
   urgent: boolean; todos: string[];
   status: string;          // 현재상태(지금 무슨 상황) — 시트 칸
@@ -158,6 +159,7 @@ export async function buildOffice(): Promise<OfficeData> {
     if (alive && s.ball !== 'unset') 가동률[s.owner] = (가동률[s.owner] || 0) + 1;
     return {
       id: s.id, project: s.project, task: s.task, owner: s.owner,
+      client: s.customer || s.project,
       money: s.money, ball: s.ball, due: s.due, dday: dd, urgent,
       todos: s.todos || [],
       status: s.status || '',
