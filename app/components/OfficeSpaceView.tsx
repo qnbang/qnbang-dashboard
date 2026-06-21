@@ -44,7 +44,8 @@ const CSS = `
 .ospace .cnt{background:#eef2f8;border:1px solid #d3dcea;border-radius:999px;padding:1px 8px;font-size:11.5px;color:#475569}
 .ospace .hint{color:#94a3b8;font-size:11.5px}
 .ospace .floorpeople{display:grid;grid-template-columns:repeat(auto-fill,98px);gap:10px 4px;align-items:end}
-.ospace .ch{width:98px;height:160px;text-align:center;cursor:pointer;position:relative;padding-top:24px;display:flex;flex-direction:column;align-items:center;transition:transform .12s}
+.ospace .ch{width:98px;height:160px;text-align:center;cursor:grab;user-select:none;position:relative;padding-top:24px;display:flex;flex-direction:column;align-items:center;transition:transform .12s}
+.ospace .ch:active{cursor:grabbing}
 .ospace .ch:hover{transform:translateY(-4px)}
 .ospace .chimg{height:82px;display:flex;align-items:flex-end;justify-content:center}
 .ospace .chimg img{max-height:82px;max-width:90px;width:auto;filter:drop-shadow(0 4px 4px #0003)}
@@ -96,15 +97,20 @@ export default function OfficeSpaceView() {
     await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, patch }) });
     setBusy(false); load();
   };
-  const dropTo = (roomKey: string) => {
-    const t = drag; setOver(''); setDrag(null);
+  const findById = (id: string): Task | null => {
+    if (!office || !id) return null;
+    for (const r of office.rooms) { const f = r.tasks.find((t) => t.id === id); if (f) return f; }
+    return (office.자체 || []).find((t) => t.id === id) || (office.언젠가 || []).find((t) => t.id === id) || null;
+  };
+  const dropTo = (roomKey: string, dragId: string) => {
+    const t = drag || findById(dragId); setOver(''); setDrag(null);
     if (!t) return;
     const patch: Record<string, string> = { 공위치: ROOM2POS[roomKey] };
     if (t.money === '투자') patch.돈종류 = '매출';   // 자체 → 대행 방으로 끌면 대행으로 전환
     patchTask(t.id, patch);
   };
-  const dropToSelf = () => {
-    const t = drag; setOver(''); setDrag(null);
+  const dropToSelf = (dragId: string) => {
+    const t = drag || findById(dragId); setOver(''); setDrag(null);
     if (!t || t.money === '투자') return;             // 대행 → 자체로 전환
     patchTask(t.id, { 돈종류: '투자' });
   };
@@ -117,9 +123,11 @@ export default function OfficeSpaceView() {
     const dt = ddText(t.dday);
     return (
       <div className={`ch ${t.stale ? 'glow' : ''}`} onClick={() => setSel(t)}
-        draggable onDragStart={(e) => { setDrag(t); e.dataTransfer.effectAllowed = 'move'; }}>
+        draggable
+        onDragStart={(e) => { setDrag(t); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); }}
+        onDragEnd={() => { setDrag(null); setOver(''); }}>
         <div className={`mk ${cls}`}>{lab}</div>
-        <div className="chimg"><img src={`/office/char${charIdx(t.id)}.png`} alt="" /></div>
+        <div className="chimg"><img src={`/office/char${charIdx(t.id)}.png`} alt="" draggable={false} /></div>
         <div className="nm">{t.client || t.project || ''}</div>
         <div className="role">{t.task}{dt ? ` · ${dt}` : ''}</div>
         <div className="ow">{t.owner && t.owner !== '신종호' ? t.owner : ''}</div>
@@ -139,7 +147,7 @@ export default function OfficeSpaceView() {
           <section key={r.key} className={`room ${r.key}`}
             onDragOver={(e) => { e.preventDefault(); setOver(r.key); }}
             onDragLeave={() => setOver((o) => (o === r.key ? '' : o))}
-            onDrop={() => dropTo(r.key)}
+            onDrop={(e) => { e.preventDefault(); dropTo(r.key, e.dataTransfer.getData('text/plain')); }}
             style={over === r.key ? { outline: '2px dashed #3b82f6', outlineOffset: '-5px' } : undefined}>
             <div className="rh"><b>{r.name}</b> <span className="cnt">{r.tasks.length}</span> <span className="hint">{r.hint}</span>{over === r.key && drag ? <span className="hint" style={{ color: '#3b82f6', fontWeight: 700 }}> ← 여기로 놓으면 «{ROOM2POS[r.key]}»</span> : null}</div>
             <div className="floorpeople">
@@ -152,7 +160,7 @@ export default function OfficeSpaceView() {
       <div className="selfbox"
         onDragOver={(e) => { e.preventDefault(); setOver('self'); }}
         onDragLeave={() => setOver((o) => (o === 'self' ? '' : o))}
-        onDrop={dropToSelf}
+        onDrop={(e) => { e.preventDefault(); dropToSelf(e.dataTransfer.getData('text/plain')); }}
         style={over === 'self' ? { outline: '2px dashed #0ea5e9', outlineOffset: '-5px' } : undefined}>
         <div className="sech">🏗️ 자체 사업 (내부·투자) — 같은 캐릭터, 자리만 분리{over === 'self' && drag ? <span style={{ color: '#0ea5e9', fontWeight: 700 }}> ← 놓으면 자체로 전환</span> : null}</div>
         <div className="floorpeople">
