@@ -14,12 +14,16 @@ const ym = (v: unknown) => {
 
 export interface Contract {
   계약일: string; 계약명: string; 클라이언트: string;
-  계약금액: number; 입금상태: string; 입금일: string; 입금액: number; 순매출: number;
+  계약금액: number; 부가세: number; 공급가: number;
+  입금상태: string; 입금일: string; 입금예정일: string; 입금액: number; 순매출: number;
   미수금: number;
+  미수종류: '받을예정' | '단순미수' | '';   // 미수 + 예정일 있으면 받을예정, 없으면 단순미수
 }
 export interface MoneyData {
   순매출누계: number;
   미수금합: number;
+  받을예정합: number;   // 미수 중 입금예정일 잡힌 것
+  단순미수합: number;   // 미수 중 예정일 없는 것(미정·연체)
   고정비월합: number;
   계약건수: number;
   월별: { 월: string; 계약액: number; 순매출: number; 실현: number }[];
@@ -43,16 +47,22 @@ export async function fetchMoneyData(): Promise<MoneyData> {
   const 계약목록: Contract[] = rows(sheets['매출']).map((r) => {
     const 계약금액 = num(r['계약금액']);
     const 입금액 = num(r['입금액']);
+    const 부가세 = num(r['부가세']);
+    const 입금예정일 = ym(r['입금예정일']);
+    const 미수금 = Math.max(0, 계약금액 - 입금액);
     return {
       계약일: ym(r['계약일']),
       계약명: String(r['계약명'] ?? ''),
       클라이언트: String(r['클라이언트'] ?? ''),
-      계약금액, 입금액,
+      계약금액, 입금액, 부가세,
+      공급가: 부가세 > 0 ? 계약금액 - 부가세 : 계약금액,   // 관행=계약금액 VAT포함, 공급가=차감
       입금상태: String(r['입금상태'] ?? ''),
       입금일: ym(r['입금일']),
+      입금예정일,
       순매출: num(r['순매출']),
-      미수금: Math.max(0, 계약금액 - 입금액),
-    };
+      미수금,
+      미수종류: 미수금 > 0 ? (입금예정일 ? '받을예정' : '단순미수') : '',
+    } as Contract;
   });
 
   // 고정비
@@ -85,6 +95,8 @@ export async function fetchMoneyData(): Promise<MoneyData> {
   return {
     순매출누계: 계약목록.reduce((s, c) => s + c.순매출, 0),
     미수금합: 계약목록.reduce((s, c) => s + c.미수금, 0),
+    받을예정합: 계약목록.filter((c) => c.미수종류 === '받을예정').reduce((s, c) => s + c.미수금, 0),
+    단순미수합: 계약목록.filter((c) => c.미수종류 === '단순미수').reduce((s, c) => s + c.미수금, 0),
     고정비월합: 고정비목록.reduce((s, c) => s + c.금액, 0),
     계약건수: 계약목록.length,
     월별,

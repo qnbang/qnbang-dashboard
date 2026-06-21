@@ -359,10 +359,12 @@ function CRMView() {
 // 미수금↔과업 연결: 각 미수 계약에 그 돈 받을 과업이 사무실에 있는지 매칭해 보여줌.
 type RevContract = {
   계약일: string; 계약명: string; 클라이언트: string;
-  계약금액: number; 입금액: number; 미수금: number; 입금상태: string; 순매출: number;
+  계약금액: number; 부가세: number; 공급가: number; 입금액: number; 미수금: number;
+  입금상태: string; 입금예정일: string; 미수종류: '받을예정' | '단순미수' | ''; 순매출: number;
 };
 type RevMoney = {
-  순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number;
+  순매출누계: number; 미수금합: number; 받을예정합: number; 단순미수합: number;
+  고정비월합: number; 계약건수: number;
   월별: { 월: string; 순매출: number; 계약액: number; 실현: number }[];
   계약목록: RevContract[];
 };
@@ -401,7 +403,7 @@ function RevenueView({ data }: { data: DashboardData | null }) {
     <div className="space-y-5">
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Scorecard label="순매출 누계" value={won(money.순매출누계)} sub={`계약 ${money.계약건수}건`} tone="text-emerald-600" />
-        <Scorecard label="미수금 ●" value={won(money.미수금합)} sub={`${미수.length}건 미입금`} tone="text-rose-600" />
+        <Scorecard label="미수금 ●" value={won(money.미수금합)} sub={`받을예정 ${won(money.받을예정합)} · 미정 ${won(money.단순미수합)}`} tone="text-rose-600" />
         <Scorecard label="올해 지출" value={won(지출연)} sub="지출 탭 합계" tone="text-slate-700" />
         <Scorecard label="손익 (순매출−지출)" value={won(손익)} sub={손익 >= 0 ? '흑자' : '적자'} tone={손익 >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
       </section>
@@ -430,7 +432,7 @@ function RevenueView({ data }: { data: DashboardData | null }) {
                   <tr className="text-[11px] text-slate-400 text-left border-b border-slate-100">
                     <th className="py-1 font-normal">클라이언트</th><th className="font-normal">계약</th>
                     <th className="font-normal text-right">계약금액</th><th className="font-normal text-right">입금</th>
-                    <th className="font-normal text-right">미수</th><th className="font-normal pl-2">상태</th><th className="font-normal pl-2">받을 과업</th>
+                    <th className="font-normal text-right">미수</th><th className="font-normal pl-2">예정일</th><th className="font-normal pl-2">상태</th><th className="font-normal pl-2">받을 과업</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -443,6 +445,10 @@ function RevenueView({ data }: { data: DashboardData | null }) {
                         <td className="text-right tabular-nums">{won(c.계약금액)}</td>
                         <td className="text-right tabular-nums text-slate-400">{won(c.입금액)}</td>
                         <td className={`text-right tabular-nums ${c.미수금 > 0 ? 'text-rose-600 font-semibold' : ''}`}>{c.미수금 > 0 ? won(c.미수금) : '–'}</td>
+                        <td className="pl-2 text-[11px] whitespace-nowrap">
+                          {c.미수종류 === '받을예정' ? <span className="text-emerald-600">📅 {c.입금예정일}</span>
+                            : c.미수종류 === '단순미수' ? <span className="text-amber-500">미정</span> : ''}
+                        </td>
                         <td className="pl-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 whitespace-nowrap">{c.입금상태 || '–'}</span></td>
                         <td className="pl-2 text-[11px]">{c.미수금 > 0 ? (mt ? <span className="text-emerald-600">▸ {mt.task}</span> : <span className="text-amber-500">⚠️ 없음</span>) : ''}</td>
                       </tr>
