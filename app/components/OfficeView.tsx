@@ -13,7 +13,7 @@ type Task = {
   staleDays?: number | null; stale?: boolean;
 };
 type Room = { key: string; name: string; hint: string; tasks: Task[] };
-type Office = { rooms: Room[]; 가동률: Record<string, number>; 과업수: number; source?: string; syncedAt?: string; 언젠가?: Task[] };
+type Office = { rooms: Room[]; 가동률: Record<string, number>; 과업수: number; source?: string; syncedAt?: string; 언젠가?: Task[]; 자체?: Task[] };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number };
 
 const BALL: Record<string, string> = {
@@ -150,6 +150,7 @@ export default function OfficeView() {
 
   // 언젠가(보류) 접힌 칸 + 되살리기
   const [somedayOpen, setSomedayOpen] = useState(false);
+  const [selfOpen, setSelfOpen] = useState(false);
   const setPos = async (id: string, label: string) => {
     try {
       const r = await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, patch: { 공위치: label } }) });
@@ -285,6 +286,27 @@ export default function OfficeView() {
           </div>
         ))}
       </section>
+
+      {/* 자체(내부·투자) 사업 — 대행 방에서 빼서 따로. 고객 '공 차례' 개념 없음. */}
+      {office.자체 && office.자체.length > 0 && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+          <button onClick={() => setSelfOpen(!selfOpen)} className="text-sm font-medium text-sky-700 flex items-center gap-2">
+            🏗️ 자체 사업 <span className="text-sky-400">{office.자체.length}개</span>
+            <span className="text-[11px] text-slate-400">{selfOpen ? '접기 ▲' : '펼쳐보기 ▼'}</span>
+          </button>
+          {selfOpen && (
+            <div className="space-y-1.5 mt-2">
+              {office.자체.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 text-sm bg-white rounded-lg border border-sky-100 px-3 py-2">
+                  <span className="font-medium text-slate-700 truncate">{t.client || t.project}</span>
+                  <span className="text-slate-400 text-xs truncate flex-1">{t.status || t.task}</span>
+                  {t.owner && t.owner !== '신종호' && <span className="text-[11px] text-pink-500 shrink-0">{t.owner}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 언젠가(보류) — 메인서 빼둔 아이디어. 접힘. 오래되면(30일+) 빨강으로 "할까/접을까" 떠오름 */}
       {office.언젠가 && office.언젠가.length > 0 && (

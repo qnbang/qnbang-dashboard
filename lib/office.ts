@@ -36,6 +36,7 @@ export interface OfficeData {
   source: 'sheet' | 'seed' | 'unavailable';
   syncedAt: string;   // 이 화면을 만든(=시트를 읽은) 시각(KST). "지금 보는 게 언제 것"인지.
   언젠가: OfficeTask[];   // 보류=언제 할지 모르는 아이디어. 메인서 빼고 따로(접힘). 오래되면 resurface.
+  자체: OfficeTask[];     // 자체(내부·투자) 사업 — 고객 '공 차례' 개념 없어 방에서 빼고 따로 관리.
 }
 
 const ROOMS = [
@@ -181,12 +182,15 @@ export async function buildOffice(): Promise<OfficeData> {
 
   // 보류(언젠가)·완수는 메인서 제외. 언젠가=따로 칸, 완수=아카이브로 이미 빠짐.
   const 활성 = tasks.filter((t) => t.ball !== 'hold' && t.ball !== 'done');
+  // 대행(고객 일)만 방(공위치=공 차례)에. 자체(투자)는 따로 — 고객 '공 차례' 개념 없음.
+  const 대행 = 활성.filter((t) => t.money !== '투자');
+  const 자체 = 활성.filter((t) => t.money === '투자');
   const rooms = ROOMS.map((r) => ({
     ...r,
-    tasks: 활성.filter((t) => roomOf(t) === r.key),
+    tasks: 대행.filter((t) => roomOf(t) === r.key),
   }));
   const 언젠가 = tasks.filter((t) => t.ball === 'hold')
     .sort((a, b) => (b.staleDays ?? 0) - (a.staleDays ?? 0)); // 오래된 것 먼저(resurface)
 
-  return { rooms, 가동률, 과업수: 활성.length, source, syncedAt, 언젠가 };
+  return { rooms, 가동률, 과업수: 대행.length, source, syncedAt, 언젠가, 자체 };
 }
