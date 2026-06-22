@@ -56,6 +56,9 @@ const CSS = `
 .qb .tkt.urgent{border-left:3px solid #ef4458}
 .qb .ic{font-size:17px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:#f1f3fa;border-radius:10px;flex-shrink:0}
 .qb .tbody{flex:1;min-width:0}.qb .tag-cli{font-size:10px;font-weight:700;color:#9298ac}
+.qb .cli-proj{font-size:10.5px;color:#9aa0b0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .cli-proj .proj{color:#5a6078;font-weight:700}
+.qb .task-big{font-size:15px;font-weight:700;color:#1a1e30;line-height:1.32;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.qb .room.wait .tkt{flex:1 1 280px}
 .qb .task{font-size:13.5px;font-weight:700;margin-top:1px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .qb .proj-sub{font-size:10.5px;color:#9298ac;margin-top:1px}
 .qb .who-bdg{font-size:10px;font-weight:700;color:#5a6078;background:#f1f3fa;border-radius:6px;padding:2px 6px;flex-shrink:0}
@@ -127,19 +130,19 @@ export default function OfficeBoardView() {
   const hold = board.filter((t) => t.ball === 'hold');
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
 
-  // 원래 구조: 고객사(위) / 과업(가운데) / 프로젝트명(아래 회색). 단건(과업=프로젝트)·중복은 생략.
-  const titleOf = (t: Task) => (t.task && t.task !== '(프로젝트 등록)') ? t.task : t.project;
+  // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
+  const bigTask = (t: Task) => (t.task && t.task !== '(프로젝트 등록)') ? t.task : (t.status || t.project);
   const Card = (t: Task) => {
-    const title = titleOf(t);
+    const cli = t.client && t.client !== t.project ? t.client : '';
     return (
     <div key={t.id} className={`tkt${t.urgent ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
-        {t.client && <div className="tag-cli">{t.client}</div>}
-        <div className="task">{title}</div>
-        {t.project !== title && t.project !== t.client && <div className="proj-sub">{t.project}</div>}
+        <div className="cli-proj">{cli && <span>{cli} · </span>}<span className="proj">{t.project}</span></div>
+        <div className="task-big">{bigTask(t)}</div>
       </div>
       {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
+      {t.ball === 'client' && <span className="waitfor">🟣 고객</span>}
       {t.due && t.dday != null && <span className={`bdg${t.dday <= 7 ? ' soon' : ''}`}>{ddText(t.dday)}</span>}
     </div>
     );
@@ -173,11 +176,7 @@ export default function OfficeBoardView() {
       </div>
 
       <section className="room wait" style={{ marginTop: 14 }}><div className="rh">🚪 대기 <span className="cnt">{wait.length}</span><span className="hint">상대 답·결과 기다림</span></div>
-        <div className="rowwrap">{wait.length ? wait.map((t) => (
-          <div key={t.id} className={`tkt${sel?.id === t.id ? ' sel' : ''}`} style={{ width: 300 }} onClick={() => setSel(t)}>
-            <div className="ic">🚪</div><div className="tbody">{t.client && t.client !== t.project && <div className="tag-cli">{t.client}</div>}<div className="task">{t.project}</div><div className="proj-sub">⏳ {t.status || t.task}</div></div>
-            <span className="waitfor">🟣 고객</span></div>
-        )) : <Empty />}</div></section>
+        <div className="rowwrap">{wait.length ? wait.map(Card) : <Empty />}</div></section>
 
       <div className="board3">
         <section className="room todo"><div className="rh">📅 예정 <span className="cnt">{todo.length}</span><span className="hint">날짜 있음</span></div>
