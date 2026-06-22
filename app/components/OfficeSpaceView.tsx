@@ -1,8 +1,8 @@
 'use client';
 
 // 공간형 사무실 뷰 — "방 = 공이 누구 차례냐". 대행은 방(사장실·작업·로비·아이디어),
-// 자체(투자)는 따로. 캐릭터 클릭 → 공위치 변경/완료. 상세는 칸반 토글이 보완.
-import { useEffect, useState, useCallback } from 'react';
+// 자체(투자)는 따로. 캐릭터를 마우스로 끌어 방에 놓으면 공위치 변경(포인터 방식 — HTML5 드래그 불안정 회피).
+import { useEffect, useState, useCallback, useRef } from 'react';
 
 type Task = {
   id: string; project: string; task: string; owner: string;
@@ -17,7 +17,7 @@ const POS_LABELS = ['시작전', '내작업', '내회신', '고객대기', '보�
 const BALL2KO: Record<string, string> = {
   start: '시작전', mywork: '내작업', myreply: '내회신', client: '고객대기', hold: '보류', done: '완수', unset: '',
 };
-// 방 → 공위치(드롭하면 이 공위치로). 끌어다 놓는 게 곧 "공 차례 넘기기".
+// 방 → 공위치(놓으면 이 공위치로) = "공 차례 넘기기"
 const ROOM2POS: Record<string, string> = { boss: '내회신', work: '내작업', lobby: '고객대기', idea: '시작전' };
 function charIdx(id: string) { let s = 0; for (const c of id) s += c.charCodeAt(0); return s % 5; }
 function marker(t: Task): [string, string] {
@@ -40,30 +40,32 @@ const CSS = `
 .ospace .room.boss{grid-row:1/3;background:#fffbf2;border-color:#f1dcae}
 .ospace .room.lobby{background:#faf8ff;border-color:#e6def9}
 .ospace .room.work{background:#f6fafe;border-color:#cfe2f3}
+.ospace .room.over{outline:2px dashed #3b82f6;outline-offset:-5px;background:#eef6ff}
+.ospace .selfbox.over{outline:2px dashed #0ea5e9;outline-offset:-5px}
 .ospace .rh{font-size:13.5px;margin-bottom:10px}.ospace .rh b{font-size:14.5px}
 .ospace .cnt{background:#eef2f8;border:1px solid #d3dcea;border-radius:999px;padding:1px 8px;font-size:11.5px;color:#475569}
 .ospace .hint{color:#94a3b8;font-size:11.5px}
-.ospace .floorpeople{display:grid;grid-template-columns:repeat(auto-fill,98px);gap:10px 4px;align-items:end}
-.ospace .ch{width:98px;height:160px;text-align:center;cursor:grab;user-select:none;position:relative;padding-top:24px;display:flex;flex-direction:column;align-items:center;transition:transform .12s}
-.ospace .ch:active{cursor:grabbing}
+.ospace .floorpeople{display:grid;grid-template-columns:repeat(auto-fill,98px);gap:10px 4px;align-items:end;min-height:60px}
+.ospace .ch{width:98px;height:160px;text-align:center;cursor:grab;user-select:none;position:relative;padding-top:24px;display:flex;flex-direction:column;align-items:center;transition:transform .12s;touch-action:none}
+.ospace .ch.dragging{opacity:.35}
 .ospace .ch:hover{transform:translateY(-4px)}
 .ospace .chimg{height:82px;display:flex;align-items:flex-end;justify-content:center}
-.ospace .chimg img{max-height:82px;max-width:90px;width:auto;filter:drop-shadow(0 4px 4px #0003)}
+.ospace .chimg img{max-height:82px;max-width:90px;width:auto;filter:drop-shadow(0 4px 4px #0003);pointer-events:none}
 .ospace .ch .nm{font-size:12.5px;font-weight:700;margin-top:2px;height:17px;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:98px;color:#1e293b}
 .ospace .ch .role{font-size:10.5px;color:#64748b;line-height:1.2;height:26px;overflow:hidden;width:98px}
 .ospace .ch .ow{font-size:10px;color:#db2777;font-weight:700;height:13px}
 .ospace .ch.glow .chimg img{filter:drop-shadow(0 0 8px #ef4444) drop-shadow(0 0 3px #ef4444)}
 .ospace .mk{position:absolute;top:0;left:50%;transform:translateX(-50%);font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:7px;white-space:nowrap;z-index:6;border:1px solid #0002}
 .ospace .mk.mine{background:var(--mine);color:#fff}.ospace .mk.client{background:var(--client);color:#fff}
-.ospace .mk.urgent{background:var(--urgent);color:#fff;animation:ofl 1s infinite}
+.ospace .mk.urgent{background:var(--urgent);color:#fff}
 .ospace .mk.run{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}.ospace .mk.seed{background:#d1fae5;color:#047857}.ospace .mk.self{background:#e0f2fe;color:#0369a1;border-color:#bae6fd}
-@keyframes ofl{50%{transform:translateX(-50%) translateY(-3px)}}
 .ospace .empty{color:#94a3b8;font-size:12.5px;padding:24px 10px;text-align:center;width:100%}
 .ospace .selfbox{margin-top:18px;border:1.5px solid #d8e0ec;border-radius:16px;padding:12px 14px 16px;background:#f4f7fb}
 .ospace .later{margin-top:12px;font-size:12px;color:#64748b}
 .ospace .file{display:inline-block;background:#fff;border:1px solid #d8e0ec;border-radius:7px;padding:4px 9px;margin:3px 3px 0 0;color:#475569}
 .ospace .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;font-size:11.5px;color:#64748b}
 .ospace .legend i{padding:2px 8px;border-radius:6px;font-weight:800;color:#fff}
+.ospace .ghost{position:fixed;pointer-events:none;z-index:200;opacity:.9;width:72px;filter:drop-shadow(0 6px 8px #0005)}
 `;
 
 export default function OfficeSpaceView() {
@@ -71,8 +73,11 @@ export default function OfficeSpaceView() {
   const [err, setErr] = useState('');
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
-  const [drag, setDrag] = useState<Task | null>(null);   // 끌고 있는 과업
-  const [over, setOver] = useState('');                   // 드롭 후보 방(하이라이트)
+  const [drag, setDrag] = useState<Task | null>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [over, setOver] = useState('');
+  const downAt = useRef<{ x: number; y: number } | null>(null);
+  const movedRef = useRef(false);
 
   const load = useCallback(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
@@ -91,29 +96,56 @@ export default function OfficeSpaceView() {
     await fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sel.id }) });
     setBusy(false); setSel(null); load();
   };
-  // 드래그 드롭: 캐릭터를 방/자체구역에 놓으면 공위치(또는 대행/자체)가 자동 변경.
-  const patchTask = async (id: string, patch: Record<string, string>) => {
+  const patchTask = async (t: Task, patch: Record<string, string>) => {
     setBusy(true);
-    await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, patch }) });
+    await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, patch }) });
     setBusy(false); load();
   };
-  const findById = (id: string): Task | null => {
-    if (!office || !id) return null;
-    for (const r of office.rooms) { const f = r.tasks.find((t) => t.id === id); if (f) return f; }
-    return (office.자체 || []).find((t) => t.id === id) || (office.언젠가 || []).find((t) => t.id === id) || null;
+  const dropOn = (t: Task, zone: string) => {
+    if (zone === 'self') {
+      if (t.money !== '투자') patchTask(t, { 돈종류: '투자' });   // 대행 → 자체
+      return;
+    }
+    if (ROOM2POS[zone]) {
+      const patch: Record<string, string> = { 공위치: ROOM2POS[zone] };
+      if (t.money === '투자') patch.돈종류 = '매출';               // 자체 → 대행
+      patchTask(t, patch);
+    }
   };
-  const dropTo = (roomKey: string, dragId: string) => {
-    const t = drag || findById(dragId); setOver(''); setDrag(null);
-    if (!t) return;
-    const patch: Record<string, string> = { 공위치: ROOM2POS[roomKey] };
-    if (t.money === '투자') patch.돈종류 = '매출';   // 자체 → 대행 방으로 끌면 대행으로 전환
-    patchTask(t.id, patch);
+
+  // 포인터 드래그: 누르고 6px 이상 움직이면 드래그, 아니면 클릭(상세). 놓은 지점의 [data-room]으로 이동.
+  const onDown = (e: React.PointerEvent, t: Task) => {
+    if (e.button !== 0) return;
+    downAt.current = { x: e.clientX, y: e.clientY };
+    movedRef.current = false;
+    setDrag(t); setPos({ x: e.clientX, y: e.clientY });
   };
-  const dropToSelf = (dragId: string) => {
-    const t = drag || findById(dragId); setOver(''); setDrag(null);
-    if (!t || t.money === '투자') return;             // 대행 → 자체로 전환
-    patchTask(t.id, { 돈종류: '투자' });
-  };
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      setPos({ x: e.clientX, y: e.clientY });
+      if (downAt.current) {
+        const dx = e.clientX - downAt.current.x, dy = e.clientY - downAt.current.y;
+        if (Math.hypot(dx, dy) > 6) movedRef.current = true;
+      }
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const zone = el?.closest('[data-room]') as HTMLElement | null;
+      setOver(zone?.getAttribute('data-room') || '');
+    };
+    const up = (e: PointerEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const zone = (el?.closest('[data-room]') as HTMLElement | null)?.getAttribute('data-room') || '';
+      const t = drag;
+      setDrag(null); setPos(null); setOver('');
+      if (!t) return;
+      if (!movedRef.current) { setSel(t); return; }   // 안 움직였으면 클릭 = 상세
+      if (zone) dropOn(t, zone);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drag]);
 
   if (err) return <p className="text-rose-500 text-center py-10">⚠️ {err}</p>;
   if (!office) return <p className="text-slate-400 text-center py-10">사무실 불러오는 중…</p>;
@@ -122,10 +154,8 @@ export default function OfficeSpaceView() {
     const [cls, lab] = self ? ['self', '🏗️ 자체'] : marker(t);
     const dt = ddText(t.dday);
     return (
-      <div className={`ch ${t.stale ? 'glow' : ''}`} onClick={() => setSel(t)}
-        draggable
-        onDragStart={(e) => { setDrag(t); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); }}
-        onDragEnd={() => { setDrag(null); setOver(''); }}>
+      <div className={`ch ${t.stale ? 'glow' : ''} ${drag?.id === t.id ? 'dragging' : ''}`}
+        onPointerDown={(e) => onDown(e, t)}>
         <div className={`mk ${cls}`}>{lab}</div>
         <div className="chimg"><img src={`/office/char${charIdx(t.id)}.png`} alt="" draggable={false} /></div>
         <div className="nm">{t.client || t.project || ''}</div>
@@ -141,16 +171,12 @@ export default function OfficeSpaceView() {
   return (
     <div className="ospace">
       <style>{CSS}</style>
-      <div className="sech">대행(고객 일) — 방 = 공이 누구 차례냐</div>
+      <div className="sech">대행(고객 일) — 방 = 공이 누구 차례냐 <span style={{ color: '#94a3b8', fontWeight: 400 }}>· 캐릭터를 끌어 다른 방에 놓으면 공위치 바뀜, 그냥 누르면 상세</span></div>
       <div className="grid">
         {office.rooms.map((r) => (
-          <section key={r.key} className={`room ${r.key}`}
-            onDragEnter={(e) => e.preventDefault()}
-            onDragOver={(e) => { e.preventDefault(); setOver((o) => (o === r.key ? o : r.key)); }}
-            onDragLeave={() => setOver((o) => (o === r.key ? '' : o))}
-            onDrop={(e) => { e.preventDefault(); dropTo(r.key, e.dataTransfer.getData('text/plain')); }}
-            style={over === r.key ? { outline: '2px dashed #3b82f6', outlineOffset: '-5px' } : undefined}>
-            <div className="rh"><b>{r.name}</b> <span className="cnt">{r.tasks.length}</span> <span className="hint">{r.hint}</span>{over === r.key && drag ? <span className="hint" style={{ color: '#3b82f6', fontWeight: 700 }}> ← 여기로 놓으면 «{ROOM2POS[r.key]}»</span> : null}</div>
+          <section key={r.key} data-room={r.key} className={`room ${r.key} ${over === r.key && drag ? 'over' : ''}`}>
+            <div className="rh"><b>{r.name}</b> <span className="cnt">{r.tasks.length}</span> <span className="hint">{r.hint}</span>
+              {over === r.key && drag ? <span className="hint" style={{ color: '#3b82f6', fontWeight: 700 }}> ← 놓으면 «{ROOM2POS[r.key]}»</span> : null}</div>
             <div className="floorpeople">
               {r.tasks.length ? r.tasks.map((t) => <Char key={t.id} t={t} />) : <div className="empty">— 비어있음 —</div>}
             </div>
@@ -158,13 +184,9 @@ export default function OfficeSpaceView() {
         ))}
       </div>
 
-      <div className="selfbox"
-        onDragEnter={(e) => e.preventDefault()}
-        onDragOver={(e) => { e.preventDefault(); setOver((o) => (o === 'self' ? o : 'self')); }}
-        onDragLeave={() => setOver((o) => (o === 'self' ? '' : o))}
-        onDrop={(e) => { e.preventDefault(); dropToSelf(e.dataTransfer.getData('text/plain')); }}
-        style={over === 'self' ? { outline: '2px dashed #0ea5e9', outlineOffset: '-5px' } : undefined}>
-        <div className="sech">🏗️ 자체 사업 (내부·투자) — 같은 캐릭터, 자리만 분리{over === 'self' && drag ? <span style={{ color: '#0ea5e9', fontWeight: 700 }}> ← 놓으면 자체로 전환</span> : null}</div>
+      <div data-room="self" className={`selfbox ${over === 'self' && drag ? 'over' : ''}`}>
+        <div className="sech">🏗️ 자체 사업 (내부·투자) — 같은 캐릭터, 자리만 분리
+          {over === 'self' && drag ? <span style={{ color: '#0ea5e9', fontWeight: 700 }}> ← 놓으면 자체로 전환</span> : null}</div>
         <div className="floorpeople">
           {자체.length ? 자체.map((t) => <Char key={t.id} t={t} self />) : <div className="empty">—</div>}
         </div>
@@ -182,6 +204,12 @@ export default function OfficeSpaceView() {
         <span><i style={{ background: '#dbeafe', color: '#1d4ed8' }}>⚙️ 작업중</i></span>
         <span>🔴 글로우=오래 멈춤(노화)</span>
       </div>
+
+      {/* 끌고 있는 유령 캐릭터 */}
+      {drag && pos && (
+        <img className="ghost" src={`/office/char${charIdx(drag.id)}.png`} alt=""
+          style={{ left: pos.x - 36, top: pos.y - 70 }} />
+      )}
 
       {sel && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setSel(null)}>
