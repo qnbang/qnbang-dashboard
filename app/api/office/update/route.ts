@@ -37,6 +37,8 @@ export async function POST(req: Request) {
     const head = (rows[0] as unknown[]).map((h) => String(h));
     const idIdx = head.indexOf('id');
     const data = rows.slice(1).filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''));
+    // 안전장치: 읽기가 비정상적으로 적게 돌아오면(일시적 읽기 오류) 전체 덮어쓰기 중단 — 대량 유실 방지.
+    if (data.length < 5) return NextResponse.json({ ok: false, error: `과업이 ${data.length}건만 읽혀 저장을 막았어요(읽기 오류 의심). 잠시 후 다시 시도하세요.` }, { status: 503 });
     const exists = data.some((r) => String(r[idIdx]) === String(id));
     if (!exists) return NextResponse.json({ ok: false, error: '해당 과업 없음: ' + id }, { status: 404 });
 
