@@ -80,6 +80,10 @@ const CSS = `
 .qb .pbody{flex:1;overflow-y:auto;padding:16px 20px}.qb .psec{font-size:12px;font-weight:800;color:#1a1e30;margin:0 0 6px}
 .qb .step{display:flex;gap:9px;padding:8px 0;border-bottom:1px dashed #f0f2f8;font-size:13px;color:#23283c}
 .qb .note{font-size:11.5px;color:#7a8098;padding:10px;background:#f6f7fb;border-radius:9px;margin-top:6px}
+.qb .editbox{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}
+.qb .ein{font-size:13px;border:1px solid #e0e3ee;border-radius:8px;padding:7px 10px;color:#1a1e30;background:#fff}
+.qb .ein:focus{outline:none;border-color:#3a3d44}.qb .ein::placeholder{color:#b0b5c6}
+.qb .esave{align-self:flex-start;font-size:12px;font-weight:700;background:#3a3d44;color:#fff;border:none;border-radius:8px;padding:6px 16px;cursor:pointer}.qb .esave:disabled{opacity:.5}
 `;
 
 function ddText(d: number | null) { if (d == null) return ''; if (d < 0) return `마감 ${-d}일 지남`; if (d === 0) return '오늘'; return `D-${d}`; }
@@ -91,6 +95,7 @@ export default function OfficeBoardView() {
   const [filter, setFilter] = useState<'all' | '회사' | 'jy'>('all');
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
+  const [edit, setEdit] = useState({ 고객: '', 프로젝트: '', 과업명: '' });
 
   const load = useCallback(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
@@ -98,6 +103,14 @@ export default function OfficeBoardView() {
     }).catch((e) => setErr(String(e)));
   }, []);
   useEffect(() => { load(); }, [load]);
+  // 패널 열 때 수정 입력칸 초기화(고객=실제 고객만, 프로젝트=프로젝트명, 과업명=자리표시 제외)
+  useEffect(() => {
+    if (sel) setEdit({
+      고객: sel.client && sel.client !== sel.project ? sel.client : '',
+      프로젝트: sel.project || '',
+      과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
+    });
+  }, [sel]);
 
   const patch = async (id: string, body: Record<string, unknown>) => {
     setBusy(true);
@@ -109,6 +122,7 @@ export default function OfficeBoardView() {
     await fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => null);
     setBusy(false); setSel(null); load();
   };
+  const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트, 과업명: edit.과업명 } });
 
   if (err) return <p className="text-rose-500 text-center py-10">⚠️ {err}</p>;
   if (!office) return <p className="text-slate-400 text-center py-10">관제탑 불러오는 중…</p>;
@@ -213,6 +227,13 @@ export default function OfficeBoardView() {
             <div className="statebtns"><button disabled={busy} onClick={() => patch(sel.id, { patch: { 담당자: sel.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {sel.owner === '김지영' ? '종호' : '지영'}</button></div>
           </div>
           <div className="pbody">
+            <div className="psec">✏️ 정보 수정</div>
+            <div className="editbox">
+              <input className="ein" value={edit.고객} onChange={(e) => setEdit({ ...edit, 고객: e.target.value })} placeholder="고객사 (자체면 비움)" />
+              <input className="ein" value={edit.프로젝트} onChange={(e) => setEdit({ ...edit, 프로젝트: e.target.value })} placeholder="프로젝트명" />
+              <input className="ein" value={edit.과업명} onChange={(e) => setEdit({ ...edit, 과업명: e.target.value })} placeholder="과업명 (지금 할 일)" />
+              <button className="esave" disabled={busy} onClick={saveEdit}>저장</button>
+            </div>
             {sel.status && (<><div className="psec">📍 현재 상황</div><div className="step">{sel.status}</div></>)}
             {sel.nextStep && (<><div className="psec" style={{ marginTop: 16 }}>▸ 다음 할 일</div><div className="step">{sel.nextStep}</div></>)}
             <div className="psec" style={{ marginTop: 16 }}>🧭 할일</div>
