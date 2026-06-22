@@ -36,10 +36,10 @@ const CSS = `
 .ospace{--mine:#f59e0b;--client:#8b5cf6;--urgent:#ef4444}
 .ospace .sech{font-size:12.5px;color:#64748b;margin:0 0 8px;font-weight:700}
 .ospace .grid{display:grid;grid-template-columns:0.8fr 1.7fr;grid-template-rows:auto auto;gap:14px}
-.ospace .room{position:relative;border:1.5px solid #d8e0ec;border-radius:16px;padding:12px 14px 16px;min-height:160px;background:#fbfcfe;box-shadow:0 1px 3px #0000000a}
-.ospace .room.boss{grid-row:1/3;background:#fffbf2;border-color:#f1dcae}
-.ospace .room.lobby{background:#faf8ff;border-color:#e6def9}
-.ospace .room.work{background:#f6fafe;border-color:#cfe2f3}
+.ospace .room{position:relative;border:1px solid #ffffff7a;border-radius:22px;padding:12px 14px 16px;min-height:160px;background:#ffffff5c;backdrop-filter:blur(32px) saturate(190%);-webkit-backdrop-filter:blur(32px) saturate(190%);box-shadow:0 12px 38px -12px #2a335548,inset 0 1px 1px #fffffff2,inset 0 0 0 1px #ffffff30,inset 0 -18px 34px -20px #ffffff55,inset 0 16px 30px -22px #ffffff66}
+.ospace .room.boss{grid-row:1/3;border-left:3px solid #e3c98f}
+.ospace .room.lobby{border-left:3px solid #c9b8f0}
+.ospace .room.work{border-left:3px solid #a9cbe8}
 .ospace .room.over{outline:2px dashed #3b82f6;outline-offset:-5px;background:#eef6ff}
 .ospace .selfbox.over{outline:2px dashed #0ea5e9;outline-offset:-5px}
 .ospace .rh{font-size:13.5px;margin-bottom:10px}.ospace .rh b{font-size:14.5px}

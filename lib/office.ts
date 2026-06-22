@@ -10,7 +10,9 @@ const SHEET_URL = process.env.SHEET_URL;
 const SHEET_KEY = process.env.SHEET_KEY;
 
 // 과업 탭 '공위치' 한글 라벨 → 내부 코드(과업POST.py BALL2POS의 역방향)
+// 받은일(inbox) = 외부·메일로 막 들어와 아직 분류 안 한 입력(시작전보다 앞). 빈 공위치(unset)와 함께 받은일 바구니로.
 const POS2BALL: Record<string, string> = {
+  '받은일': 'inbox',
   '시작전': 'start', '내작업': 'mywork', '내회신': 'myreply',
   '고객대기': 'client', '보류': 'hold', '완수': 'done',
 };

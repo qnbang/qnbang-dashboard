@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #c9ced8;
+  --foreground: #1e2233;
 }
 
 @theme inline {
@@ -12,15 +12,46 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* 리퀴드 글라스(시안 I) — 라이트 베이스 고정(다크모드여도 같은 룩). */
+body {
+  background: #c9ced8;
+  background-attachment: fixed;
+  background-image:
+    radial-gradient(640px 540px at 12% 6%, #eef0f5, transparent),
+    radial-gradient(720px 620px at 88% 14%, #e3e6ef, transparent),
+    radial-gradient(700px 760px at 50% 102%, #bcc2d0, transparent),
+    radial-gradient(500px 500px at 70% 60%, #d4d8e2, transparent);
+  color: #1e2233;
+  font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", Arial, sans-serif;
+  min-height: 100vh;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* 프로스트 글라스 패널 — 뒤 배경 그라데이션이 비쳐야 보임. webkit 접두사 필수(사파리 블러). */
+.glass {
+  background: #ffffff5c;
+  border: 1px solid #ffffff7a;
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  box-shadow:
+    0 12px 38px -12px #2a335548,
+    inset 0 1px 1px #fffffff2,
+    inset 0 0 0 1px #ffffff30,
+    inset 0 -18px 34px -20px #ffffff55,
+    inset 0 16px 30px -22px #ffffff66;
+}
+
+/* 가벼운 글라스 — 작은 카드·바 */
+.glass-soft {
+  background: #ffffffb0;
+  border: 1px solid #ffffff9a;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+/* 헤더 프로스트 */
+.glass-header {
+  background: #ffffffb0;
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border-bottom: 1px solid #ffffffcc;
 }

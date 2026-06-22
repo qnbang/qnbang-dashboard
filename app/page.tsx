@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { MonthlyBar, CategoryPie } from './components/charts';
 import OfficeView from './components/OfficeView';
 import OfficeSpaceView from './components/OfficeSpaceView';
+import OfficeBoardView from './components/OfficeBoardView';
 
 type Expense = {
   month: number;
@@ -36,7 +37,7 @@ const TABS = [
   { key: 'hubs', label: '협업 허브', ready: true },
   { key: 'shares', label: '공유된 문서', ready: true },
   { key: 'finance', label: '정산', ready: true },
-  { key: 'tools', label: '업무툴', ready: true },
+  { key: 'tools', label: '큐앤뱅 서비스', ready: true },
 ];
 
 // 협업 허브 — 협업사·클라이언트에게 건네는 "프로젝트 진행 공유 창구" 모음.
@@ -54,8 +55,18 @@ const COLLAB_HUBS = [
   },
 ];
 
-// 업무에 쓰는 외부 도구 목록 — 새 도구가 생기면 여기에 한 줄 추가하면 됩니다.
-const WORK_TOOLS = [
+// 큐앤뱅이 만든 서비스·업무 도구 목록 — 새 서비스가 생기면 여기에 한 줄 추가하면 됩니다.
+// 단일 서비스는 href, 사이트/어드민처럼 갈래가 나뉘면 links에 여러 줄. 로고가 있으면 logo(없으면 icon 이모지).
+type WorkTool = {
+  name: string;
+  desc: string;
+  color: string;
+  icon?: string;
+  logo?: string;
+  href?: string;
+  links?: { label: string; href: string }[];
+};
+const WORK_TOOLS: WorkTool[] = [
   {
     name: '키워드 광고 도구',
     desc: '네이버 검색광고 키워드 월간 검색량·연관키워드 조회',
@@ -70,6 +81,16 @@ const WORK_TOOLS = [
     icon: '✏️',
     color: 'bg-indigo-50 text-indigo-600 border-indigo-200',
   },
+  {
+    name: '반보',
+    desc: '커뮤니티 모임 대시보드 — 모임 안내·신청과 운영 관리',
+    logo: '/logos/banbo.png',
+    color: 'bg-orange-50 text-orange-600 border-orange-200',
+    links: [
+      { label: '사이트', href: 'https://banbo-preview.vercel.app' },
+      { label: '어드민', href: 'https://banbo-preview.vercel.app/admin.html' },
+    ],
+  },
 ];
 
 export default function Home() {
@@ -78,7 +99,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('office');
-  const [officeMode, setOfficeMode] = useState<'space' | 'kanban'>('space');
+  const [officeMode, setOfficeMode] = useState<'board' | 'space' | 'kanban'>('board');
 
   useEffect(() => {
     fetch('/api/data')
@@ -98,8 +119,8 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="bg-white border-b border-slate-200">
+    <div className="min-h-screen">
+      <header className="glass-header sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-lg font-bold text-slate-800">큐앤뱅 대시보드</h1>
           <div className="flex items-center gap-4">
@@ -136,12 +157,13 @@ export default function Home() {
         {tab === 'office' && (
           <div>
             <div className="flex justify-end mb-3">
-              <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs bg-white">
+              <div className="inline-flex rounded-lg border border-white/60 glass-soft p-0.5 text-xs">
+                <button onClick={() => setOfficeMode('board')} className={`px-3 py-1 rounded-md font-medium ${officeMode === 'board' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>🛰️ 보드</button>
                 <button onClick={() => setOfficeMode('space')} className={`px-3 py-1 rounded-md font-medium ${officeMode === 'space' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>🏢 공간</button>
                 <button onClick={() => setOfficeMode('kanban')} className={`px-3 py-1 rounded-md font-medium ${officeMode === 'kanban' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>📋 칸반</button>
               </div>
             </div>
-            {officeMode === 'space' ? <OfficeSpaceView /> : <OfficeView />}
+            {officeMode === 'board' ? <OfficeBoardView /> : officeMode === 'space' ? <OfficeSpaceView /> : <OfficeView />}
           </div>
         )}
         {tab === 'crm' && <CRMView />}
@@ -637,27 +659,63 @@ function HubsView() {
 function ToolsView() {
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-500">업무에 쓰는 도구 모음입니다. 아이콘을 누르면 새 창에서 열려요.</p>
+      <p className="text-sm text-slate-500">큐앤뱅이 만든 서비스·업무 도구 모음입니다. 아이콘을 누르면 새 창에서 열려요.</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {WORK_TOOLS.map((t) => (
-          <a
-            key={t.name}
-            href={t.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col items-center text-center transition hover:shadow-md hover:-translate-y-0.5"
-          >
-            <div
-              className={`w-14 h-14 rounded-2xl border flex items-center justify-center text-2xl ${t.color}`}
+        {WORK_TOOLS.map((t) => {
+          // 카드 윗부분(로고/아이콘 + 이름 + 설명) — 단일·다중 링크 카드 공통
+          const head = (
+            <>
+              <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center overflow-hidden bg-white ${t.color}`}>
+                {t.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={t.logo} alt={t.name} className="w-10 h-10 object-contain" />
+                ) : (
+                  <span className="text-2xl">{t.icon}</span>
+                )}
+              </div>
+              <p className="mt-3 text-sm font-semibold text-slate-800 group-hover:text-indigo-600">{t.name}</p>
+              <p className="mt-1 text-xs text-slate-400 leading-snug">{t.desc}</p>
+            </>
+          );
+
+          // 사이트/어드민처럼 갈래가 나뉜 카드 — 하단에 링크 버튼 여러 개
+          if (t.links) {
+            return (
+              <div
+                key={t.name}
+                className="group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col items-center text-center transition hover:shadow-md hover:-translate-y-0.5"
+              >
+                {head}
+                <div className="mt-3 flex gap-2">
+                  {t.links.map((l) => (
+                    <a
+                      key={l.label}
+                      href={l.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium px-3 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition"
+                    >
+                      {l.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          // 단일 링크 카드 — 카드 전체가 링크
+          return (
+            <a
+              key={t.name}
+              href={t.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col items-center text-center transition hover:shadow-md hover:-translate-y-0.5"
             >
-              {t.icon}
-            </div>
-            <p className="mt-3 text-sm font-semibold text-slate-800 group-hover:text-indigo-600">
-              {t.name}
-            </p>
-            <p className="mt-1 text-xs text-slate-400 leading-snug">{t.desc}</p>
-          </a>
-        ))}
+              {head}
+            </a>
+          );
+        })}
       </div>
     </div>
   );

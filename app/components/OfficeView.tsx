@@ -33,11 +33,6 @@ const MONEY_CLS: Record<string, string> = {
   투자: 'bg-violet-50 text-violet-700 border-violet-200',
   운영: 'bg-slate-50 text-slate-600 border-slate-200',
 };
-const ROOM_CLS: Record<string, string> = {
-  boss: 'border-amber-200 bg-amber-50', work: 'border-emerald-200 bg-emerald-50',
-  lobby: 'border-sky-200 bg-sky-50', team: 'border-pink-200 bg-pink-50',
-  idea: 'border-violet-200 bg-violet-50', store: 'border-slate-200 bg-slate-50',
-};
 
 function ddayText(d: number | null): string {
   if (d === null) return '';
@@ -48,8 +43,8 @@ function ddayText(d: number | null): string {
 
 function Scorecard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <div className="text-xs text-slate-400 mb-1">{label}</div>
+    <div className="glass rounded-2xl p-4">
+      <div className="text-xs text-slate-500 mb-1">{label}</div>
       <div className={`text-2xl font-bold ${tone || 'text-slate-800'}`}>{value}</div>
       {sub && <div className="text-[11px] text-slate-400 mt-1">{sub}</div>}
     </div>
@@ -214,7 +209,7 @@ export default function OfficeView() {
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {office.rooms.map((room) => (
-          <div key={room.key} className={`rounded-xl border p-3 min-h-[120px] ${ROOM_CLS[room.key]}`}>
+          <div key={room.key} className="glass rounded-2xl p-3 min-h-[120px]">
             <div className="flex items-baseline justify-between mb-2">
               <div className="font-bold text-sm">{room.name}</div>
               <div className="text-[11px] text-slate-400">{room.hint} · {room.tasks.length}</div>
