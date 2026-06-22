@@ -145,7 +145,8 @@ export default function OfficeSpaceView() {
       <div className="grid">
         {office.rooms.map((r) => (
           <section key={r.key} className={`room ${r.key}`}
-            onDragOver={(e) => { e.preventDefault(); setOver(r.key); }}
+            onDragEnter={(e) => e.preventDefault()}
+            onDragOver={(e) => { e.preventDefault(); setOver((o) => (o === r.key ? o : r.key)); }}
             onDragLeave={() => setOver((o) => (o === r.key ? '' : o))}
             onDrop={(e) => { e.preventDefault(); dropTo(r.key, e.dataTransfer.getData('text/plain')); }}
             style={over === r.key ? { outline: '2px dashed #3b82f6', outlineOffset: '-5px' } : undefined}>
@@ -158,7 +159,8 @@ export default function OfficeSpaceView() {
       </div>
 
       <div className="selfbox"
-        onDragOver={(e) => { e.preventDefault(); setOver('self'); }}
+        onDragEnter={(e) => e.preventDefault()}
+        onDragOver={(e) => { e.preventDefault(); setOver((o) => (o === 'self' ? o : 'self')); }}
         onDragLeave={() => setOver((o) => (o === 'self' ? '' : o))}
         onDrop={(e) => { e.preventDefault(); dropToSelf(e.dataTransfer.getData('text/plain')); }}
         style={over === 'self' ? { outline: '2px dashed #0ea5e9', outlineOffset: '-5px' } : undefined}>
