@@ -122,18 +122,24 @@ export default function OfficeBoardView() {
   const hold = vis.filter((t) => t.ball === 'hold');
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
 
-  const Card = (t: Task) => (
+  // 자리표시·중복 텍스트 제거: 제목=과업명(자리표시면 프로젝트명), 윗줄=고객(없으면 제목과 다를 때만 프로젝트), 상태=제목과 다를 때만.
+  const titleOf = (t: Task) => (t.task && t.task !== '(프로젝트 등록)') ? t.task : t.project;
+  const ctxOf = (t: Task) => t.client || (titleOf(t) !== t.project ? t.project : '');
+  const Card = (t: Task) => {
+    const title = titleOf(t), ctx = ctxOf(t);
+    return (
     <div key={t.id} className={`tkt${t.urgent ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
-        <div className="tag-cli">{t.client || t.project}</div>
-        <div className="task">{t.task}</div>
-        {t.status ? <div className="proj-sub">▸ {t.status}</div> : (t.client !== t.project && <div className="proj-sub">{t.project}</div>)}
+        {ctx && <div className="tag-cli">{ctx}</div>}
+        <div className="task">{title}</div>
+        {t.status && t.status !== title && <div className="proj-sub">▸ {t.status}</div>}
       </div>
       {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
       {t.due && t.dday != null && <span className={`bdg${t.dday <= 7 ? ' soon' : ''}`}>{ddText(t.dday)}</span>}
     </div>
-  );
+    );
+  };
   const Empty = () => <div className="empty">— 없음 —</div>;
 
   return (
@@ -165,7 +171,7 @@ export default function OfficeBoardView() {
       <section className="room wait" style={{ marginTop: 14 }}><div className="rh">🚪 대기 <span className="cnt">{wait.length}</span><span className="hint">상대 답·결과 기다림</span></div>
         <div className="rowwrap">{wait.length ? wait.map((t) => (
           <div key={t.id} className={`tkt${sel?.id === t.id ? ' sel' : ''}`} style={{ width: 300 }} onClick={() => setSel(t)}>
-            <div className="ic">🚪</div><div className="tbody"><div className="tag-cli">{t.client || t.project}</div><div className="task">{t.project}</div><div className="proj-sub">⏳ {t.status || t.task}</div></div>
+            <div className="ic">🚪</div><div className="tbody">{t.client && t.client !== t.project && <div className="tag-cli">{t.client}</div>}<div className="task">{t.project}</div><div className="proj-sub">⏳ {t.status || t.task}</div></div>
             <span className="waitfor">🟣 고객</span></div>
         )) : <Empty />}</div></section>
 
