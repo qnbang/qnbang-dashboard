@@ -26,7 +26,12 @@ const PRODUCTS = [
   { n: '네이버 키워드 검색기', v: '배포·인증 추가', next: '다음: 요금제' },
   { n: '크몽 상세페이지 생성기', v: '개발 중', next: '다음: 완성도 마무리' },
   { n: '쇼츠 자동 편집기', v: '개발 중', next: '다음: 자동자막' },
+  { n: '매크로 투자 브리핑', v: '자동발행 운영', next: '' },
+  { n: 'AI 마케팅팀', v: '콘텐츠 루프', next: '' },
+  { n: '가게지기', v: '개발 중', next: '' },
 ];
+// 도구는 과업 보드(공위치)가 아니라 도구 백로그로 — 임시 하드코딩(추후 시트 `분류` 칸으로 대체).
+const TOOL_PROJECTS = new Set(['매크로 투자 브리핑', '큐앤뱅 AI마케팅팀']);
 const EXPERIMENTS = [
   { n: '풋살 케어·트레이닝', g: '개인 — v1 출시 판정 대기' },
   { n: '생일 커뮤니티', g: '개인 — 할지 말지 미정' },
@@ -111,29 +116,28 @@ export default function OfficeBoardView() {
     ...(office.언젠가 || []),
   ];
   const vis = all.filter((t) => filter === 'all' || filter === '회사' || (filter === 'jy' && t.owner === '김지영'));
-  // 단일 기준 = 공위치. 모든 일(대행·자체 사업 다)이 "지금 어느 단계냐"로 배치. AI지원=작업, 촌캉스=보류 등.
-  // (서비스개발 5종 제품·개인 실험은 과업이 아니라 아래 고정 섹션으로 분리.)
-  const inbox = vis.filter((t) => t.ball === 'inbox');
-  const proc = vis.filter((t) => t.ball === 'myreply');
-  const work = vis.filter((t) => t.ball === 'mywork').sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
-  const wait = vis.filter((t) => t.ball === 'client');
-  const todo = vis.filter((t) => t.ball === 'start' && t.due);
-  const some = vis.filter((t) => t.ball === 'start' && !t.due);
-  const hold = vis.filter((t) => t.ball === 'hold');
+  // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
+  const board = vis.filter((t) => !TOOL_PROJECTS.has(t.project));
+  const inbox = board.filter((t) => t.ball === 'inbox');
+  const proc = board.filter((t) => t.ball === 'myreply');
+  const work = board.filter((t) => t.ball === 'mywork').sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
+  const wait = board.filter((t) => t.ball === 'client');
+  const todo = board.filter((t) => t.ball === 'start' && t.due);
+  const some = board.filter((t) => t.ball === 'start' && !t.due);
+  const hold = board.filter((t) => t.ball === 'hold');
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
 
-  // 자리표시·중복 텍스트 제거: 제목=과업명(자리표시면 프로젝트명), 윗줄=고객(없으면 제목과 다를 때만 프로젝트), 상태=제목과 다를 때만.
+  // 원래 구조: 고객사(위) / 과업(가운데) / 프로젝트명(아래 회색). 단건(과업=프로젝트)·중복은 생략.
   const titleOf = (t: Task) => (t.task && t.task !== '(프로젝트 등록)') ? t.task : t.project;
-  const ctxOf = (t: Task) => t.client || (titleOf(t) !== t.project ? t.project : '');
   const Card = (t: Task) => {
-    const title = titleOf(t), ctx = ctxOf(t);
+    const title = titleOf(t);
     return (
     <div key={t.id} className={`tkt${t.urgent ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
-        {ctx && <div className="tag-cli">{ctx}</div>}
+        {t.client && <div className="tag-cli">{t.client}</div>}
         <div className="task">{title}</div>
-        {t.status && t.status !== title && <div className="proj-sub">▸ {t.status}</div>}
+        {t.project !== title && t.project !== t.client && <div className="proj-sub">{t.project}</div>}
       </div>
       {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
       {t.due && t.dday != null && <span className={`bdg${t.dday <= 7 ? ' soon' : ''}`}>{ddText(t.dday)}</span>}
