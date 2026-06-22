@@ -145,7 +145,11 @@ export default function OfficeBoardView() {
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
 
   // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
-  const bigTask = (t: Task) => (t.task && t.task !== '(프로젝트 등록)') ? t.task : (t.status || t.project);
+  // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
+  const bigTask = (t: Task) => {
+    if (t.ball === 'client') return t.status || (t.task !== '(프로젝트 등록)' ? t.task : '') || t.project;
+    return (t.task && t.task !== '(프로젝트 등록)') ? t.task : (t.status || t.project);
+  };
   const Card = (t: Task) => {
     const cli = t.client && t.client !== t.project ? t.client : '';
     return (
