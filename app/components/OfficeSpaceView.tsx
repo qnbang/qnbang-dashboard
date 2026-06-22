@@ -76,6 +76,7 @@ export default function OfficeSpaceView() {
   const [drag, setDrag] = useState<Task | null>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [over, setOver] = useState('');
+  const [toast, setToast] = useState('');
   const downAt = useRef<{ x: number; y: number } | null>(null);
   const movedRef = useRef(false);
 
@@ -98,8 +99,12 @@ export default function OfficeSpaceView() {
   };
   const patchTask = async (t: Task, patch: Record<string, string>) => {
     setBusy(true);
-    await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, patch }) });
-    setBusy(false); load();
+    const r = await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, patch }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    setBusy(false);
+    if (!j.ok) { setToast(`⚠️ 이동 실패: ${j.error || '네트워크 오류'}`); setTimeout(() => setToast(''), 4000); return; }
+    setToast(`✅ ${t.client || t.project} → ${patch.공위치 || (patch.돈종류 === '투자' ? '자체' : '')}`); setTimeout(() => setToast(''), 2000);
+    load();
   };
   const dropOn = (t: Task, zone: string) => {
     if (zone === 'self') {
@@ -171,6 +176,7 @@ export default function OfficeSpaceView() {
   return (
     <div className="ospace">
       <style>{CSS}</style>
+      {toast && <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[300] bg-slate-800 text-white text-sm px-4 py-2 rounded-lg shadow-lg">{toast}</div>}
       <div className="sech">대행(고객 일) — 방 = 공이 누구 차례냐 <span style={{ color: '#94a3b8', fontWeight: 400 }}>· 캐릭터를 끌어 다른 방에 놓으면 공위치 바뀜, 그냥 누르면 상세</span></div>
       <div className="grid">
         {office.rooms.map((r) => (
