@@ -137,10 +137,17 @@ export default function OfficeBoardView() {
 
   const load = useCallback(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
-      if (j.ok) { setOffice(j.office); setMoney(j.money); setOver({}); } else setErr(j.error || '불러오기 실패');
+      if (j.ok) {
+        setOffice(j.office); setMoney(j.money); setOver({});
+        try { localStorage.setItem('qb-office', JSON.stringify({ office: j.office, money: j.money })); } catch {}
+      } else setErr(j.error || '불러오기 실패');
     }).catch((e) => setErr(String(e)));
   }, []);
-  useEffect(() => { load(); }, [load]);
+  // 첫 페인트: 지난번 받은 보드를 즉시 그려 7~9초 빈 화면을 없앰(뒤에서 최신으로 갱신)
+  useEffect(() => {
+    try { const s = localStorage.getItem('qb-office'); if (s) { const d = JSON.parse(s); setOffice(d.office); setMoney(d.money); } } catch {}
+    load();
+  }, [load]);
   // 패널 열 때 수정 입력칸 초기화(고객=실제 고객만, 프로젝트=프로젝트명, 과업명=자리표시 제외)
   useEffect(() => {
     if (sel) {
