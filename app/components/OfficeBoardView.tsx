@@ -165,7 +165,7 @@ export default function OfficeBoardView() {
     setSel(null);
     fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).then(() => load()).catch(() => load());
   };
-  const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트, 과업명: edit.과업명 } });
+  const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트 } });
   // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
   const stepPost = async (id: string, todos: string[], 내용: string) => {
     setBusy(true);
@@ -226,20 +226,21 @@ export default function OfficeBoardView() {
 
   // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
   // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
+  // 프로젝트=과업. 큰 글씨 = 지금 할 일(현재 단계) → 없으면 현재상태 → 그것도 없으면 프로젝트.
   const bigTask = (t: Task) => {
-    const cur = (t.todos || []).map(parseStep).find((s) => !s.done); // 할일 흐름의 "지금 단계"가 곧 지금 할 일
-    if (cur) return cur.text;
-    if (t.ball === 'client') return t.status || (t.task !== '(프로젝트 등록)' ? t.task : '') || t.project;
-    return (t.task && t.task !== '(프로젝트 등록)') ? t.task : (t.status || t.project);
+    const cur = (t.todos || []).map(parseStep).find((s) => !s.done);
+    return (cur && cur.text) || t.status || t.project;
   };
   const Card = (t: Task) => {
     const cli = t.client && t.client !== t.project ? t.client : '';
+    const big = bigTask(t);
+    const showProj = big !== t.project; // 큰글씨가 프로젝트면 윗줄에 또 안 씀
     return (
     <div key={t.id} className={`tkt${t.urgent ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
-        <div className="cli-proj">{cli && <span>{cli} · </span>}<span className="proj">{t.project}</span></div>
-        <div className="task-big">{bigTask(t)}</div>
+        {(cli || showProj) && <div className="cli-proj">{cli && <span>{cli}{showProj ? ' · ' : ''}</span>}{showProj && <span className="proj">{t.project}</span>}</div>}
+        <div className="task-big">{big}</div>
       </div>
       {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
       {t.ball === 'client' && <span className="waitfor">🟣 고객</span>}
@@ -316,8 +317,7 @@ export default function OfficeBoardView() {
             <button className="editbtn" onClick={() => setShowEdit((v) => !v)}>✏️ 정보 수정 {showEdit ? '▲' : '▼'}</button>
             {showEdit && (<div className="editbox">
               <input className="ein" value={edit.고객} onChange={(e) => setEdit({ ...edit, 고객: e.target.value })} placeholder="고객사 (자체면 비움)" />
-              <input className="ein" value={edit.프로젝트} onChange={(e) => setEdit({ ...edit, 프로젝트: e.target.value })} placeholder="프로젝트명" />
-              <input className="ein" value={edit.과업명} onChange={(e) => setEdit({ ...edit, 과업명: e.target.value })} placeholder="과업명 / 현재 상태" />
+              <input className="ein" value={edit.프로젝트} onChange={(e) => setEdit({ ...edit, 프로젝트: e.target.value })} placeholder="프로젝트명 (= 과업)" />
               <button className="esave" disabled={busy} onClick={saveEdit}>저장</button>
             </div>)}
             <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span></div>
