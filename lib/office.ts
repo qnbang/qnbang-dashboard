@@ -28,6 +28,7 @@ export interface OfficeTask {
   updatedAt: string;       // 갱신일(원본)
   staleDays: number | null; // 마지막 갱신 후 며칠(노화)
   stale: boolean;          // 공위치별 임계 넘겨 "썩는 공"인가
+  history: { when: string; what: string }[]; // 🕘 이력(이력 탭에서, 최신순) — 여정 타임라인
 }
 export interface OfficeRoom { key: string; name: string; hint: string; tasks: OfficeTask[]; }
 export interface OfficeData {
@@ -88,6 +89,7 @@ type Seed = {
   id: string; project: string; task: string; owner: string;
   ball: string; due: string; money: string; customer: string; todos: string[];
   status?: string; nextStep?: string; reason?: string; updatedAt?: string;
+  history?: { when: string; what: string }[];
 };
 
 // 과업 시트 탭 → Seed[] 로 정규화. 못 읽으면 null(→ 폴백).
@@ -107,14 +109,32 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
       status: col('현재상태'), nextStep: col('다음할일'), reason: col('판정근거'), updatedAt: col('갱신일'),
     };
 
+    // 🕘 이력 탭 → 과업id별 이벤트(최신순). 탭 없으면 빈 history.
+    const hist: Record<string, { when: string; what: string }[]> = {};
+    const hrows: unknown[][] = sheets?.['이력'];
+    if (Array.isArray(hrows) && hrows.length > 1) {
+      const hh = (hrows[0] as unknown[]).map((h) => String(h));
+      const hi = { id: hh.indexOf('과업id'), when: hh.indexOf('시각'), what: hh.indexOf('내용') };
+      for (let k = 1; k < hrows.length; k++) {
+        const hr = hrows[k];
+        if (!Array.isArray(hr)) continue;
+        const tid = String(hr[hi.id] ?? '').trim();
+        if (!tid) continue;
+        (hist[tid] ||= []).push({ when: String(hr[hi.when] ?? ''), what: String(hr[hi.what] ?? '') });
+      }
+      for (const k of Object.keys(hist)) hist[k].reverse(); // 최신순
+    }
+
     const out: Seed[] = [];
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       if (!Array.isArray(r) || r.every((c) => String(c ?? '').trim() === '')) continue;
       const get = (j: number) => (j >= 0 ? String(r[j] ?? '').trim() : '');
       const todosRaw = get(ci.todos);
+      const tid = get(ci.id) || `r${i}`;
       out.push({
-        id: get(ci.id) || `r${i}`,
+        id: tid,
+        history: hist[tid] || [],
         project: get(ci.project),
         task: get(ci.task),
         owner: get(ci.owner),
@@ -170,6 +190,7 @@ export async function buildOffice(): Promise<OfficeData> {
       reason: s.reason || '',
       updatedAt: s.updatedAt || '',
       staleDays, stale,
+      history: s.history || [],
     };
   });
 

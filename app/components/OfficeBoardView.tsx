@@ -9,7 +9,17 @@ type Task = {
   money: string; ball: string; due: string; dday: number | null;
   urgent: boolean; client?: string; status?: string; nextStep?: string;
   todos?: string[]; staleDays?: number | null; stale?: boolean;
+  history?: { when: string; what: string }[];
 };
+// 할일 단계 파싱: "✓텍스트 @6/25" → {done, text, date}
+function parseStep(raw: string) {
+  const done = raw.startsWith('✓');
+  let s = (done ? raw.slice(1) : raw).trim();
+  const dm = s.match(/@\s*(\d{1,2}\/\d{1,2})\s*$/);
+  const date = dm ? dm[1] : '';
+  if (dm) s = s.slice(0, dm.index).trim();
+  return { done, text: s, date, raw };
+}
 type Office = { rooms: { tasks: Task[] }[]; 자체?: Task[]; 언젠가?: Task[]; 가동률?: Record<string, number>; 과업수?: number; source?: string; syncedAt?: string };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number };
 const won = (n: number) => `${(n || 0).toLocaleString('ko-KR')}원`;
@@ -84,6 +94,15 @@ const CSS = `
 .qb .ein{font-size:13px;border:1px solid #e0e3ee;border-radius:8px;padding:7px 10px;color:#1a1e30;background:#fff}
 .qb .ein:focus{outline:none;border-color:#3a3d44}.qb .ein::placeholder{color:#b0b5c6}
 .qb .esave{align-self:flex-start;font-size:12px;font-weight:700;background:#3a3d44;color:#fff;border:none;border-radius:8px;padding:6px 16px;cursor:pointer}.qb .esave:disabled{opacity:.5}
+.qb .hint2{font-weight:400;color:#9298ac;font-size:10.5px;margin-left:4px}
+.qb .jstep{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #eef0f7;border-radius:10px;margin-bottom:6px;cursor:pointer;font-size:13.5px;color:#23283c;background:#fff;transition:border-color .1s}
+.qb .jstep:hover{border-color:#c4c8da}.qb .jstep.cur{border-color:#3a3d44;box-shadow:0 0 0 1px #3a3d4422;font-weight:700}
+.qb .jstep.done{color:#a0a5b8;background:#f7f8fc}.qb .jstep.done .jtext{text-decoration:line-through}
+.qb .jmark{width:18px;text-align:center;flex-shrink:0;color:#9298ac}.qb .jstep.cur .jmark{color:#3a3d44}.qb .jstep.done .jmark{color:#10b981}
+.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0}
+.qb .addstep{display:flex;gap:6px;margin:8px 0 4px}.qb .addstep input{flex:1;font-size:12.5px;border:1px solid #e0e3ee;border-radius:8px;padding:6px 10px}.qb .addstep input:focus{outline:none;border-color:#3a3d44}
+.qb .addstep button{font-size:12px;font-weight:700;background:#eef0f7;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;color:#3a3d44}.qb .addstep button:disabled{opacity:.4}
+.qb .ev{display:flex;gap:10px;padding:6px 0;font-size:12.5px;align-items:baseline;border-bottom:1px dashed #f0f2f8}.qb .ev .when{color:#9298ac;font-size:10.5px;flex-shrink:0;width:64px}.qb .ev .what{color:#23283c}
 `;
 
 function ddText(d: number | null) { if (d == null) return ''; if (d < 0) return `마감 ${-d}일 지남`; if (d === 0) return '오늘'; return `D-${d}`; }
@@ -96,6 +115,7 @@ export default function OfficeBoardView() {
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState({ 고객: '', 프로젝트: '', 과업명: '' });
+  const [newStep, setNewStep] = useState('');
 
   const load = useCallback(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
@@ -123,6 +143,23 @@ export default function OfficeBoardView() {
     setBusy(false); setSel(null); load();
   };
   const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트, 과업명: edit.과업명 } });
+  // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
+  const stepPost = async (id: string, todos: string[], 내용: string) => {
+    setBusy(true);
+    await fetch('/api/office/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 할일: todos.join(';'), 내용 }) }).catch(() => null);
+    setBusy(false); load();
+  };
+  const toggleStep = (t: Task, i: number) => {
+    const todos = [...(t.todos || [])];
+    const st = parseStep(todos[i]);
+    todos[i] = st.done ? st.raw.replace(/^✓\s*/, '') : '✓' + todos[i];
+    stepPost(t.id, todos, st.done ? `↩ "${st.text}" 되돌림` : `✓ "${st.text}" 완료`);
+  };
+  const addStep = (t: Task) => {
+    const txt = newStep.trim(); if (!txt) return;
+    setNewStep('');
+    stepPost(t.id, [...(t.todos || []), txt], `+ "${txt.replace(/@.*$/, '').trim()}" 추가`);
+  };
 
   if (err) return <p className="text-rose-500 text-center py-10">⚠️ {err}</p>;
   if (!office) return <p className="text-slate-400 text-center py-10">관제탑 불러오는 중…</p>;
@@ -143,6 +180,7 @@ export default function OfficeBoardView() {
   const some = board.filter((t) => t.ball === 'start' && !t.due);
   const hold = board.filter((t) => t.ball === 'hold');
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
+  const cur = sel ? all.find((t) => t.id === sel.id) || sel : null; // 패널 라이브(단계·이력 갱신 반영)
 
   // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
   // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
@@ -219,31 +257,47 @@ export default function OfficeBoardView() {
         ))}</div></section>
       </>)}
 
-      {sel && (<>
+      {cur && (<>
         <div className="ovl" onClick={() => setSel(null)} />
         <aside className="panel">
           <div className="ph"><button className="pclose" onClick={() => setSel(null)}>✕</button>
-            <div className="pcli">{sel.client || sel.project}</div><div className="pproj">{sel.task}</div>
-            <div className="pmeta">{sel.project} · {WHO[sel.owner] || sel.owner}{sel.due && sel.dday != null ? ` · ${ddText(sel.dday)}` : ''}</div>
+            <div className="pcli">{cur.client && cur.client !== cur.project ? `${cur.client} · ` : ''}{cur.project}</div><div className="pproj">{bigTask(cur)}</div>
+            <div className="pmeta">{WHO[cur.owner] || cur.owner}{cur.due && cur.dday != null ? ` · ${ddText(cur.dday)}` : ''}</div>
             <div className="statebtns">{POS_BTN.map((p) => (
-              <button key={p} className={BALL2KO[sel.ball] === p ? 'cur' : ''} disabled={busy} onClick={() => p === '완수' ? complete(sel.id) : patch(sel.id, { patch: { 공위치: p } })}>{p}</button>
+              <button key={p} className={BALL2KO[cur.ball] === p ? 'cur' : ''} disabled={busy} onClick={() => p === '완수' ? complete(cur.id) : patch(cur.id, { patch: { 공위치: p } })}>{p}</button>
             ))}</div>
-            <div className="statebtns"><button disabled={busy} onClick={() => patch(sel.id, { patch: { 담당자: sel.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {sel.owner === '김지영' ? '종호' : '지영'}</button></div>
+            <div className="statebtns"><button disabled={busy} onClick={() => patch(cur.id, { patch: { 담당자: cur.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {cur.owner === '김지영' ? '종호' : '지영'}</button></div>
           </div>
           <div className="pbody">
             <div className="psec">✏️ 정보 수정</div>
             <div className="editbox">
               <input className="ein" value={edit.고객} onChange={(e) => setEdit({ ...edit, 고객: e.target.value })} placeholder="고객사 (자체면 비움)" />
               <input className="ein" value={edit.프로젝트} onChange={(e) => setEdit({ ...edit, 프로젝트: e.target.value })} placeholder="프로젝트명" />
-              <input className="ein" value={edit.과업명} onChange={(e) => setEdit({ ...edit, 과업명: e.target.value })} placeholder="과업명 (지금 할 일)" />
+              <input className="ein" value={edit.과업명} onChange={(e) => setEdit({ ...edit, 과업명: e.target.value })} placeholder="과업명 / 현재 상태" />
               <button className="esave" disabled={busy} onClick={saveEdit}>저장</button>
             </div>
-            {sel.status && (<><div className="psec">📍 현재 상황</div><div className="step">{sel.status}</div></>)}
-            {sel.nextStep && (<><div className="psec" style={{ marginTop: 16 }}>▸ 다음 할 일</div><div className="step">{sel.nextStep}</div></>)}
-            <div className="psec" style={{ marginTop: 16 }}>🧭 할일</div>
-            {sel.todos && sel.todos.length ? sel.todos.map((td, i) => <div key={i} className="step">☐ {td}</div>) : <div className="note">할일 미입력. 라크 과업방에서 추가.</div>}
-            <div className="psec" style={{ marginTop: 16 }}>🕘 이력</div>
-            <div className="note">과업별 이력 저장소는 다음 단계. 지금은 갱신일·현재상태로 대체.</div>
+            <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span></div>
+            {(() => {
+              const steps = (cur.todos || []).map(parseStep);
+              const firstUndone = steps.findIndex((s) => !s.done);
+              return steps.map((st, i) => (
+                <div key={i} className={`jstep${st.done ? ' done' : i === firstUndone ? ' cur' : ''}`} onClick={() => !busy && toggleStep(cur, i)}>
+                  <span className="jmark">{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
+                  <span className="jtext">{st.text}</span>
+                  {st.date && <span className="jdate">📅 {st.date}</span>}
+                </div>
+              ));
+            })()}
+            <div className="addstep">
+              <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStep(cur)} placeholder="+ 단계 추가 (날짜 @6/25)" />
+              <button disabled={busy || !newStep.trim()} onClick={() => addStep(cur)}>추가</button>
+            </div>
+            <div className="psec" style={{ marginTop: 18 }}>🕘 이력</div>
+            {cur.history && cur.history.length ? (
+              <div className="tl">{cur.history.map((e, i) => (
+                <div key={i} className="ev"><span className="when">{e.when}</span><span className="what">{e.what}</span></div>
+              ))}</div>
+            ) : <div className="note">아직 이력 없음. 단계를 완료하면 여기 쌓입니다.</div>}
           </div>
         </aside>
       </>)}
