@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MonthlyBar, CategoryPie } from './components/charts';
-import OfficeView from './components/OfficeView';
-import OfficeSpaceView from './components/OfficeSpaceView';
 import OfficeBoardView from './components/OfficeBoardView';
 
 type Expense = {
@@ -99,7 +97,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('office');
-  const [officeMode, setOfficeMode] = useState<'board' | 'space' | 'kanban'>('board');
 
   useEffect(() => {
     fetch('/api/data')
@@ -154,18 +151,7 @@ export default function Home() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6">
-        {tab === 'office' && (
-          <div>
-            <div className="flex justify-end mb-3">
-              <div className="inline-flex rounded-lg border border-white/60 glass-soft p-0.5 text-xs">
-                <button onClick={() => setOfficeMode('board')} className={`px-3 py-1 rounded-md font-medium ${officeMode === 'board' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>🛰️ 보드</button>
-                <button onClick={() => setOfficeMode('space')} className={`px-3 py-1 rounded-md font-medium ${officeMode === 'space' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>🏢 공간</button>
-                <button onClick={() => setOfficeMode('kanban')} className={`px-3 py-1 rounded-md font-medium ${officeMode === 'kanban' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}>📋 칸반</button>
-              </div>
-            </div>
-            {officeMode === 'board' ? <OfficeBoardView /> : officeMode === 'space' ? <OfficeSpaceView /> : <OfficeView />}
-          </div>
-        )}
+        {tab === 'office' && <OfficeBoardView />}
         {tab === 'crm' && <CRMView />}
         {tab === 'sales' && <SalesView />}
         {tab === 'projects' && <ProjectsView />}
