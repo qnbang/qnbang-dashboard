@@ -18,7 +18,7 @@ async function w(body: Record<string, unknown>) {
 
 export async function POST(req: Request) {
   try {
-    const { 종류, 계약명, 클라이언트, 금액, 입금상태, 입금액, 시작월 } = await req.json().catch(() => ({}));
+    const { 종류, 계약명, 클라이언트, 금액, 입금상태, 입금액, 계약일, 마감일, 시작월, 종료월 } = await req.json().catch(() => ({}));
     if (!계약명 || !금액) return NextResponse.json({ ok: false, error: '계약명·금액 필요' }, { status: 400 });
     const amt = num(금액);
 
@@ -26,10 +26,10 @@ export async function POST(req: Request) {
     let tab: string;
     if (종류 === '정기매출') {
       tab = '정기매출';
-      행 = { 항목: 계약명, 클라이언트: 클라이언트 || '', 월금액: amt, 시작월: 시작월 || today().slice(0, 7), 활성: 'Y' };
+      행 = { 항목: 계약명, 클라이언트: 클라이언트 || '', 월금액: amt, 시작월: 시작월 || today().slice(0, 7), 종료월: 종료월 || '', 활성: 'Y' };
     } else {
       tab = '매출';
-      행 = { 계약일: today(), 계약명, 클라이언트: 클라이언트 || '', 계약금액: amt, 입금상태: 입금상태 || '입금대기', 입금액: num(입금액) };
+      행 = { 계약일: 계약일 || today(), 계약명, 클라이언트: 클라이언트 || '', 계약금액: amt, 입금상태: 입금상태 || '입금대기', 입금액: num(입금액), 마감일: 마감일 || '' };
     }
     const u = await w({ key: KEY, 종류: tab, 행 });
     if (!u.ok) return NextResponse.json({ ok: false, error: u.error || '기록 실패' }, { status: 502 });
