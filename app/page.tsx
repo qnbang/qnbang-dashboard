@@ -29,8 +29,7 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
   { key: 'office', label: '🏢 사무실', ready: true },
-  { key: 'crm', label: '👥 고객', ready: true },
-  { key: 'sales', label: '📣 영업', ready: true },
+  { key: 'crm', label: '👥 고객·영업', ready: true },
   { key: 'projects', label: '프로젝트', ready: true },
   { key: 'hubs', label: '협업 허브', ready: true },
   { key: 'shares', label: '공유된 문서', ready: true },
@@ -153,7 +152,6 @@ export default function Home() {
       <main className="max-w-5xl mx-auto px-4 py-6">
         {tab === 'office' && <OfficeBoardView />}
         {tab === 'crm' && <CRMView />}
-        {tab === 'sales' && <SalesView />}
         {tab === 'projects' && <ProjectsView />}
         {tab === 'finance' && <FinanceView data={data} loading={loading} error={error} />}
         {tab === 'shares' && <SharesView />}
@@ -339,14 +337,18 @@ function CRMView() {
   if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
   if (!crm) return <p className="text-slate-400 text-center py-10">고객 불러오는 중…</p>;
   const cols = [
-    { key: 'lead', label: '📣 영업 대기중', hint: '계약 전', cls: 'border-sky-200 bg-sky-50', items: crm.영업중 },
     { key: 'active', label: '🔨 계약 진행중', hint: '납품 중', cls: 'border-emerald-200 bg-emerald-50', items: crm.진행중 },
     { key: 'done', label: '✅ 완수 고객', hint: '끝난 고객', cls: 'border-slate-200 bg-slate-50', items: crm.완수 },
   ];
   return (
-    <div className="space-y-4">
-      <div className="text-sm text-slate-500">고객 생애주기 — 영업 대기 → 계약 진행 → 완수. <span className="text-slate-400">(리드 추가·계약처리는 📣영업 탭에서, 여기선 한눈에)</span></div>
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div className="space-y-6">
+      {/* 영업 = 고객 생애주기의 첫 단계. 영업 탭을 여기로 흡수(리드·팔로업·계약완료까지) */}
+      <div>
+        <div className="text-sm font-bold text-slate-700 mb-2">📣 영업 중 <span className="font-normal text-slate-400">— 리드·팔로업·계약 완료</span></div>
+        <SalesView />
+      </div>
+      <div className="text-sm font-bold text-slate-700 border-t pt-5 -mb-1">🤝 고객 <span className="font-normal text-slate-400">— 계약 진행 → 완수</span></div>
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {cols.map((c) => (
           <div key={c.key} className={`rounded-xl border p-3 min-h-[160px] ${c.cls}`}>
             <div className="flex items-baseline justify-between mb-2"><div className="font-bold text-sm">{c.label}</div><div className="text-[11px] text-slate-400">{c.hint} · {c.items.length}</div></div>
