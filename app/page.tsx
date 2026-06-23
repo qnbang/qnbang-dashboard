@@ -994,8 +994,6 @@ const STATUS_COLOR: Record<string, string> = {
 
 // 항목별 선택지
 const PROGRESS_OPTS = ['시작 전', '진행 중', '피드백 대기', '보류', '완료', '중단'];
-const CONTRACT_OPTS = ['계약 대기', '구두 계약', '계약 완료'];
-const PAYMENT_OPTS = ['입금 대기', '착수금', '완수금'];
 function StatusTag({ value }: { value?: string }) {
   if (!value) return null;
   const cls = STATUS_COLOR[value] || 'bg-slate-100 text-slate-500';
@@ -1173,83 +1171,6 @@ function parseStatusBoard(md: string): { sections: StatusSection[]; done: number
   return { sections, done, total };
 }
 
-// 편집용 드롭다운 (계약·진행·입금 상태)
-function EditSelect({ label, value, options, onChange }: { label: string; value?: string; options: string[]; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] text-slate-400">{label}</span>
-      <select
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        className={`rounded-lg border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400 ${value ? 'text-slate-700' : 'text-slate-400'}`}
-      >
-        <option value="">미정</option>
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  );
-}
-
-// 편집용 금액 입력 (만원 단위 입력 → 원으로 저장)
-function EditMan({ label, value, onSave }: { label: string; value?: number; onSave: (won: number) => void }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] text-slate-400">{label} (만원)</span>
-      <input
-        type="number"
-        defaultValue={value ? value / 10000 : ''}
-        key={value}
-        onBlur={(e) => onSave(Math.round(Number(e.target.value || 0) * 10000))}
-        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-        placeholder="0"
-        className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-400"
-      />
-    </div>
-  );
-}
-
-// 편집용 날짜 입력
-function EditDate({ label, value, onChange }: { label: string; value?: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] text-slate-400">{label}</span>
-      <input
-        type="date"
-        defaultValue={value || ''}
-        key={value || 'empty'}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-slate-200 px-2 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-400"
-      />
-    </div>
-  );
-}
-
-// 담당자 편집 — 조직 멤버를 칩으로 토글(여러 명 가능). 멤버에 없는 기존 이름도 칩으로 보여줌.
-function EditMembers({ label, value, members, onSave }: { label: string; value?: string; members: OrgMember[]; onSave: (v: string) => void }) {
-  const selected = managerList(value);
-  const toggle = (name: string) => {
-    const next = selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name];
-    onSave(next.join(', '));
-  };
-  const names = Array.from(new Set([...members.map((m) => m.login), ...selected]));
-  return (
-    <div className="flex flex-col gap-1 col-span-2 sm:col-span-3">
-      <span className="text-[11px] text-slate-400">{label} (여러 명 선택 가능)</span>
-      <div className="flex flex-wrap gap-1.5">
-        {names.length === 0 ? <span className="text-xs text-slate-300">멤버 없음</span> : names.map((n) => {
-          const on = selected.includes(n);
-          return (
-            <button key={n} type="button" onClick={() => toggle(n)}
-              className={`text-xs rounded-full px-2.5 py-1 border transition ${on ? 'border-indigo-300 bg-indigo-50 text-indigo-700 font-semibold' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}>
-              {on ? '✓ ' : ''}{n}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // 진행률 막대
 function ProgressBar({ done, total }: { done: number; total: number }) {
   const pct = total ? Math.round((done / total) * 100) : 0;
@@ -1292,10 +1213,6 @@ function ProjectsView() {
   const [draft, setDraft] = useState('');
   const [docSaving, setDocSaving] = useState(false);
   const [docMsg, setDocMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
-  // 편집 가능한 계약 정보
-  const [meta, setMeta] = useState<{ manager?: string; progressStatus?: string; contractStatus?: string; paymentStatus?: string; amount?: number; paidAmount?: number; startDate?: string; endDate?: string; contractUrl?: string }>({});
-  const [saved, setSaved] = useState(false);
-  const [showContract, setShowContract] = useState(false);
 
   const filteredProjects = projects
     .filter((p) => {
@@ -1319,23 +1236,6 @@ function ProjectsView() {
   const daehengProjects = filteredProjects.filter((p) => p.category === '대행');
   const jacheProjects = filteredProjects.filter((p) => p.category !== '대행');
   const managers = Array.from(new Set(projects.flatMap((p) => managerList(p.manager))));
-
-  // 한 항목 저장 → GitHub 프로젝트.json + 로컬·카드 갱신
-  const saveMeta = async (field: string, value: string | number) => {
-    if (!selected) return;
-    setMeta((m) => ({ ...m, [field]: value }));
-    setProjects((ps) => ps.map((p) => (p.repo === selected.repo ? { ...p, [field]: value } : p)));
-    setSaved(false);
-    try {
-      const r = await fetch(`/api/git-projects/${selected.repo}/meta`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ field, value }),
-      });
-      const j = await r.json();
-      if (j.ok) { setSaved(true); setTimeout(() => setSaved(false), 1500); }
-    } catch { /* 무시 */ }
-  };
 
   useEffect(() => {
     fetch('/api/git-projects')
@@ -1378,8 +1278,7 @@ function ProjectsView() {
   const openProject = async (p: ProjectRepo) => {
     setSelected(p);
     setWorkLog(null); setCommits([]); setDocs([]); setStatusBoard(null); setDriveFolderId(null);
-    setShowFlow(false); setOpenDoc(null); setSaved(false); setShowContract(false);
-    setMeta({ manager: p.manager, progressStatus: p.progressStatus, contractStatus: p.contractStatus, paymentStatus: p.paymentStatus, amount: p.amount, paidAmount: p.paidAmount });
+    setShowFlow(false); setOpenDoc(null);
     setDetailLoading(true);
     try {
       const r = await fetch(`/api/git-projects/${p.repo}`);
@@ -1390,7 +1289,6 @@ function ProjectsView() {
         setDocs(j.docs || []);
         setStatusBoard(j.statusBoard || null);
         setDriveFolderId(j.driveFolderId || null);
-        if (j.meta) setMeta(j.meta);
       }
     } finally {
       setDetailLoading(false);
