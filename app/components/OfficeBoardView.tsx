@@ -99,7 +99,13 @@ const CSS = `
 .qb .jstep:hover{border-color:#c4c8da}.qb .jstep.cur{border-color:#3a3d44;box-shadow:0 0 0 1px #3a3d4422;font-weight:700}
 .qb .jstep.done{color:#a0a5b8;background:#f7f8fc}.qb .jstep.done .jtext{text-decoration:line-through}
 .qb .jmark{width:18px;text-align:center;flex-shrink:0;color:#9298ac}.qb .jstep.cur .jmark{color:#3a3d44}.qb .jstep.done .jmark{color:#10b981}
-.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0}
+.qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0}
+.qb .jeditbtn{background:none;border:none;cursor:pointer;font-size:11px;opacity:0;transition:opacity .1s;flex-shrink:0;padding:0 2px}
+.qb .jstep:hover .jeditbtn{opacity:.55}.qb .jeditbtn:hover{opacity:1}
+.qb .jstep.editing{padding:6px 8px;gap:6px}
+.qb .jein2{flex:1;font-size:13px;border:1px solid #3a3d44;border-radius:7px;padding:6px 9px;outline:none}
+.qb .jbtn{font-size:11px;font-weight:700;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;flex-shrink:0}
+.qb .jbtn.ok{background:#3a3d44;color:#fff}.qb .jbtn.del{background:#fbe4e8;color:#e0364a}.qb .jbtn:disabled{opacity:.4}
 .qb .addstep{display:flex;gap:6px;margin:8px 0 4px}.qb .addstep input{flex:1;font-size:12.5px;border:1px solid #e0e3ee;border-radius:8px;padding:6px 10px}.qb .addstep input:focus{outline:none;border-color:#3a3d44}
 .qb .addstep button{font-size:12px;font-weight:700;background:#eef0f7;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;color:#3a3d44}.qb .addstep button:disabled{opacity:.4}
 .qb .ev{display:flex;gap:10px;padding:6px 0;font-size:12.5px;align-items:baseline;border-bottom:1px dashed #f0f2f8}.qb .ev .when{color:#9298ac;font-size:10.5px;flex-shrink:0;width:64px}.qb .ev .what{color:#23283c}
@@ -116,6 +122,8 @@ export default function OfficeBoardView() {
   const [busy, setBusy] = useState(false);
   const [edit, setEdit] = useState({ 고객: '', 프로젝트: '', 과업명: '' });
   const [newStep, setNewStep] = useState('');
+  const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
+  const [editStepVal, setEditStepVal] = useState('');
 
   const load = useCallback(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
@@ -163,6 +171,20 @@ export default function OfficeBoardView() {
     setNewStep('');
     const todos = [...(t.todos || []), txt];
     const 내용 = `+ "${txt.replace(/@.*$/, '').trim()}" 추가`;
+    optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
+  };
+  const startEditStep = (i: number, st: { text: string; date: string }) => { setEditStepIdx(i); setEditStepVal(st.text + (st.date ? ` @${st.date}` : '')); };
+  const saveStepEdit = (t: Task, i: number) => {
+    const v = editStepVal.trim(); if (!v) return;
+    const todos = [...(t.todos || [])]; const wasDone = parseStep(todos[i]).done;
+    todos[i] = (wasDone ? '✓' : '') + v; setEditStepIdx(null);
+    const 내용 = `✎ 단계 수정: "${v.replace(/@.*$/, '').trim()}"`;
+    optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
+  };
+  const delStep = (t: Task, i: number) => {
+    const todos = [...(t.todos || [])]; const st = parseStep(todos[i]);
+    todos.splice(i, 1); setEditStepIdx(null);
+    const 내용 = `🗑 "${st.text}" 삭제`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
 
@@ -285,11 +307,18 @@ export default function OfficeBoardView() {
             {(() => {
               const steps = (cur.todos || []).map(parseStep);
               const firstUndone = steps.findIndex((s) => !s.done);
-              return steps.map((st, i) => (
-                <div key={i} className={`jstep${st.done ? ' done' : i === firstUndone ? ' cur' : ''}`} onClick={() => !busy && toggleStep(cur, i)}>
-                  <span className="jmark">{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
-                  <span className="jtext">{st.text}</span>
+              return steps.map((st, i) => editStepIdx === i ? (
+                <div key={i} className="jstep editing">
+                  <input className="jein2" value={editStepVal} autoFocus onChange={(e) => setEditStepVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveStepEdit(cur, i); if (e.key === 'Escape') setEditStepIdx(null); }} placeholder="단계 내용 (날짜 @6/25)" />
+                  <button className="jbtn ok" disabled={busy} onClick={() => saveStepEdit(cur, i)}>저장</button>
+                  <button className="jbtn del" disabled={busy} onClick={() => delStep(cur, i)}>🗑</button>
+                </div>
+              ) : (
+                <div key={i} className={`jstep${st.done ? ' done' : i === firstUndone ? ' cur' : ''}`}>
+                  <span className="jmark" onClick={() => !busy && toggleStep(cur, i)}>{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
+                  <span className="jtext" onClick={() => !busy && toggleStep(cur, i)}>{st.text}</span>
                   {st.date && <span className="jdate">📅 {st.date}</span>}
+                  <button className="jeditbtn" onClick={() => startEditStep(i, st)}>✏️</button>
                 </div>
               ));
             })()}
