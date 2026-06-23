@@ -147,18 +147,23 @@ export default function OfficeBoardView() {
   const stepPost = async (id: string, todos: string[], 내용: string) => {
     setBusy(true);
     await fetch('/api/office/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 할일: todos.join(';'), 내용 }) }).catch(() => null);
-    setBusy(false); load();
+    setBusy(false);
   };
+  const optimistic = (t: Task, todos: string[], 내용: string) =>
+    setSel({ ...t, todos, history: [{ when: '방금', what: 내용 }, ...(t.history || [])] }); // 클릭 즉시 화면 반영
   const toggleStep = (t: Task, i: number) => {
     const todos = [...(t.todos || [])];
     const st = parseStep(todos[i]);
     todos[i] = st.done ? st.raw.replace(/^✓\s*/, '') : '✓' + todos[i];
-    stepPost(t.id, todos, st.done ? `↩ "${st.text}" 되돌림` : `✓ "${st.text}" 완료`);
+    const 내용 = st.done ? `↩ "${st.text}" 되돌림` : `✓ "${st.text}" 완료`;
+    optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
   const addStep = (t: Task) => {
     const txt = newStep.trim(); if (!txt) return;
     setNewStep('');
-    stepPost(t.id, [...(t.todos || []), txt], `+ "${txt.replace(/@.*$/, '').trim()}" 추가`);
+    const todos = [...(t.todos || []), txt];
+    const 내용 = `+ "${txt.replace(/@.*$/, '').trim()}" 추가`;
+    optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
 
   if (err) return <p className="text-rose-500 text-center py-10">⚠️ {err}</p>;
@@ -180,7 +185,7 @@ export default function OfficeBoardView() {
   const some = board.filter((t) => t.ball === 'start' && !t.due);
   const hold = board.filter((t) => t.ball === 'hold');
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
-  const cur = sel ? all.find((t) => t.id === sel.id) || sel : null; // 패널 라이브(단계·이력 갱신 반영)
+  const cur = sel; // 패널은 sel 직접 사용 — 단계/이력은 낙관적 업데이트로 즉시 반영(캐시 지연 우회)
 
   // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
   // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
