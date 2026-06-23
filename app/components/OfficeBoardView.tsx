@@ -118,6 +118,7 @@ const CSS = `
 .qb .jbtn{font-size:11px;font-weight:700;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;flex-shrink:0}
 .qb .jbtn.ok{background:#3a3d44;color:#fff}.qb .jbtn.del{background:#fbe4e8;color:#e0364a}.qb .jbtn:disabled{opacity:.4}
 .qb .editbtn{font-size:12px;font-weight:800;color:#1a1e30;background:none;border:none;cursor:pointer;padding:2px 0;margin-bottom:6px}
+.qb .mtype{display:flex;gap:14px;font-size:12.5px;color:#41465a;margin-bottom:2px}.qb .mtype label{display:flex;align-items:center;gap:4px;cursor:pointer}
 .qb .addstep{display:flex;gap:6px;margin:8px 0 4px}.qb .addstep input{flex:1;font-size:12.5px;background:#fff;border:1px solid #e0e3ee;border-radius:10px;padding:8px 11px}.qb .addstep input:focus{outline:none;border-color:#3a3d44}
 .qb .addstep button{font-size:12px;font-weight:700;background:#eef0f7;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;color:#3a3d44}.qb .addstep button:disabled{opacity:.4}
 .qb .ev{display:flex;gap:10px;padding:6px 0;font-size:12.5px;align-items:baseline;border-bottom:1px dashed #f0f2f8}.qb .ev .when{color:#9298ac;font-size:10.5px;flex-shrink:0;width:64px}.qb .ev .what{color:#23283c}
@@ -135,6 +136,8 @@ export default function OfficeBoardView() {
   const [over, setOver] = useState<Record<string, Partial<Task>>>({}); // 낙관적 덮어쓰기(서버 반영 전 즉시 화면)
   const [edit, setEdit] = useState({ 고객: '', 프로젝트: '', 과업명: '' });
   const [showEdit, setShowEdit] = useState(false);
+  const [showMoney, setShowMoney] = useState(false);
+  const [mForm, setMForm] = useState({ 종류: '매출', 금액: '', 입금상태: '입금대기' });
   const [newStep, setNewStep] = useState('');
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
@@ -160,7 +163,7 @@ export default function OfficeBoardView() {
         프로젝트: sel.project || '',
         과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
       });
-      setShowEdit(false); setEditStepIdx(null);
+      setShowEdit(false); setShowMoney(false); setEditStepIdx(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel?.id]);
@@ -177,6 +180,12 @@ export default function OfficeBoardView() {
     fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).then(() => load()).catch(() => load());
   };
   const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트 } });
+  const saveContract = () => {
+    if (!sel || !mForm.금액.trim()) return;
+    const body = { 종류: mForm.종류, 계약명: sel.project, 클라이언트: (sel.client && sel.client !== sel.project) ? sel.client : '', 금액: mForm.금액, 입금상태: mForm.입금상태 };
+    setShowMoney(false); setMForm({ 종류: '매출', 금액: '', 입금상태: '입금대기' });
+    fetch('/api/office/contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(() => load()).catch(() => load());
+  };
   // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
   const stepPost = async (id: string, todos: string[], 내용: string) => {
     setBusy(true);
@@ -330,6 +339,20 @@ export default function OfficeBoardView() {
               <input className="ein" value={edit.고객} onChange={(e) => setEdit({ ...edit, 고객: e.target.value })} placeholder="고객사 (자체면 비움)" />
               <input className="ein" value={edit.프로젝트} onChange={(e) => setEdit({ ...edit, 프로젝트: e.target.value })} placeholder="프로젝트명 (= 과업)" />
               <button className="esave" disabled={busy} onClick={saveEdit}>저장</button>
+            </div>)}
+            <button className="editbtn" onClick={() => setShowMoney((v) => !v)}>💰 계약 입력 {showMoney ? '▲' : '▼'}</button>
+            {showMoney && (<div className="editbox">
+              <div className="mtype">
+                <label><input type="radio" checked={mForm.종류 === '매출'} onChange={() => setMForm({ ...mForm, 종류: '매출' })} /> 일회성 계약</label>
+                <label><input type="radio" checked={mForm.종류 === '정기매출'} onChange={() => setMForm({ ...mForm, 종류: '정기매출' })} /> 월정기</label>
+              </div>
+              <input className="ein" inputMode="numeric" value={mForm.금액} onChange={(e) => setMForm({ ...mForm, 금액: e.target.value })} placeholder={mForm.종류 === '정기매출' ? '월 금액 (원)' : '계약금액 (원)'} />
+              {mForm.종류 === '매출' && (
+                <select className="ein" value={mForm.입금상태} onChange={(e) => setMForm({ ...mForm, 입금상태: e.target.value })}>
+                  <option>입금대기</option><option>선수금</option><option>부분입금</option><option>입금완료</option>
+                </select>
+              )}
+              <button className="esave" disabled={busy} onClick={saveContract}>{mForm.종류 === '정기매출' ? '정기매출' : '매출'} 원장에 기록</button>
             </div>)}
             <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span></div>
             {(() => {
