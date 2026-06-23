@@ -20,6 +20,10 @@ function parseStep(raw: string) {
   if (dm) s = s.slice(0, dm.index).trim();
   return { done, text: s, date, raw };
 }
+// 할일 단계가 비었으면 현재상태를 '지금 단계'로 흐름에 흡수. 손대는 순간(체크·추가) 진짜 단계로 굳어 이력에 쌓임.
+function effTodos(t: { todos?: string[]; status?: string }): string[] {
+  return t.todos && t.todos.length ? t.todos : (t.status ? [t.status] : []);
+}
 type Office = { rooms: { tasks: Task[] }[]; 자체?: Task[]; 언젠가?: Task[]; 가동률?: Record<string, number>; 과업수?: number; source?: string; syncedAt?: string };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number };
 const won = (n: number) => `${(n || 0).toLocaleString('ko-KR')}원`;
@@ -182,7 +186,7 @@ export default function OfficeBoardView() {
   const optimistic = (t: Task, todos: string[], 내용: string) =>
     setSel({ ...t, todos, history: [{ when: '방금', what: 내용 }, ...(t.history || [])] }); // 클릭 즉시 화면 반영
   const toggleStep = (t: Task, i: number) => {
-    const todos = [...(t.todos || [])];
+    const todos = [...effTodos(t)];
     const st = parseStep(todos[i]);
     todos[i] = st.done ? st.raw.replace(/^✓\s*/, '') : '✓' + todos[i];
     const 내용 = st.done ? `↩ "${st.text}" 되돌림` : `✓ "${st.text}" 완료`;
@@ -191,20 +195,20 @@ export default function OfficeBoardView() {
   const addStep = (t: Task) => {
     const txt = newStep.trim(); if (!txt) return;
     setNewStep('');
-    const todos = [...(t.todos || []), txt];
+    const todos = [...effTodos(t), txt];
     const 내용 = `+ "${txt.replace(/@.*$/, '').trim()}" 추가`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
   const startEditStep = (i: number, st: { text: string; date: string }) => { setEditStepIdx(i); setEditStepVal(st.text + (st.date ? ` @${st.date}` : '')); };
   const saveStepEdit = (t: Task, i: number) => {
     const v = editStepVal.trim(); if (!v) return;
-    const todos = [...(t.todos || [])]; const wasDone = parseStep(todos[i]).done;
+    const todos = [...effTodos(t)]; const wasDone = parseStep(todos[i]).done;
     todos[i] = (wasDone ? '✓' : '') + v; setEditStepIdx(null);
     const 내용 = `✎ 단계 수정: "${v.replace(/@.*$/, '').trim()}"`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
   const delStep = (t: Task, i: number) => {
-    const todos = [...(t.todos || [])]; const st = parseStep(todos[i]);
+    const todos = [...effTodos(t)]; const st = parseStep(todos[i]);
     todos.splice(i, 1); setEditStepIdx(null);
     const 내용 = `🗑 "${st.text}" 삭제`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
@@ -329,7 +333,7 @@ export default function OfficeBoardView() {
             </div>)}
             <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span></div>
             {(() => {
-              const steps = (cur.todos || []).map(parseStep);
+              const steps = effTodos(cur).map(parseStep);
               const firstUndone = steps.findIndex((s) => !s.done);
               return steps.map((st, i) => editStepIdx === i ? (
                 <div key={i} className="jstep editing">
