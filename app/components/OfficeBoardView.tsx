@@ -110,7 +110,7 @@ const CSS = `
 .qb .jstep:hover{border-color:#c4c8da}.qb .jstep.cur{border-color:#3a3d44;box-shadow:0 0 0 1px #3a3d4422;font-weight:700}
 .qb .jstep.done{color:#a0a5b8;background:#f7f8fc}.qb .jstep.done .jtext{text-decoration:line-through}
 .qb .jmark{width:18px;text-align:center;flex-shrink:0;color:#9298ac}.qb .jstep.cur .jmark{color:#3a3d44}.qb .jstep.done .jmark{color:#10b981}
-.qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0}
+.qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0}.qb .jdate.now{background:#fde8eb;color:#e0364a;font-weight:700}
 .qb .jeditbtn{background:none;border:none;cursor:pointer;font-size:11px;opacity:0;transition:opacity .1s;flex-shrink:0;padding:0 2px}
 .qb .jstep:hover .jeditbtn{opacity:.55}.qb .jeditbtn:hover{opacity:1}
 .qb .jstep.editing{padding:6px 8px;gap:6px}
@@ -126,6 +126,17 @@ const CSS = `
 `;
 
 function ddText(d: number | null) { if (d == null) return ''; if (d < 0) return `마감 ${-d}일 지남`; if (d === 0) return '오늘'; return `D-${d}`; }
+// 단계 날짜 "M/D" → D-day 정수(연도 없어 올해 기준, 6개월 넘게 지난 날이면 내년으로 본다).
+function stepDday(md: string): number | null {
+  const m = md.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!m) return null;
+  const now = new Date();
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let target = new Date(now.getFullYear(), +m[1] - 1, +m[2]);
+  let diff = Math.round((target.getTime() - t0.getTime()) / 86400000);
+  if (diff < -180) { target = new Date(now.getFullYear() + 1, +m[1] - 1, +m[2]); diff = Math.round((target.getTime() - t0.getTime()) / 86400000); }
+  return diff;
+}
 
 export default function OfficeBoardView() {
   const [office, setOffice] = useState<Office | null>(null);
@@ -265,7 +276,12 @@ export default function OfficeBoardView() {
       </div>
       {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
       {t.ball === 'client' && <span className="waitfor">🟣 고객</span>}
-      {t.due && t.dday != null && <span className={`bdg${t.dday <= 7 ? ' soon' : ''}`}>{ddText(t.dday)}</span>}
+      {(() => {
+        const c = (t.todos || []).map(parseStep).find((s) => !s.done);  // 지금(첫 미완료) 단계
+        const sd = c && c.date ? stepDday(c.date) : null;                // 그 단계 날짜의 D-day
+        const dd = sd != null ? sd : (t.due && t.dday != null ? t.dday : null); // 없으면 전체 마감
+        return dd != null ? <span className={`bdg${dd <= 7 ? ' soon' : ''}`}>{ddText(dd)}</span> : null;
+      })()}
     </div>
     );
   };
@@ -374,7 +390,7 @@ export default function OfficeBoardView() {
                 <div key={i} className={`jstep${st.done ? ' done' : i === firstUndone ? ' cur' : ''}`}>
                   <span className="jmark" onClick={() => !busy && toggleStep(cur, i)}>{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
                   <span className="jtext" onClick={() => !busy && toggleStep(cur, i)}>{st.text}</span>
-                  {st.date && <span className="jdate">📅 {st.date}</span>}
+                  {st.date && <span className={`jdate${i === firstUndone ? ' now' : ''}`}>📅 {st.date}{i === firstUndone && stepDday(st.date) != null ? ` · ${ddText(stepDday(st.date))}` : ''}</span>}
                   <button className="jeditbtn" onClick={() => startEditStep(i, st)}>✏️</button>
                 </div>
               ));
