@@ -1550,51 +1550,9 @@ function ProjectsView() {
             <p className="text-slate-400 text-sm py-10 text-center">불러오는 중…</p>
           ) : (
             <>
-              {/* 계약 정보 — 눌러야 펼쳐짐, 대시보드에서 직접 편집 (GitHub 저장) */}
-              <div className="rounded-2xl border border-slate-200 bg-white">
-                <button onClick={() => setShowContract((v) => !v)}
-                  className="w-full flex items-center justify-between px-5 py-3 text-left">
-                  <span className="text-sm font-semibold text-slate-700">💼 계약 정보</span>
-                  <span className="text-xs text-slate-400">{showContract ? '접기 ▲' : '펼치기 ▾'}</span>
-                </button>
-                {showContract && (
-                  <div className="px-5 pb-4 border-t border-slate-100 pt-3 space-y-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
-                      <EditMembers label="담당자" value={meta.manager} members={members} onSave={(v) => saveMeta('manager', v)} />
-                      <EditSelect label="진행상태" value={meta.progressStatus} options={PROGRESS_OPTS} onChange={(v) => saveMeta('progressStatus', v)} />
-                      <EditSelect label="계약상태" value={meta.contractStatus} options={CONTRACT_OPTS} onChange={(v) => saveMeta('contractStatus', v)} />
-                      <EditSelect label="입금상태" value={meta.paymentStatus} options={PAYMENT_OPTS} onChange={(v) => saveMeta('paymentStatus', v)} />
-                      <EditMan label="계약금액" value={meta.amount} onSave={(v) => saveMeta('amount', v)} />
-                      <EditMan label="받은 금액" value={meta.paidAmount} onSave={(v) => saveMeta('paidAmount', v)} />
-                      {!!meta.amount && (
-                        <div className="flex flex-col justify-end">
-                          <span className="text-[11px] text-slate-400">미수금</span>
-                          <span className="text-sm font-semibold text-slate-700">
-                            {manwon(Math.max(0, (meta.amount || 0) - (meta.paidAmount || 0))) || '0원'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {/* 계약 일정 */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 border-t border-slate-50 pt-3">
-                      <EditDate label="착수일" value={meta.startDate} onChange={(v) => saveMeta('startDate', v)} />
-                      <EditDate label="마감일" value={meta.endDate} onChange={(v) => saveMeta('endDate', v)} />
-                      {meta.endDate && (
-                        <div className="flex flex-col justify-end">
-                          <span className="text-[11px] text-slate-400">마감까지</span>
-                          <span className="text-sm font-semibold text-slate-700">{dday(meta.endDate)}</span>
-                        </div>
-                      )}
-                    </div>
-                    {meta.contractUrl && (
-                      <a href={meta.contractUrl} target="_blank" rel="noreferrer"
-                         className="inline-block text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 hover:bg-emerald-100">
-                        📄 계약서 원본 열기
-                      </a>
-                    )}
-                    <p className="text-[11px] text-slate-300 h-3">{saved ? '✓ 저장됨' : ''}</p>
-                  </div>
-                )}
+              {/* 계약·매출은 사무실 카드 💰로 이동(매출 원장 직결). 옛 프로젝트.json 계약폼 제거 — 원장과 따로 놀던 헛폼. */}
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-xs text-slate-500">
+                💼 계약·매출은 이제 <b className="text-slate-700">사무실 → 카드 → 💰 계약 입력</b>에서 넣어요 <span className="text-slate-400">(순매출·미수금 자동 반영)</span>
               </div>
 
               {/* 진행 현황 — 전체 대비 어디까지 */}
