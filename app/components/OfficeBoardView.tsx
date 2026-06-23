@@ -27,6 +27,13 @@ const won = (n: number) => `${(n || 0).toLocaleString('ko-KR')}원`;
 // 공위치(ball) → 시안 I 칸. 내회신=처리(영업·연락·결재류) / 내작업=작업(제작) / 고객대기=대기 / 시작전=예정(날짜)·언젠가(무날짜) / 보류=보류.
 const POS_BTN = ['받은일', '시작전', '내작업', '내회신', '고객대기', '보류', '완수'];
 const BALL2KO: Record<string, string> = { inbox: '받은일', start: '시작전', mywork: '내작업', myreply: '내회신', client: '고객대기', hold: '보류', done: '완수' };
+const KO2BALL: Record<string, string> = { 받은일: 'inbox', 시작전: 'start', 내작업: 'mywork', 내회신: 'myreply', 고객대기: 'client', 보류: 'hold', 완수: 'done' };
+const K2F: Record<string, string> = { 공위치: 'ball', 담당자: 'owner', 고객: 'client', 프로젝트: 'project', 과업명: 'task', 현재상태: 'status', 다음할일: 'nextStep', 기한: 'due' };
+function toOver(p: Record<string, string>): Partial<Task> { // 한글 patch → Task 필드(낙관적 즉시반영용)
+  const o: Record<string, string> = {};
+  for (const [k, v] of Object.entries(p)) { const f = K2F[k]; if (f) o[f] = f === 'ball' ? (KO2BALL[v] || v) : v; }
+  return o as Partial<Task>;
+}
 const WHO: Record<string, string> = { 신종호: '🧑‍💼 종호', 김지영: '🎨 김지영' };
 
 // 📦 제품 백로그(서비스개발 5종) · 🧪 실험실 — 과업 시트가 아닌 고정 참조(시안 I).
@@ -106,7 +113,8 @@ const CSS = `
 .qb .jein2{flex:1;font-size:13px;border:1px solid #3a3d44;border-radius:7px;padding:6px 9px;outline:none}
 .qb .jbtn{font-size:11px;font-weight:700;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;flex-shrink:0}
 .qb .jbtn.ok{background:#3a3d44;color:#fff}.qb .jbtn.del{background:#fbe4e8;color:#e0364a}.qb .jbtn:disabled{opacity:.4}
-.qb .addstep{display:flex;gap:6px;margin:8px 0 4px}.qb .addstep input{flex:1;font-size:12.5px;border:1px solid #e0e3ee;border-radius:8px;padding:6px 10px}.qb .addstep input:focus{outline:none;border-color:#3a3d44}
+.qb .editbtn{font-size:12px;font-weight:800;color:#1a1e30;background:none;border:none;cursor:pointer;padding:2px 0;margin-bottom:6px}
+.qb .addstep{display:flex;gap:6px;margin:8px 0 4px}.qb .addstep input{flex:1;font-size:12.5px;background:#fff;border:1px solid #e0e3ee;border-radius:10px;padding:8px 11px}.qb .addstep input:focus{outline:none;border-color:#3a3d44}
 .qb .addstep button{font-size:12px;font-weight:700;background:#eef0f7;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;color:#3a3d44}.qb .addstep button:disabled{opacity:.4}
 .qb .ev{display:flex;gap:10px;padding:6px 0;font-size:12.5px;align-items:baseline;border-bottom:1px dashed #f0f2f8}.qb .ev .when{color:#9298ac;font-size:10.5px;flex-shrink:0;width:64px}.qb .ev .what{color:#23283c}
 `;
@@ -120,35 +128,42 @@ export default function OfficeBoardView() {
   const [filter, setFilter] = useState<'all' | '회사' | 'jy'>('all');
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState<Record<string, Partial<Task>>>({}); // 낙관적 덮어쓰기(서버 반영 전 즉시 화면)
   const [edit, setEdit] = useState({ 고객: '', 프로젝트: '', 과업명: '' });
+  const [showEdit, setShowEdit] = useState(false);
   const [newStep, setNewStep] = useState('');
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
 
   const load = useCallback(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
-      if (j.ok) { setOffice(j.office); setMoney(j.money); } else setErr(j.error || '불러오기 실패');
+      if (j.ok) { setOffice(j.office); setMoney(j.money); setOver({}); } else setErr(j.error || '불러오기 실패');
     }).catch((e) => setErr(String(e)));
   }, []);
   useEffect(() => { load(); }, [load]);
   // 패널 열 때 수정 입력칸 초기화(고객=실제 고객만, 프로젝트=프로젝트명, 과업명=자리표시 제외)
   useEffect(() => {
-    if (sel) setEdit({
-      고객: sel.client && sel.client !== sel.project ? sel.client : '',
-      프로젝트: sel.project || '',
-      과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
-    });
-  }, [sel]);
+    if (sel) {
+      setEdit({
+        고객: sel.client && sel.client !== sel.project ? sel.client : '',
+        프로젝트: sel.project || '',
+        과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
+      });
+      setShowEdit(false); setEditStepIdx(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel?.id]);
 
-  const patch = async (id: string, body: Record<string, unknown>) => {
-    setBusy(true);
-    await fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...body }) }).catch(() => null);
-    setBusy(false); setSel(null); load();
+  const patch = (id: string, body: Record<string, unknown>) => {
+    const p = (body as { patch?: Record<string, string> }).patch;
+    if (p) setOver((o) => ({ ...o, [id]: { ...o[id], ...toOver(p) } })); // 즉시 화면
+    setSel(null);
+    fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...body }) }).then(() => load()).catch(() => load());
   };
-  const complete = async (id: string) => {
-    setBusy(true);
-    await fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => null);
-    setBusy(false); setSel(null); load();
+  const complete = (id: string) => {
+    setOver((o) => ({ ...o, [id]: { ...o[id], ball: 'done' } })); // 완수=보드서 즉시 사라짐
+    setSel(null);
+    fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).then(() => load()).catch(() => load());
   };
   const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트, 과업명: edit.과업명 } });
   // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
@@ -195,7 +210,7 @@ export default function OfficeBoardView() {
     ...(office.rooms || []).flatMap((r) => r.tasks),
     ...(office.자체 || []),
     ...(office.언젠가 || []),
-  ];
+  ].map((t) => (over[t.id] ? { ...t, ...over[t.id] } : t)); // 낙관적 덮어쓰기 적용
   const vis = all.filter((t) => filter === 'all' || filter === '회사' || (filter === 'jy' && t.owner === '김지영'));
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   const board = vis.filter((t) => !TOOL_PROJECTS.has(t.project));
@@ -212,6 +227,8 @@ export default function OfficeBoardView() {
   // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
   // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
   const bigTask = (t: Task) => {
+    const cur = (t.todos || []).map(parseStep).find((s) => !s.done); // 할일 흐름의 "지금 단계"가 곧 지금 할 일
+    if (cur) return cur.text;
     if (t.ball === 'client') return t.status || (t.task !== '(프로젝트 등록)' ? t.task : '') || t.project;
     return (t.task && t.task !== '(프로젝트 등록)') ? t.task : (t.status || t.project);
   };
@@ -296,13 +313,13 @@ export default function OfficeBoardView() {
             <div className="statebtns"><button disabled={busy} onClick={() => patch(cur.id, { patch: { 담당자: cur.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {cur.owner === '김지영' ? '종호' : '지영'}</button></div>
           </div>
           <div className="pbody">
-            <div className="psec">✏️ 정보 수정</div>
-            <div className="editbox">
+            <button className="editbtn" onClick={() => setShowEdit((v) => !v)}>✏️ 정보 수정 {showEdit ? '▲' : '▼'}</button>
+            {showEdit && (<div className="editbox">
               <input className="ein" value={edit.고객} onChange={(e) => setEdit({ ...edit, 고객: e.target.value })} placeholder="고객사 (자체면 비움)" />
               <input className="ein" value={edit.프로젝트} onChange={(e) => setEdit({ ...edit, 프로젝트: e.target.value })} placeholder="프로젝트명" />
               <input className="ein" value={edit.과업명} onChange={(e) => setEdit({ ...edit, 과업명: e.target.value })} placeholder="과업명 / 현재 상태" />
               <button className="esave" disabled={busy} onClick={saveEdit}>저장</button>
-            </div>
+            </div>)}
             <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span></div>
             {(() => {
               const steps = (cur.todos || []).map(parseStep);
