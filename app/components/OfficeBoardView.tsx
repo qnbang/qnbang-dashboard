@@ -102,6 +102,7 @@ const CSS = `
 .qb .task{font-size:13.5px;font-weight:700;margin-top:1px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .qb .proj-sub{font-size:10.5px;color:#9298ac;margin-top:1px}
 .qb .who-bdg{font-size:10px;font-weight:700;color:#5a6078;background:#f1f3fa;border-radius:6px;padding:2px 6px;flex-shrink:0}
+.qb .who-bdg.outsrc{color:#0d9488;background:#ccfbf1}
 .qb .bdg{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:#eef0f7;color:#5a6078;flex-shrink:0}.qb .bdg.soon{background:#fde8eb;color:#e0364a}
 .qb .row-item{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #e7e9f3;border-radius:11px;padding:8px 11px;margin-bottom:6px;cursor:pointer}
 .qb .row-item .it{font-size:13px;font-weight:600;color:var(--ink)}.qb .row-item .imeta{font-size:10.5px;color:#9298ac;margin-top:1px}.qb .row-item .ibody{flex:1;min-width:0}
@@ -363,7 +364,9 @@ export default function OfficeBoardView() {
         {(cli || showProj) && <div className="cli-proj">{cli && <span>{cli}{showProj ? ' · ' : ''}</span>}{showProj && <span className="proj" style={cat ? { color: cat.c } : undefined}>{cat ? cat.e + ' ' : ''}{t.project}</span>}</div>}
         <div className="task-big">{big}</div>
       </div>
-      {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
+      {t.owner && t.owner !== '신종호' && (WHO[t.owner]
+        ? <span className="who-bdg">{WHO[t.owner]}</span>
+        : <span className="who-bdg outsrc">🤝 외주 · {t.owner}</span>)}
       {t.ball === 'client' && <span className="waitfor">🟣 고객</span>}
       {(() => {
         const dd = cardDday(t); // 단계날짜 우선, 없으면 과업기한

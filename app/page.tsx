@@ -216,6 +216,7 @@ function ProjectDocs({ name, onClose }: { name: string; onClose: () => void }) {
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [openLog, setOpenLog] = useState<number | null>(null);
   const [openD, setOpenD] = useState<{ title: string; content: string } | null>(null);
+  const [outsrc, setOutsrc] = useState(false); // 외주(담당자가 내부팀 아님) — 작업로그 대신 메모 관리
   useEffect(() => {
     (async () => {
       const sq = (s: string) => (s || '').replace(/\s+/g, '');
@@ -223,6 +224,8 @@ function ProjectDocs({ name, onClose }: { name: string; onClose: () => void }) {
       const j = await fetch('/api/git-projects').then((r) => r.json()).catch(() => null);
       const m = j?.ok && (j.projects as ProjectRepo[]).find((p) => { const q = sq(p.title); return !!q && (q.includes(n) || n.includes(q)); });
       if (!m) { setState('notfound'); return; }
+      const mgr = String(m.manager || '');
+      setOutsrc(!!mgr && !['신종호', '김지영'].some((x) => mgr.includes(x))); // 내부팀 아니면 외주
       setRepo(m.repo);
       const d = await fetch(`/api/git-projects/${m.repo}`).then((r) => r.json()).catch(() => null);
       if (d?.ok) { setWorkLog(d.workLog); setStatusBoard(d.statusBoard || null); setDocs(d.docs || []); }
@@ -257,7 +260,9 @@ function ProjectDocs({ name, onClose }: { name: string; onClose: () => void }) {
               </div>
             )}
             {entries.length === 0 && (
-              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[12.5px] text-amber-700 font-medium">⚠️ 작업로그 누락 — <code className="text-[11px] bg-amber-100 px-1 rounded">0_작업로그.md</code>가 없어요. 이 프로젝트는 작업 기록이 안 쌓이고 있어요.</div>
+              outsrc
+                ? <div className="rounded-lg bg-teal-50 border border-teal-200 px-3 py-2 text-[12.5px] text-teal-700">🤝 외주 프로젝트 — 작업로그 대신 <b>메모·할일</b>로 관리해요. 보고 받은 건 보드 카드에 한 줄씩 쌓으면 돼요.</div>
+                : <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[12.5px] text-amber-700 font-medium">⚠️ 작업로그 누락 — <code className="text-[11px] bg-amber-100 px-1 rounded">0_작업로그.md</code>가 없어요. 이 프로젝트는 작업 기록이 안 쌓이고 있어요.</div>
             )}
             {entries.length > 0 && (
               <div>
