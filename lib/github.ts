@@ -135,8 +135,8 @@ export async function listProjectRepos(): Promise<ProjectRepo[]> {
   );
   if (!res.ok) throw new Error(`GitHub repo 목록 실패: ${res.status} ${await res.text()}`);
   const repos = await res.json();
-  const tagged = (repos as { name: string; pushed_at: string; html_url: string; topics?: string[] }[])
-    .filter((r) => (r.topics || []).includes(TOPIC));
+  const tagged = (repos as { name: string; pushed_at: string; html_url: string; topics?: string[]; archived?: boolean }[])
+    .filter((r) => (r.topics || []).includes(TOPIC) && !r.archived); // 아카이브(은퇴) repo는 제외 — 중복·옛 저장소 안 뜸
 
   // 각 repo: 작업로그 H1(이름) + 프로젝트.json(계약·입금·금액)
   const projects: ProjectRepo[] = await Promise.all(
