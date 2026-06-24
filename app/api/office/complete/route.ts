@@ -52,18 +52,18 @@ export async function POST(req: Request) {
     const target = data.find((r) => String(r[idIdx]) === String(id));
     if (!target) return NextResponse.json({ ok: false, error: '해당 과업 없음: ' + id }, { status: 404 });
 
-    // 남길 active 행들(HEADER 순서·날짜 정규화)
+    // 남길 active 행들 — ⚠️ 실제 시트 헤더(head) 전체 폭으로 보존. HEADER(15칸)로 자르면 분류·메모(16·17칸)가 매 완수마다 날아감.
     const active = data.filter((r) => String(r[idIdx]) !== String(id))
-      .map((r) => HEADER.map((_, i) => normCell(r[i])));
+      .map((r) => head.map((_, i) => normCell(r[i])));
 
-    // 완수 행(객체) — 공위치=완수, 갱신일=오늘
+    // 완수 행(객체) — 실제 헤더 기준, 공위치=완수, 갱신일=오늘
     const done: Record<string, string> = {};
-    HEADER.forEach((h, i) => { done[h] = normCell(target[i]); });
+    head.forEach((h, i) => { done[h] = normCell(target[i]); });
     done['공위치'] = '완수';
     done['갱신일'] = todayKST();
 
-    // 과업 탭 = active만 다시(덮어쓰기) → 아카이브에 완수행 append
-    const r1 = await postSheet({ key: KEY, 종류: '과업', 헤더: HEADER, 행들: active, 드롭다운: { 공위치: 공위치_LIST, 돈종류: 돈종류_LIST }, 덮어쓰기: true });
+    // 과업 탭 = active만 다시(덮어쓰기) — 실제 헤더로 써서 칼럼 보존 → 아카이브에 완수행 append
+    const r1 = await postSheet({ key: KEY, 종류: '과업', 헤더: head, 행들: active, 드롭다운: { 공위치: 공위치_LIST, 돈종류: 돈종류_LIST }, 덮어쓰기: true });
     const r2 = await postSheet({ key: KEY, 종류: '아카이브', 헤더: HEADER, 행: done });
     if (!r1.ok || !r2.ok) return NextResponse.json({ ok: false, error: '이동 실패', r1, r2 }, { status: 502 });
     invalidateSheets(); // 이동 즉시 반영

@@ -55,9 +55,9 @@ export async function POST(req: Request) {
     const data = rows.slice(1).filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''));
     if (data.length < 5) return NextResponse.json({ ok: false, error: `과업이 ${data.length}건만 읽혀 저장을 막았어요.` }, { status: 503 });
     if (!data.some((r) => String(r[idIdx]) === String(id))) return NextResponse.json({ ok: false, error: '해당 과업 없음: ' + id }, { status: 404 });
-    const idxOf = (name: string) => head.indexOf(name);
-    const 행들 = data.filter((r) => String(r[idIdx]) !== String(id)).map((r) => HEADER.map((h) => normCell(r[idxOf(h)] ?? '')));
-    const res = await w({ key: KEY, 종류: '과업', 헤더: HEADER, 행들, 드롭다운: { 공위치: ['받은일', '시작전', '내작업', '내회신', '고객대기', '보류', '완수'], 돈종류: ['매출', '투자'] }, 덮어쓰기: true });
+    // ⚠️ 실제 헤더(head) 전체 폭으로 보존 — HEADER(15칸)로 자르면 분류·메모(16·17칸)가 삭제 때마다 날아감.
+    const 행들 = data.filter((r) => String(r[idIdx]) !== String(id)).map((r) => head.map((_, i) => normCell(r[i] ?? '')));
+    const res = await w({ key: KEY, 종류: '과업', 헤더: head, 행들, 드롭다운: { 공위치: ['받은일', '시작전', '내작업', '내회신', '고객대기', '보류', '완수'], 돈종류: ['매출', '투자'] }, 덮어쓰기: true });
     if (!res.ok) return NextResponse.json({ ok: false, error: res.error || '삭제 실패' }, { status: 502 });
     invalidateSheets();
     return NextResponse.json({ ok: true, action: 'deleted' });
