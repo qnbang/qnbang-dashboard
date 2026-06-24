@@ -32,10 +32,14 @@ const DOC_LABEL: Record<string, { t: string; h: string; p: string }> = {
 function parseStep(raw: string) {
   const done = raw.startsWith('✓');
   let s = (done ? raw.slice(1) : raw).trim();
-  const dm = s.match(/@\s*(\d{1,2}\/\d{1,2})\s*$/);
+  // 단계 앞 @담당 토큰(공백 없는 한 토큰). 신종호·김지영=내부, 그 외=외주사명. 안 적으면 카드 담당 상속.
+  const om = s.match(/^@(\S+)\s+/);
+  const owner = om ? om[1] : '';
+  if (om) s = s.slice(om[0].length).trim();
+  const dm = s.match(/@\s*(\d{1,2}\/\d{1,2})\s*$/); // 끝의 @월/일 = 날짜
   const date = dm ? dm[1] : '';
   if (dm) s = s.slice(0, dm.index).trim();
-  return { done, text: s, date, raw };
+  return { done, text: s, date, owner, raw };
 }
 // 할일 단계가 비었으면 현재상태를 '지금 단계'로 흐름에 흡수. 손대는 순간(체크·추가) 진짜 단계로 굳어 이력에 쌓임.
 function effTodos(t: { todos?: string[]; status?: string }): string[] {
@@ -143,6 +147,9 @@ const CSS = `
 .qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0}.qb .jdate.now{background:#fde8eb;color:#e0364a;font-weight:700}
 .qb .jeditbtn{background:none;border:none;cursor:pointer;font-size:11px;opacity:0;transition:opacity .1s;flex-shrink:0;padding:0 2px}
 .qb .jstep:hover .jeditbtn{opacity:.55}.qb .jeditbtn:hover{opacity:1}
+.qb .jwho{font-size:10px;font-weight:700;border:none;border-radius:6px;padding:2px 4px;flex-shrink:0;cursor:pointer;background:#f1f3fa;color:#9298ac;opacity:.5;transition:opacity .1s;-webkit-appearance:none;appearance:none}
+.qb .jstep:hover .jwho{opacity:1}.qb .jwho:hover{opacity:1}
+.qb .jwho.set{opacity:1;color:#5a6078}.qb .jwho.set.out{color:#0d9488;background:#ccfbf1}
 .qb .jstep.editing{padding:6px 8px;gap:6px}
 .qb .jein2{flex:1;font-size:13px;border:1px solid #3a3d44;border-radius:7px;padding:6px 9px;outline:none}
 .qb .jbtn{font-size:11px;font-weight:700;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;flex-shrink:0}
@@ -186,12 +193,17 @@ function currentStep(t: { todos?: string[]; status?: string }) {
   if (!undone.length) return null;
   return [...undone].sort((a, b) => (a.date ? (stepDday(a.date) ?? 99999) : 99999) - (b.date ? (stepDday(b.date) ?? 99999) : 99999))[0];
 }
+// 대기 카드가 누구 답을 기다리는지 — 지금 단계(없으면 카드) 담당이 외부인이면 그 이름, 내부·미지정이면 '고객'
+function waitOn(t: { todos?: string[]; status?: string; owner?: string }): string {
+  const o = currentStep(t)?.owner || t.owner || '';
+  return o && o !== '신종호' && o !== '김지영' ? o : '고객';
+}
 
 export default function OfficeBoardView() {
   const [office, setOffice] = useState<Office | null>(null);
   const [money, setMoney] = useState<Money | null>(null);
   const [err, setErr] = useState('');
-  const [filter, setFilter] = useState<'all' | '회사' | 'jy'>('all');
+  const [filter, setFilter] = useState<'all' | 'jh' | 'jy' | 'out'>('all');
   const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
   useEffect(() => { try { const c = localStorage.getItem('qb-cat'); if (c) setCat(c as typeof cat); } catch { /**/ } }, []); // 새로고침 유지
   useEffect(() => { try { localStorage.setItem('qb-cat', cat); } catch { /**/ } }, [cat]);
@@ -305,7 +317,7 @@ export default function OfficeBoardView() {
     const 내용 = `+ "${txt.replace(/@.*$/, '').trim()}" 추가`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
-  const startEditStep = (i: number, st: { text: string; date: string }) => { setEditStepIdx(i); setEditStepVal(st.text + (st.date ? ` @${st.date}` : '')); };
+  const startEditStep = (i: number, st: { text: string; date: string; owner: string }) => { setEditStepIdx(i); setEditStepVal((st.owner ? `@${st.owner} ` : '') + st.text + (st.date ? ` @${st.date}` : '')); };
   const saveStepEdit = (t: Task, i: number) => {
     const v = editStepVal.trim(); if (!v) return;
     const todos = [...effTodos(t)]; const wasDone = parseStep(todos[i]).done;
@@ -319,6 +331,18 @@ export default function OfficeBoardView() {
     const 내용 = `🗑 "${st.text}" 삭제`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
+  // 단계 담당 지정(드롭다운) — '' 상속(카드담당), 신종호/김지영 내부, '__외주__' 선택 시 이름 입력, 기존 외주명 유지
+  const setStepOwner = (t: Task, i: number, val: string) => {
+    const todos = [...effTodos(t)]; const st = parseStep(todos[i]);
+    let next = val;
+    if (val === '__외주__') next = (prompt('외주사 이름 (공백 없이)') || '').trim().replace(/\s+/g, ''); // 취소·빈값이면 상속
+    if (next === st.owner) return; // 변화 없음
+    const body = (next ? `@${next} ` : '') + st.text + (st.date ? ` @${st.date}` : '');
+    todos[i] = (st.done ? '✓' : '') + body;
+    const lbl = next ? (WHO[next] || `🤝 ${next}`) : '담당 해제(카드 담당 상속)';
+    const 내용 = `👤 "${st.text}" → ${lbl}`;
+    optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
+  };
 
   if (err) return <p className="text-rose-500 text-center py-10">⚠️ {err}</p>;
   if (!office) return <p className="text-slate-400 text-center py-10">관제탑 불러오는 중…</p>;
@@ -328,7 +352,17 @@ export default function OfficeBoardView() {
     ...(office.자체 || []),
     ...(office.언젠가 || []),
   ].map((t) => (over[t.id] ? { ...t, ...over[t.id] } : t)); // 낙관적 덮어쓰기 적용
-  const vis = all.filter((t) => filter === 'all' || filter === '회사' || (filter === 'jy' && t.owner === '김지영'));
+  // 외주 명단 = 지금 보드에 이미 박힌 외주 이름들(카드 담당 + 단계 담당, 내부 제외). 한 번 쓴 외주는 모든 카드 드롭다운에 뜸.
+  const vendors = [...new Set(
+    all.flatMap((t) => [t.owner, ...effTodos(t).map((s) => parseStep(s).owner)])
+       .filter((o) => o && o !== '신종호' && o !== '김지영')
+  )].sort();
+  // 담당자(역할) 필터 — 외주 판정은 카드 뱃지와 동일: 신종호·김지영이 아니면 외주
+  const vis = all.filter((t) =>
+    filter === 'all'
+    || (filter === 'jh' && (t.owner || '신종호') === '신종호')
+    || (filter === 'jy' && t.owner === '김지영')
+    || (filter === 'out' && !!t.owner && t.owner !== '신종호' && t.owner !== '김지영'));
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
   const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
@@ -380,7 +414,7 @@ export default function OfficeBoardView() {
       {t.owner && t.owner !== '신종호' && (WHO[t.owner]
         ? <span className="who-bdg">{WHO[t.owner]}</span>
         : <span className="who-bdg outsrc">🤝 외주 · {t.owner}</span>)}
-      {t.ball === 'client' && <span className="waitfor">🟣 고객</span>}
+      {t.ball === 'client' && <span className="waitfor">🟣 {waitOn(t)}</span>}
       {(() => {
         const dd = cardDday(t); // 단계날짜 우선, 없으면 과업기한
         return dd != null ? <span className={`bdg${dd <= 7 ? ' soon' : ''}`}>{ddText(dd)}</span> : null;
@@ -401,7 +435,7 @@ export default function OfficeBoardView() {
       </section>
       <p className="note0">실시간 업무 현황 — 받은일 · 처리 · 작업 · 대기 · 예정 · 언젠가 · 제품 {office.source === 'sheet' ? `· ✓ ${office.syncedAt} 기준` : office.source === 'seed' ? '· ⚠️ 미리보기 시드' : ''}</p>
       <div className="filters">
-        {([['all', '전체'], ['회사', '🏢 큐앤뱅'], ['jy', '🎨 김지영']] as const).map(([k, lb]) => (
+        {([['all', '전체'], ['jh', '🧑‍💼 신종호'], ['jy', '🎨 김지영'], ['out', '🤝 외주']] as const).map(([k, lb]) => (
           <div key={k} className={`chip${filter === k ? ' on' : ''}`} onClick={() => setFilter(k)}>{lb}</div>
         ))}
       </div>
@@ -568,6 +602,15 @@ export default function OfficeBoardView() {
                   <span className="jmark" onClick={() => toggleStep(cur, i)}>{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
                   <span className="jtext" onClick={() => toggleStep(cur, i)}>{st.text}</span>
                   {st.date && <span className={`jdate${i === firstUndone ? ' now' : ''}`}>📅 {st.date}{i === firstUndone && stepDday(st.date) != null ? ` · ${ddText(stepDday(st.date))}` : ''}</span>}
+                  {(() => { const out = st.owner && st.owner !== '신종호' && st.owner !== '김지영'; return (
+                    <select className={`jwho${st.owner ? (out ? ' set out' : ' set') : ''}`} title="이 단계 담당" value={st.owner || ''} onClick={(e) => e.stopPropagation()} onChange={(e) => setStepOwner(cur, i, e.target.value)}>
+                      <option value="">담당</option>
+                      <option value="신종호">🧑‍💼 종호</option>
+                      <option value="김지영">🎨 김지영</option>
+                      {vendors.map((v) => <option key={v} value={v}>🤝 {v}</option>)}
+                      <option value="__외주__">🤝 새 외주…</option>
+                    </select>
+                  ); })()}
                   <button className="jeditbtn" onClick={() => startEditStep(i, st)}>✏️</button>
                 </div>
               ));
