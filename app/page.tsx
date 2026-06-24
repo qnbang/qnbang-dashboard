@@ -326,10 +326,11 @@ function SalesView() {
 }
 
 // 고객 관리 CRM(#5) — 영업/과업/매출을 고객 기준으로 묶은 생애주기 overview(읽기 중심).
-type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number };
+type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number; 프로젝트들?: string[] };
 type CRMD = { 영업중: CRMClient[]; 진행중: CRMClient[]; 완수: CRMClient[]; source: string };
 function CRMView() {
   const [crm, setCrm] = useState<CRMD | null>(null);
+  const [openClient, setOpenClient] = useState<string | null>(null); // 고객 클릭→프로젝트 펼침
   const [err, setErr] = useState('');
   useEffect(() => {
     fetch('/api/crm').then((r) => r.json()).then((j) => { if (j.ok) setCrm(j.crm); else setErr(j.error || '불러오기 실패'); }).catch((e) => setErr(String(e)));
@@ -354,9 +355,17 @@ function CRMView() {
             <div className="flex items-baseline justify-between mb-2"><div className="font-bold text-sm">{c.label}</div><div className="text-[11px] text-slate-400">{c.hint} · {c.items.length}</div></div>
             <div className="space-y-2">
               {c.items.length === 0 && <div className="text-xs text-slate-300 py-3 text-center">없음</div>}
-              {c.items.map((x, i) => (
-                <div key={i} className="bg-white rounded-lg border border-slate-200 px-3 py-2">
-                  <div className="text-[13px] font-bold text-slate-800 truncate">{x.고객}</div>
+              {c.items.map((x, i) => {
+                const ckey = c.key + ':' + x.고객;
+                const hasPj = (x.프로젝트들?.length ?? 0) > 0;
+                const open = openClient === ckey;
+                return (
+                <div key={i} className={`bg-white rounded-lg border px-3 py-2 ${hasPj ? 'cursor-pointer hover:border-slate-300' : ''} ${open ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-slate-200'}`}
+                  onClick={() => hasPj && setOpenClient(open ? null : ckey)}>
+                  <div className="flex items-center gap-1">
+                    <div className="text-[13px] font-bold text-slate-800 truncate flex-1">{x.고객}</div>
+                    {hasPj && <span className="text-[10px] text-slate-400 shrink-0">{open ? '▲' : `프로젝트 ${x.프로젝트들!.length} ▾`}</span>}
+                  </div>
                   <div className="flex items-center gap-1 mt-1 flex-wrap">
                     {x.단계 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-600">{x.단계}</span>}
                     {x.예상금액 != null && <span className="text-[11px] text-emerald-600">{won(x.예상금액)}</span>}
@@ -367,8 +376,14 @@ function CRMView() {
                     {c.key === 'done' && x.계약금액 != null && x.계약금액 > 0 && <span className="text-[11px] text-slate-400">{won(x.계약금액)}</span>}
                     {x.담당 && x.담당.filter((o) => o && o !== '신종호').map((o) => <span key={o} className="text-[11px] text-pink-500">{o}</span>)}
                   </div>
+                  {open && x.프로젝트들 && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                      {x.프로젝트들.map((p) => <div key={p} className="text-[12px] text-slate-600 flex items-center gap-1.5"><span className="text-slate-300">▸</span>{p}</div>)}
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}
