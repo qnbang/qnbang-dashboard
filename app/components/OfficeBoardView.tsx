@@ -200,6 +200,7 @@ export default function OfficeBoardView() {
   const [showHist, setShowHist] = useState(false); // 🕘 이력 아코디언
   const [docEdit, setDocEdit] = useState(false); // 📄 문서 읽기/편집
   const [openSec, setOpenSec] = useState<number | null>(null); // 리서치 섹션 펼침
+  const [showDone, setShowDone] = useState(false); // 문서형: 완료 단계 접기
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
 
@@ -225,7 +226,7 @@ export default function OfficeBoardView() {
         과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
       });
       setShowEdit(false); setShowMoney(false); setEditStepIdx(null);
-      setMemoVal(sel.memo || ''); setShowHist(false); setDocEdit(false); setOpenSec(null);
+      setMemoVal(sel.memo || ''); setShowHist(false); setDocEdit(false); setOpenSec(null); setShowDone(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel?.id]);
@@ -505,11 +506,12 @@ export default function OfficeBoardView() {
               </>)}
               <button className="esave" disabled={busy} onClick={saveContract}>{mForm.종류 === '정기매출' ? '정기매출' : '매출'} 원장에 기록</button>
             </div>)}
-            <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span></div>
+            <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span>
+              {DOC_LABEL[cur.category || ''] && (() => { const dn = effTodos(cur).map(parseStep).filter((s) => s.done).length; return dn > 0 ? <button className="docbtn" onClick={() => setShowDone((v) => !v)}>✓ 완료 {dn}개 {showDone ? '숨기기' : '보기'}</button> : null; })()}</div>
             {(() => {
               const steps = effTodos(cur).map(parseStep);
               const firstUndone = steps.findIndex((s) => !s.done);
-              return steps.map((st, i) => editStepIdx === i ? (
+              return steps.map((st, i) => (DOC_LABEL[cur.category || ''] && st.done && !showDone) ? null : editStepIdx === i ? (
                 <div key={i} className="jstep editing">
                   <input className="jein2" value={editStepVal} autoFocus onChange={(e) => setEditStepVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveStepEdit(cur, i); if (e.key === 'Escape') setEditStepIdx(null); }} placeholder="단계 내용 (날짜 @6/25)" />
                   <button className="jbtn ok" disabled={busy} onClick={() => saveStepEdit(cur, i)}>저장</button>
