@@ -167,6 +167,12 @@ function stepDday(md: string): number | null {
   if (diff < -180) { target = new Date(now.getFullYear() + 1, +m[1] - 1, +m[2]); diff = Math.round((target.getTime() - t0.getTime()) / 86400000); }
   return diff;
 }
+// 카드가 실제로 보여주는 D-day = 지금 단계의 @날짜(있으면) 아니면 과업 기한. 정렬·뱃지·urgent 모두 이걸로.
+function cardDday(t: { todos?: string[]; status?: string; due?: string; dday?: number | null }): number | null {
+  const c = effTodos(t).map(parseStep).find((s) => !s.done);
+  const sd = c && c.date ? stepDday(c.date) : null;
+  return sd != null ? sd : (t.due && t.dday != null ? t.dday : null);
+}
 
 export default function OfficeBoardView() {
   const [office, setOffice] = useState<Office | null>(null);
@@ -308,7 +314,7 @@ export default function OfficeBoardView() {
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
   const 도구들 = all.filter((t) => (t.category || '') === '도구');
-  const byDday = (a: Task, b: Task) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || (a.dday ?? 9999) - (b.dday ?? 9999); // 급함→임박순(없으면 뒤)
+  const byDday = (a: Task, b: Task) => (cardDday(a) ?? 9999) - (cardDday(b) ?? 9999); // 카드가 보여주는 D-day(단계날짜 우선) 임박순
   const inbox = board.filter((t) => t.ball === 'inbox').sort(byDday);
   const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
   const work = board.filter((t) => t.ball === 'mywork').sort(byDday);
@@ -332,7 +338,7 @@ export default function OfficeBoardView() {
     const showProj = big !== t.project; // 큰글씨가 프로젝트면 윗줄에 또 안 씀
     const cat = CAT[t.category || '']; // 분류 색·이모지
     return (
-    <div key={t.id} className={`tkt${t.urgent ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
+    <div key={t.id} className={`tkt${(cardDday(t) ?? 99) <= 3 ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
         {(cli || showProj) && <div className="cli-proj">{cli && <span>{cli}{showProj ? ' · ' : ''}</span>}{showProj && <span className="proj" style={cat ? { color: cat.c } : undefined}>{cat ? cat.e + ' ' : ''}{t.project}</span>}</div>}
@@ -341,9 +347,7 @@ export default function OfficeBoardView() {
       {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
       {t.ball === 'client' && <span className="waitfor">🟣 고객</span>}
       {(() => {
-        const c = (t.todos || []).map(parseStep).find((s) => !s.done);  // 지금(첫 미완료) 단계
-        const sd = c && c.date ? stepDday(c.date) : null;                // 그 단계 날짜의 D-day
-        const dd = sd != null ? sd : (t.due && t.dday != null ? t.dday : null); // 없으면 전체 마감
+        const dd = cardDday(t); // 단계날짜 우선, 없으면 과업기한
         return dd != null ? <span className={`bdg${dd <= 7 ? ' soon' : ''}`}>{ddText(dd)}</span> : null;
       })()}
     </div>
@@ -521,7 +525,7 @@ export default function OfficeBoardView() {
               ));
             })()}
             <div className="addstep">
-              <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStep(cur)} placeholder="+ 단계 추가 (날짜 @6/25)" />
+              <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addStep(cur); }} placeholder="+ 단계 추가 (날짜 @6/25)" />
               <button disabled={busy || !newStep.trim()} onClick={() => addStep(cur)}>추가</button>
             </div>
             {!DOC_LABEL[cur.category || ''] && (<>
