@@ -267,7 +267,9 @@ export default function OfficeBoardView() {
   const addStep = (t: Task) => {
     const txt = newStep.trim(); if (!txt) return;
     setNewStep('');
-    const todos = [...effTodos(t), txt];
+    const d = new Date(); // 날짜(@) 안 적으면 오늘로
+    const withDate = /@\s*\d{1,2}\/\d{1,2}/.test(txt) ? txt : `${txt} @${d.getMonth() + 1}/${d.getDate()}`;
+    const todos = [...effTodos(t), withDate];
     const 내용 = `+ "${txt.replace(/@.*$/, '').trim()}" 추가`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
