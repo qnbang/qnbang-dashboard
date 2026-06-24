@@ -357,12 +357,14 @@ export default function OfficeBoardView() {
     all.flatMap((t) => [t.owner, ...effTodos(t).map((s) => parseStep(s).owner)])
        .filter((o) => o && o !== '신종호' && o !== '김지영')
   )].sort();
-  // 담당자(역할) 필터 — 외주 판정은 카드 뱃지와 동일: 신종호·김지영이 아니면 외주
-  const vis = all.filter((t) =>
-    filter === 'all'
-    || (filter === 'jh' && (t.owner || '신종호') === '신종호')
-    || (filter === 'jy' && t.owner === '김지영')
-    || (filter === 'out' && !!t.owner && t.owner !== '신종호' && t.owner !== '김지영'));
+  // 담당자(역할) 필터 — 카드 담당 + 단계 담당 모두 본다(준엽처럼 단계만 외주여도 외주 필터에 잡히게)
+  const vis = all.filter((t) => {
+    if (filter === 'all') return true;
+    const owners = [t.owner || '신종호', ...effTodos(t).map((s) => parseStep(s).owner).filter(Boolean)];
+    if (filter === 'jh') return owners.includes('신종호');
+    if (filter === 'jy') return owners.includes('김지영');
+    return owners.some((o) => o !== '신종호' && o !== '김지영'); // 외주
+  });
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
   const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
