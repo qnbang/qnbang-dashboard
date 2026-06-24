@@ -527,12 +527,14 @@ export default function OfficeBoardView() {
               <textarea className="memoarea" value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="진행 정리, 문서 링크, 메모를 자유롭게…" />
               {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>메모 저장</button>}
             </>)}
-            <button className="editbtn" style={{ marginTop: 16 }} onClick={() => setShowHist((v) => !v)}>🕘 이력{cur.history && cur.history.length ? ` (${cur.history.length})` : ''} {showHist ? '▲' : '▼'}</button>
-            {showHist && (cur.history && cur.history.length ? (
-              <div className="tl">{cur.history.map((e, i) => (
-                <div key={i} className="ev"><span className="when">{e.when}</span><span className="what">{e.what}</span></div>
-              ))}</div>
-            ) : <div className="note">아직 이력 없음. 단계를 완료하면 여기 쌓입니다.</div>)}
+            {!DOC_LABEL[cur.category || ''] && (<>
+              <button className="editbtn" style={{ marginTop: 16 }} onClick={() => setShowHist((v) => !v)}>🕘 이력{cur.history && cur.history.length ? ` (${cur.history.length})` : ''} {showHist ? '▲' : '▼'}</button>
+              {showHist && (cur.history && cur.history.length ? (
+                <div className="tl">{cur.history.map((e, i) => (
+                  <div key={i} className="ev"><span className="when">{e.when}</span><span className="what">{e.what}</span></div>
+                ))}</div>
+              ) : <div className="note">아직 이력 없음. 단계를 완료하면 여기 쌓입니다.</div>)}
+            </>)}
           </div>
         </aside>
       </>)}
