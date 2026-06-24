@@ -3,7 +3,7 @@
 // 관제탑 보드 — 시안 I 그대로(리퀴드 글라스). 받은일·처리·작업·대기·예정·언젠가·보류 + 제품.
 // 시트의 flat 공위치(ball)를 시안 I 칸으로 매핑해 실데이터로 그린다. 카드 클릭=슬라이드 패널.
 import { useEffect, useState, useCallback } from 'react';
-import { renderMarkdown } from '@/lib/md';
+import { renderMarkdown } from '@/lib/markdown';
 
 type Task = {
   id: string; project: string; task: string; owner: string;

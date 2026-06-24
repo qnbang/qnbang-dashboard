@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { MonthlyBar, CategoryPie } from './components/charts';
 import OfficeBoardView from './components/OfficeBoardView';
-import { renderMarkdown } from '@/lib/md';
+import { renderMarkdown } from '@/lib/markdown';
 
 type Expense = {
   month: number;
