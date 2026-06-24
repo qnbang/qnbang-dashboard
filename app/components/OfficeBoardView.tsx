@@ -21,6 +21,12 @@ const CAT: Record<string, { c: string; e: string }> = {
   자체사업: { c: '#ea580c', e: '🚀' }, // 주황 — 시장 벤처
   내부: { c: '#475569', e: '🛠️' },     // 회색 — 내부 인프라
 };
+// 포트폴리오 분류 = 문서-중심 패널(할일 아닌 내용이 먼저). 분류별 라벨·플레이스홀더.
+const DOC_LABEL: Record<string, { t: string; h: string; p: string }> = {
+  리서치: { t: '📄 리서치 문서', h: '직접 조사한 내용·링크 (메인)', p: '직접 리서치한 내용, 자료 링크, 전체 정리를 여기에…' },
+  자체사업: { t: '📄 사업 개요', h: '어떤 사업·현황', p: '어떤 사업인지, 현재 진행 현황, 다음 방향을…' },
+  도구: { t: '📄 도구 설명', h: '어떤 건지·진행상태·사용법', p: '어떤 도구인지, 어디까지 됐는지, 어떻게 쓰는지를…' },
+};
 // 할일 단계 파싱: "✓텍스트 @6/25" → {done, text, date}
 function parseStep(raw: string) {
   const done = raw.startsWith('✓');
@@ -51,18 +57,7 @@ function toOver(p: Record<string, string>): Partial<Task> { // 한글 patch → 
 }
 const WHO: Record<string, string> = { 신종호: '🧑‍💼 종호', 김지영: '🎨 김지영' };
 
-// 📦 제품 백로그(서비스개발 5종) · 🧪 실험실 — 과업 시트가 아닌 고정 참조(시안 I).
-const PRODUCTS = [
-  { n: '가격 모니터링', v: 'MVP 배포', next: '다음: 알림 자동화' },
-  { n: 'SEO 상품명 작명기', v: 'MVP 배포', next: '다음: 사용성 개선' },
-  { n: '네이버 키워드 검색기', v: '배포·인증 추가', next: '다음: 요금제' },
-  { n: '크몽 상세페이지 생성기', v: '개발 중', next: '다음: 완성도 마무리' },
-  { n: '쇼츠 자동 편집기', v: '개발 중', next: '다음: 자동자막' },
-  { n: '매크로 투자 브리핑', v: '자동발행 운영', next: '' },
-  { n: 'AI 마케팅팀', v: '콘텐츠 루프', next: '' },
-  { n: '가게지기', v: '개발 중', next: '' },
-];
-// 도구는 과업 보드(공위치)가 아니라 도구 백로그로 — 임시 하드코딩(추후 시트 `분류` 칸으로 대체).
+// 🧪 실험실 — 과업 시트가 아닌 고정 참조. (도구 백로그는 분류=도구 행으로 이관됨)
 const EXPERIMENTS = [
   { n: '풋살 케어·트레이닝', g: '개인 — v1 출시 판정 대기' },
   { n: '생일 커뮤니티', g: '개인 — 할지 말지 미정' },
@@ -162,6 +157,11 @@ export default function OfficeBoardView() {
   const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
   useEffect(() => { try { const c = localStorage.getItem('qb-cat'); if (c) setCat(c as typeof cat); } catch { /**/ } }, []); // 새로고침 유지
   useEffect(() => { try { localStorage.setItem('qb-cat', cat); } catch { /**/ } }, [cat]);
+  useEffect(() => { // PC: ESC로 모달 닫기
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSel(null); setMoneyList(null); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [moneyList, setMoneyList] = useState<'rev' | 'due' | null>(null); // 스코어카드 클릭→계약 리스트
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
@@ -283,6 +283,7 @@ export default function OfficeBoardView() {
     : vis.filter((t) => (t.category || '') === cat);
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
+  const 도구들 = all.filter((t) => (t.category || '') === '도구');
   const byDday = (a: Task, b: Task) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || (a.dday ?? 9999) - (b.dday ?? 9999); // 급함→임박순(없으면 뒤)
   const inbox = board.filter((t) => t.ball === 'inbox').sort(byDday);
   const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
@@ -371,10 +372,10 @@ export default function OfficeBoardView() {
       </div>
 
       {cat === 'all' && filter !== 'jy' && (<>
-        <div className="divider" style={{ color: CAT['도구'].c }}>🧰 도구 백로그 — 판매 제품 (마감 없는 지속 개선)</div>
-        <section className="room product"><div className="rowwrap">{PRODUCTS.map((p) => (
-          <div key={p.n} className="prodcard"><div className="pn">{p.n}</div><div className="pv">{p.v}</div><div className="pnext">{p.next}</div></div>
-        ))}</div></section>
+        <div className="divider" style={{ color: CAT['도구'].c }}>🧰 도구 백로그 — 판매 제품 ({도구들.length}) · 누르면 설명·사용법</div>
+        <section className="room product"><div className="rowwrap">{도구들.length ? 도구들.map((t) => (
+          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['도구'].c }}>🧰 {t.project || t.task}</div><div className="pnext">{t.status || bigTask(t)}</div></div>
+        )) : <div className="empty">없음</div>}</div></section>
 
         <div className="divider" style={{ color: CAT['자체사업'].c }}>🚀 자체사업 — 시장 벤처 → 브랜드 ({자체사업들.length})</div>
         <section className="room product"><div className="rowwrap">{자체사업들.length ? 자체사업들.map((t) => (
@@ -434,9 +435,9 @@ export default function OfficeBoardView() {
             <div className="statebtns"><button disabled={busy} onClick={() => patch(cur.id, { patch: { 담당자: cur.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {cur.owner === '김지영' ? '종호' : '지영'}</button></div>
           </div>
           <div className="pbody">
-            {cur.category === '리서치' && (<>
-              <div className="psec">📄 리서치 문서 <span className="hint2">조사 내용·링크 (메인)</span></div>
-              <textarea className="memoarea" style={{ minHeight: 220 }} value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="조사한 내용, 문서 링크, 전체 정리를 여기에…" />
+            {DOC_LABEL[cur.category || ''] && (<>
+              <div className="psec">{DOC_LABEL[cur.category!].t} <span className="hint2">{DOC_LABEL[cur.category!].h}</span></div>
+              <textarea className="memoarea" style={{ minHeight: 220 }} value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder={DOC_LABEL[cur.category!].p} />
               {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>문서 저장</button>}
             </>)}
             <button className="editbtn" onClick={() => setShowEdit((v) => !v)}>✏️ 정보 수정 {showEdit ? '▲' : '▼'}</button>
@@ -487,7 +488,7 @@ export default function OfficeBoardView() {
               <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStep(cur)} placeholder="+ 단계 추가 (날짜 @6/25)" />
               <button disabled={busy || !newStep.trim()} onClick={() => addStep(cur)}>추가</button>
             </div>
-            {cur.category !== '리서치' && (<>
+            {!DOC_LABEL[cur.category || ''] && (<>
               <div className="psec" style={{ marginTop: 16 }}>📝 메모 <span className="hint2">현재 정리·문서 링크 (살아있는 기록)</span></div>
               <textarea className="memoarea" value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="진행 정리, 문서 링크, 메모를 자유롭게…" />
               {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>메모 저장</button>}
