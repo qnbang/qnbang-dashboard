@@ -34,7 +34,8 @@ function effTodos(t: { todos?: string[]; status?: string }): string[] {
   return t.todos && t.todos.length ? t.todos : (t.status ? [t.status] : []);
 }
 type Office = { rooms: { tasks: Task[] }[]; 자체?: Task[]; 언젠가?: Task[]; 가동률?: Record<string, number>; 과업수?: number; source?: string; syncedAt?: string };
-type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number };
+type Contract = { 계약일: string; 계약명: string; 클라이언트: string; 계약금액: number; 순매출: number; 입금액: number; 미수금: number; 입금상태: string; 입금예정일: string; 미수종류?: string };
+type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number; 계약목록?: Contract[] };
 const won = (n: number) => `${(n || 0).toLocaleString('ko-KR')}원`;
 
 // 공위치(ball) → 시안 I 칸. 내회신=처리(영업·연락·결재류) / 내작업=작업(제작) / 고객대기=대기 / 시작전=예정(날짜)·언젠가(무날짜) / 보류=보류.
@@ -108,6 +109,10 @@ const CSS = `
 .qb .pclose{position:absolute;top:14px;right:16px;border:none;background:#f1f3fa;width:30px;height:30px;border-radius:9px;font-size:16px;cursor:pointer;color:#5a6078}
 .qb .statebtns{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}.qb .statebtns button{font-size:11px;font-weight:700;border:1px solid #e0e3ee;background:#f7f8fc;border-radius:8px;padding:5px 10px;cursor:pointer;color:#5a6078}.qb .statebtns button:hover{background:#fff;border-color:#3a3d44}.qb .statebtns button.cur{background:#3a3d44;color:#fff;border-color:#3a3d44}
 .qb .pbody{flex:1;overflow-y:auto;padding:16px 20px}.qb .psec{font-size:12px;font-weight:800;color:#1a1e30;margin:0 0 6px}
+.qb .mli{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #eef0f6}
+.qb .mli-t{font-size:13px;font-weight:700;color:#1a1e30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qb .mli-s{font-size:10.5px;color:#9298ac;margin-top:1px}
+.qb .mli-r{text-align:right;flex-shrink:0}.qb .mli-amt{display:block;font-size:13.5px;font-weight:800}.qb .mli-tag{font-size:9.5px;color:#9298ac}
 .qb .step{display:flex;gap:9px;padding:8px 0;border-bottom:1px dashed #f0f2f8;font-size:13px;color:#23283c}
 .qb .note{font-size:11.5px;color:#7a8098;padding:10px;background:#f6f7fb;border-radius:9px;margin-top:6px}
 .qb .editbox{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}
@@ -152,6 +157,7 @@ export default function OfficeBoardView() {
   const [money, setMoney] = useState<Money | null>(null);
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState<'all' | '회사' | 'jy'>('all');
+  const [moneyList, setMoneyList] = useState<'rev' | 'due' | null>(null); // 스코어카드 클릭→계약 리스트
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState<Record<string, Partial<Task>>>({}); // 낙관적 덮어쓰기(서버 반영 전 즉시 화면)
@@ -301,8 +307,8 @@ export default function OfficeBoardView() {
     <div className="qb">
       <style>{CSS}</style>
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <div className="glass rounded-2xl p-4"><div className="text-xs text-slate-500 mb-1">순매출 누계</div><div className="text-2xl font-bold text-emerald-600">{won(money?.순매출누계 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약 {money?.계약건수 ?? 0}건</div></div>
-        <div className="glass rounded-2xl p-4"><div className="text-xs text-slate-500 mb-1">미수금 ●</div><div className="text-2xl font-bold text-rose-600">{won(money?.미수금합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약금액 − 입금액</div></div>
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-emerald-200 transition" onClick={() => setMoneyList('rev')}><div className="text-xs text-slate-500 mb-1">순매출 누계 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-emerald-600">{won(money?.순매출누계 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약 {money?.계약건수 ?? 0}건 · 클릭=목록</div></div>
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-rose-200 transition" onClick={() => setMoneyList('due')}><div className="text-xs text-slate-500 mb-1">미수금 ● <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-rose-600">{won(money?.미수금합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약금액 − 입금액 · 클릭=목록</div></div>
         <div className="glass rounded-2xl p-4"><div className="text-xs text-slate-500 mb-1">월 고정비</div><div className="text-2xl font-bold text-slate-700">{won(money?.고정비월합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">매달 나가는 돈</div></div>
         <div className="glass rounded-2xl p-4"><div className="text-xs text-slate-500 mb-1">가동률 (담당 과업)</div><div className="text-xl font-bold text-slate-800">{가동}</div><div className="text-[11px] text-slate-400 mt-1">진행 중 과업 {office.과업수 ?? 0}개</div></div>
       </section>
@@ -348,6 +354,36 @@ export default function OfficeBoardView() {
           <div key={x.n} className="labcard"><div className="ln">🧪 {x.n}</div><div className="lg">{x.g}</div></div>
         ))}</div></section>
       </>)}
+
+      {moneyList && (() => {
+        const cs = money?.계약목록 || [];
+        const list = moneyList === 'due'
+          ? cs.filter((c) => c.미수금 > 0).sort((a, b) => b.미수금 - a.미수금)
+          : cs.slice().sort((a, b) => b.순매출 - a.순매출);
+        return (<>
+          <div className="ovl" onClick={() => setMoneyList(null)} />
+          <aside className="panel">
+            <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
+              <div className="pproj">{moneyList === 'due' ? '🔴 미수금 계약' : '💰 순매출 계약'} <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{list.length}건</span></div>
+              <div className="pmeta">{moneyList === 'due' ? '아직 못 받은 돈 (계약금액 − 입금액)' : '계약별 순매출 = 부가세 뺀 실매출'}</div>
+            </div>
+            <div className="pbody">
+              {list.length === 0 ? <div className="empty">없음</div> : list.map((c, i) => (
+                <div key={i} className="mli">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="mli-t">{c.계약명}</div>
+                    <div className="mli-s">{c.클라이언트}{c.계약일 ? ' · ' + c.계약일 : ''}</div>
+                  </div>
+                  <div className="mli-r">
+                    <span className="mli-amt" style={{ color: moneyList === 'due' ? '#e0364a' : '#059669' }}>{won(moneyList === 'due' ? c.미수금 : c.순매출)}</span>
+                    <span className="mli-tag">{moneyList === 'due' ? (c.미수종류 === '받을예정' ? '예정 ' + (c.입금예정일 || '') : '미정') : c.입금상태}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        </>);
+      })()}
 
       {cur && (<>
         <div className="ovl" onClick={() => setSel(null)} />
