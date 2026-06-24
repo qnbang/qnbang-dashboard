@@ -326,7 +326,7 @@ function SalesView() {
 }
 
 // 고객 관리 CRM(#5) — 영업/과업/매출을 고객 기준으로 묶은 생애주기 overview(읽기 중심).
-type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number; 프로젝트들?: string[] };
+type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number; 프로젝트들?: { 이름: string; 금액: number; 미수: number }[] };
 type CRMD = { 영업중: CRMClient[]; 진행중: CRMClient[]; 완수: CRMClient[]; source: string };
 function CRMView() {
   const [crm, setCrm] = useState<CRMD | null>(null);
@@ -378,7 +378,12 @@ function CRMView() {
                   </div>
                   {open && x.프로젝트들 && (
                     <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
-                      {x.프로젝트들.map((p) => <div key={p} className="text-[12px] text-slate-600 flex items-center gap-1.5"><span className="text-slate-300">▸</span>{p}</div>)}
+                      {x.프로젝트들.map((p) => (
+                        <div key={p.이름} className="text-[12px] flex items-center justify-between gap-2">
+                          <span className="text-slate-600 truncate flex items-center gap-1.5"><span className="text-slate-300">▸</span>{p.이름}</span>
+                          {p.금액 > 0 && <span className="text-slate-500 shrink-0 tabular-nums">{won(p.금액)}{p.미수 > 0 ? <span className="text-rose-500"> · 미수 {won(p.미수)}</span> : ''}</span>}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
