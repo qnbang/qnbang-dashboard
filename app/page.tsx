@@ -238,6 +238,8 @@ function LeadCard({ l, onWin, winning }: { l: Lead; onWin: (id: string, 대상: 
   );
 }
 
+// [폐기 2026-06-24] 영업 탭(0행) + crm.영업중과 중복 → CRM 3단 생애주기의 '영업중' 칸으로 흡수. 미사용.
+//   리드 입력·win·팔로업이 다시 필요하면 이 컴포넌트 복구. 죽은 코드, 컴파일만 됨. ponytail: 삭제 후보.
 function SalesView() {
   const [sales, setSales] = useState<SalesD | null>(null);
   const [err, setErr] = useState('');
@@ -376,6 +378,9 @@ function ProjectDocs({ name, onClose }: { name: string; onClose: () => void }) {
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-400" style={{ width: `${(status.done / status.total) * 100}%` }} /></div>
               </div>
             )}
+            {entries.length === 0 && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[12.5px] text-amber-700 font-medium">⚠️ 작업로그 누락 — <code className="text-[11px] bg-amber-100 px-1 rounded">0_작업로그.md</code>가 없어요. 이 프로젝트는 작업 기록이 안 쌓이고 있어요.</div>
+            )}
             {entries.length > 0 && (
               <div>
                 <div className="text-xs font-semibold text-slate-500 mb-2">🕘 작업로그</div>
@@ -406,7 +411,6 @@ function ProjectDocs({ name, onClose }: { name: string; onClose: () => void }) {
                 ))}
               </div>
             )}
-            {entries.length === 0 && docs.length === 0 && <p className="text-slate-400 text-sm text-center py-6">문서·로그가 없어요.</p>}
           </>)}
         </div>
       </div>
@@ -433,7 +437,12 @@ function CRMView() {
   const [err, setErr] = useState('');
   useEffect(() => {
     fetch('/api/crm').then((r) => r.json()).then((j) => { if (j.ok) setCrm(j.crm); else setErr(j.error || '불러오기 실패'); }).catch((e) => setErr(String(e)));
-    fetch('/api/git-projects').then((r) => r.json()).then((j) => { if (j.ok) setJache((j.projects as ProjectRepo[]).filter((p) => p.category !== '대행').sort((a, b) => (b.pushedAt || '').localeCompare(a.pushedAt || ''))); }).catch(() => {});
+    fetch('/api/git-projects').then((r) => r.json()).then((j) => {
+      if (!j.ok) return;
+      const raw = (j.projects as ProjectRepo[]).filter((p) => p.category !== '대행').sort((a, b) => (b.pushedAt || '').localeCompare(a.pushedAt || ''));
+      const seen = new Set<string>(); // ponytail: 제목 같으면 같은 프로젝트 repo 둘 → 최근 것만(정렬 후 첫 것)
+      setJache(raw.filter((p) => { const k = p.title.replace(/\s+/g, ''); if (seen.has(k)) return false; seen.add(k); return true; }));
+    }).catch(() => {});
   }, []);
   if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
   if (!crm) return <p className="text-slate-400 text-center py-10">고객 불러오는 중…</p>;
