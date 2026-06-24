@@ -9,7 +9,16 @@ type Task = {
   money: string; ball: string; due: string; dday: number | null;
   urgent: boolean; client?: string; status?: string; nextStep?: string;
   todos?: string[]; staleDays?: number | null; stale?: boolean;
+  category?: string;
   history?: { when: string; what: string }[];
+};
+// 분류별 색·이모지 — 카드 프로젝트명 색, 칩, 포트폴리오 공통.
+const CAT: Record<string, { c: string; e: string }> = {
+  대행: { c: '#2563eb', e: '🤝' },     // 파랑 — 고객 일(매출)
+  도구: { c: '#0d9488', e: '🧰' },     // 청록 — 판매 도구
+  리서치: { c: '#9333ea', e: '🔬' },   // 보라 — 탐색·자산
+  자체사업: { c: '#ea580c', e: '🚀' }, // 주황 — 시장 벤처
+  내부: { c: '#475569', e: '🛠️' },     // 회색 — 내부 인프라
 };
 // 할일 단계 파싱: "✓텍스트 @6/25" → {done, text, date}
 function parseStep(raw: string) {
@@ -267,11 +276,12 @@ export default function OfficeBoardView() {
     const cli = t.client && t.client !== t.project ? t.client : '';
     const big = bigTask(t);
     const showProj = big !== t.project; // 큰글씨가 프로젝트면 윗줄에 또 안 씀
+    const cat = CAT[t.category || '']; // 분류 색·이모지
     return (
     <div key={t.id} className={`tkt${t.urgent ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
-        {(cli || showProj) && <div className="cli-proj">{cli && <span>{cli}{showProj ? ' · ' : ''}</span>}{showProj && <span className="proj">{t.project}</span>}</div>}
+        {(cli || showProj) && <div className="cli-proj">{cli && <span>{cli}{showProj ? ' · ' : ''}</span>}{showProj && <span className="proj" style={cat ? { color: cat.c } : undefined}>{cat ? cat.e + ' ' : ''}{t.project}</span>}</div>}
         <div className="task-big">{big}</div>
       </div>
       {t.owner && t.owner !== '신종호' && <span className="who-bdg">{WHO[t.owner] || t.owner}</span>}
