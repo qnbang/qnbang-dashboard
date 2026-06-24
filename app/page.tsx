@@ -429,9 +429,11 @@ function CRMView() {
   const [crm, setCrm] = useState<CRMD | null>(null);
   const [openClient, setOpenClient] = useState<string | null>(null); // 고객 클릭→프로젝트 펼침
   const [projDoc, setProjDoc] = useState<string | null>(null); // 프로젝트 클릭→문서 뷰
+  const [jache, setJache] = useState<ProjectRepo[]>([]); // 고객 없는 자체 프로젝트(GitHub)
   const [err, setErr] = useState('');
   useEffect(() => {
     fetch('/api/crm').then((r) => r.json()).then((j) => { if (j.ok) setCrm(j.crm); else setErr(j.error || '불러오기 실패'); }).catch((e) => setErr(String(e)));
+    fetch('/api/git-projects').then((r) => r.json()).then((j) => { if (j.ok) setJache((j.projects as ProjectRepo[]).filter((p) => p.category !== '대행')); }).catch(() => {});
   }, []);
   if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
   if (!crm) return <p className="text-slate-400 text-center py-10">고객 불러오는 중…</p>;
@@ -491,6 +493,16 @@ function CRMView() {
           </div>
         ))}
       </section>
+      {jache.length > 0 && (<>
+        <div className="text-sm font-bold text-slate-700 border-t pt-5 -mb-1">🏢 자체 프로젝트 <span className="font-normal text-slate-400">— 고객 없는 큐앤뱅 자체 ({jache.length}) · 누르면 문서</span></div>
+        <section className="flex flex-wrap gap-2">
+          {jache.map((p) => (
+            <button key={p.repo} onClick={() => setProjDoc(p.title)} className="text-[12.5px] px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-indigo-300 hover:bg-indigo-50 text-left">
+              <span className="font-semibold">{p.title}</span>{p.category && <span className="ml-1.5 text-[10px] text-slate-400">{p.category}</span>}
+            </button>
+          ))}
+        </section>
+      </>)}
       {projDoc && <ProjectDocs name={projDoc} onClose={() => setProjDoc(null)} />}
     </div>
   );
@@ -1231,6 +1243,8 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
   );
 }
 
+// [폐기 2026-06-24] 프로젝트 탭 → CRM 통합으로 미사용. 문서 브라우징은 ProjectDocs(읽기)가 대체.
+//   다음 차수에 통째 삭제 + 문서편집/공유 로직은 공용 컴포넌트로(SharesView와 중복). ponytail: 죽은 코드, 컴파일만 됨.
 function ProjectsView() {
   const [projects, setProjects] = useState<ProjectRepo[]>([]);
   const [loading, setLoading] = useState(true);
