@@ -62,7 +62,6 @@ const PRODUCTS = [
   { n: '가게지기', v: '개발 중', next: '' },
 ];
 // 도구는 과업 보드(공위치)가 아니라 도구 백로그로 — 임시 하드코딩(추후 시트 `분류` 칸으로 대체).
-const TOOL_PROJECTS = new Set(['매크로 투자 브리핑', '큐앤뱅 AI마케팅팀']);
 const EXPERIMENTS = [
   { n: '풋살 케어·트레이닝', g: '개인 — v1 출시 판정 대기' },
   { n: '생일 커뮤니티', g: '개인 — 할지 말지 미정' },
@@ -157,6 +156,7 @@ export default function OfficeBoardView() {
   const [money, setMoney] = useState<Money | null>(null);
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState<'all' | '회사' | 'jy'>('all');
+  const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
   const [moneyList, setMoneyList] = useState<'rev' | 'due' | null>(null); // 스코어카드 클릭→계약 리스트
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
@@ -260,7 +260,11 @@ export default function OfficeBoardView() {
   ].map((t) => (over[t.id] ? { ...t, ...over[t.id] } : t)); // 낙관적 덮어쓰기 적용
   const vis = all.filter((t) => filter === 'all' || filter === '회사' || (filter === 'jy' && t.owner === '김지영'));
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
-  const board = vis.filter((t) => !TOOL_PROJECTS.has(t.project));
+  // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
+  const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
+  const board = cat === 'all' ? vis.filter((t) => !PORTFOLIO_CATS.has(t.category || '')) : vis.filter((t) => (t.category || '') === cat);
+  const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
+  const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
   const inbox = board.filter((t) => t.ball === 'inbox');
   const proc = board.filter((t) => t.ball === 'myreply');
   const work = board.filter((t) => t.ball === 'mywork').sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
@@ -318,6 +322,12 @@ export default function OfficeBoardView() {
           <div key={k} className={`chip${filter === k ? ' on' : ''}`} onClick={() => setFilter(k)}>{lb}</div>
         ))}
       </div>
+      <div className="filters" style={{ marginTop: -6 }}>
+        <div className={`chip${cat === 'all' ? ' on' : ''}`} onClick={() => setCat('all')}>전체 분류</div>
+        {(['대행', '도구', '리서치', '자체사업', '내부'] as const).map((k) => (
+          <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(k)}>{CAT[k].e} {k}</div>
+        ))}
+      </div>
 
       <section className="room inbox-room"><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">라크·메일·DM에서 들어온 미분류</span></div>
         <div className="rowwrap">{inbox.length ? inbox.map(Card) : <div className="empty">📭 받은 일 비움</div>}</div></section>
@@ -341,14 +351,22 @@ export default function OfficeBoardView() {
           {hold.length ? hold.map((t) => <div key={t.id} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
       </div>
 
-      {filter !== 'jy' && (<>
-        <div className="divider">📦 제품 백로그 — 자체 제품 (마감 없는 지속 개선)</div>
+      {cat === 'all' && filter !== 'jy' && (<>
+        <div className="divider" style={{ color: CAT['도구'].c }}>🧰 도구 백로그 — 판매 제품 (마감 없는 지속 개선)</div>
         <section className="room product"><div className="rowwrap">{PRODUCTS.map((p) => (
           <div key={p.n} className="prodcard"><div className="pn">{p.n}</div><div className="pv">{p.v}</div><div className="pnext">{p.next}</div></div>
         ))}</div></section>
-      </>)}
 
-      {filter === 'all' && (<>
+        <div className="divider" style={{ color: CAT['자체사업'].c }}>🚀 자체사업 — 시장 벤처 → 브랜드 ({자체사업들.length})</div>
+        <section className="room product"><div className="rowwrap">{자체사업들.length ? 자체사업들.map((t) => (
+          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['자체사업'].c }}>🚀 {t.project || t.task}</div><div className="pnext">{bigTask(t)}</div></div>
+        )) : <div className="empty">없음</div>}</div></section>
+
+        <div className="divider" style={{ color: CAT['리서치'].c }}>🔬 리서치 풀 — 탐색·자산 (쌓여 프로젝트 자산) ({리서치들.length})</div>
+        <section className="room product"><div className="rowwrap">{리서치들.length ? 리서치들.map((t) => (
+          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['리서치'].c }}>🔬 {t.project || t.task}</div><div className="pnext">{bigTask(t)}</div></div>
+        )) : <div className="empty">없음</div>}</div></section>
+
         <div className="divider">🧪 실험실 — 개인·미공식 (공식화 게이트)</div>
         <section className="room product"><div className="rowwrap">{EXPERIMENTS.map((x) => (
           <div key={x.n} className="labcard"><div className="ln">🧪 {x.n}</div><div className="lg">{x.g}</div></div>
