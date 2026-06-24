@@ -262,7 +262,10 @@ export default function OfficeBoardView() {
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
   const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
-  const board = cat === 'all' ? vis.filter((t) => !PORTFOLIO_CATS.has(t.category || '')) : vis.filter((t) => (t.category || '') === cat);
+  const ACTIVE_BALLS = new Set(['inbox', 'mywork', 'myreply', 'client']); // 흐르는 중 = 작업 보드에도 (멈춘 건 포트폴리오에만)
+  const board = cat === 'all'
+    ? vis.filter((t) => !PORTFOLIO_CATS.has(t.category || '') || ACTIVE_BALLS.has(t.ball))
+    : vis.filter((t) => (t.category || '') === cat);
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
   const inbox = board.filter((t) => t.ball === 'inbox');
