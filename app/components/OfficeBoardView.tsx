@@ -230,9 +230,8 @@ export default function OfficeBoardView() {
   };
   // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
   const stepPost = async (id: string, todos: string[], 내용: string) => {
-    setBusy(true);
     await fetch('/api/office/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 할일: todos.join(';'), 내용 }) }).catch(() => null);
-    setBusy(false);
+    load(); // 보드 카드도 갱신(시트API ~0.4초)
   };
   const optimistic = (t: Task, todos: string[], 내용: string) =>
     setSel({ ...t, todos, history: [{ when: '방금', what: 내용 }, ...(t.history || [])] }); // 클릭 즉시 화면 반영
@@ -277,9 +276,10 @@ export default function OfficeBoardView() {
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
   const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
-  // 포트폴리오 분류(도구·리서치·자체사업)는 작업 보드 아닌 아래 포트폴리오 섹션에만. 보드는 대행+내부.
+  const ACTIVE_BALLS = new Set(['inbox', 'mywork', 'myreply', 'client']);
+  // 보드 = 대행+내부 + 자체사업의 '활성 과업'(반보 호스트모집 등). 도구·리서치는 작업 아니라 포트폴리오만.
   const board = cat === 'all'
-    ? vis.filter((t) => !PORTFOLIO_CATS.has(t.category || ''))
+    ? vis.filter((t) => { const c = t.category || ''; if (c === '도구' || c === '리서치') return false; if (c === '자체사업') return ACTIVE_BALLS.has(t.ball); return true; })
     : vis.filter((t) => (t.category || '') === cat);
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
@@ -477,8 +477,8 @@ export default function OfficeBoardView() {
                 </div>
               ) : (
                 <div key={i} className={`jstep${st.done ? ' done' : i === firstUndone ? ' cur' : ''}`}>
-                  <span className="jmark" onClick={() => !busy && toggleStep(cur, i)}>{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
-                  <span className="jtext" onClick={() => !busy && toggleStep(cur, i)}>{st.text}</span>
+                  <span className="jmark" onClick={() => toggleStep(cur, i)}>{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
+                  <span className="jtext" onClick={() => toggleStep(cur, i)}>{st.text}</span>
                   {st.date && <span className={`jdate${i === firstUndone ? ' now' : ''}`}>📅 {st.date}{i === firstUndone && stepDday(st.date) != null ? ` · ${ddText(stepDday(st.date))}` : ''}</span>}
                   <button className="jeditbtn" onClick={() => startEditStep(i, st)}>✏️</button>
                 </div>
