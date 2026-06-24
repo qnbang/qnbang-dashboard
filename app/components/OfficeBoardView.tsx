@@ -41,6 +41,18 @@ function parseStep(raw: string) {
 function effTodos(t: { todos?: string[]; status?: string }): string[] {
   return t.todos && t.todos.length ? t.todos : (t.status ? [t.status] : []);
 }
+// 리서치 문서를 # / ## 헤딩 기준 섹션으로 분해 — 게시판식(섹션 클릭하면 펼침).
+function mdSections(md: string): { h: string; body: string }[] {
+  const cur = { h: '', body: [] as string[] };
+  const secs: { h: string; body: string[] }[] = [];
+  for (const ln of (md || '').split('\n')) {
+    const m = ln.match(/^#{1,2}\s+(.*)/);
+    if (m) { if (cur.h || cur.body.join('').trim()) secs.push({ h: cur.h, body: [...cur.body] }); cur.h = m[1]; cur.body = []; }
+    else cur.body.push(ln);
+  }
+  if (cur.h || cur.body.join('').trim()) secs.push({ h: cur.h, body: cur.body });
+  return secs.map((s) => ({ h: s.h, body: s.body.join('\n') }));
+}
 type Office = { rooms: { tasks: Task[] }[]; 자체?: Task[]; 언젠가?: Task[]; 가동률?: Record<string, number>; 과업수?: number; source?: string; syncedAt?: string };
 type Contract = { 계약일: string; 계약명: string; 클라이언트: string; 계약금액: number; 순매출: number; 입금액: number; 미수금: number; 입금상태: string; 입금예정일: string; 미수종류?: string };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number; 계약목록?: Contract[] };
@@ -136,6 +148,10 @@ const CSS = `
 .qb .memoarea{width:100%;min-height:68px;font-size:12.5px;line-height:1.5;background:#fff;border:1px solid #e0e3ee;border-radius:10px;padding:8px 11px;resize:vertical;font-family:inherit;color:#1a1e30;box-sizing:border-box}.qb .memoarea:focus{outline:none;border-color:#3a3d44}
 .qb .docbtn{float:right;font-size:11px;font-weight:700;background:#eef0f7;border:none;border-radius:7px;padding:3px 9px;cursor:pointer;color:#3a3d44}
 .qb .mddoc{background:#fafbfe;border:1px solid #eef0f6;border-radius:12px;padding:12px 15px;margin-top:4px}.qb .mddoc>:first-child{margin-top:0}
+.qb .secboard{margin-top:4px;border:1px solid #eef0f6;border-radius:12px;overflow:hidden}
+.qb .secitem{border-bottom:1px solid #f1f3f9}.qb .secitem:last-child{border-bottom:none}
+.qb .sechead{width:100%;text-align:left;background:#fff;border:none;cursor:pointer;font-size:12.5px;font-weight:700;color:#2a2f44;padding:10px 13px;display:flex;gap:7px;align-items:flex-start}.qb .sechead:hover{background:#fafbfe}.qb .secarr{color:#9298ac;flex-shrink:0}
+.qb .secitem .mddoc{border:none;border-radius:0;margin-top:0;border-top:1px solid #f1f3f9}
 .qb .ev{display:flex;gap:10px;padding:6px 0;font-size:12.5px;align-items:baseline;border-bottom:1px dashed #f0f2f8}.qb .ev .when{color:#9298ac;font-size:10.5px;flex-shrink:0;width:64px}.qb .ev .what{color:#23283c}
 `;
 
@@ -177,6 +193,7 @@ export default function OfficeBoardView() {
   const [memoVal, setMemoVal] = useState(''); // 📝 메모(현재 정리·링크)
   const [showHist, setShowHist] = useState(false); // 🕘 이력 아코디언
   const [docEdit, setDocEdit] = useState(false); // 📄 문서 읽기/편집
+  const [openSec, setOpenSec] = useState<number | null>(null); // 리서치 섹션 펼침
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
 
@@ -202,7 +219,7 @@ export default function OfficeBoardView() {
         과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
       });
       setShowEdit(false); setShowMoney(false); setEditStepIdx(null);
-      setMemoVal(sel.memo || ''); setShowHist(false); setDocEdit(false);
+      setMemoVal(sel.memo || ''); setShowHist(false); setDocEdit(false); setOpenSec(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel?.id]);
@@ -446,7 +463,14 @@ export default function OfficeBoardView() {
               {docEdit ? (<>
                 <textarea className="memoarea" style={{ minHeight: 300 }} value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder={DOC_LABEL[cur.category!].p + ' (마크다운 # ## - **굵게** [링크](url) 지원)'} />
                 {memoVal !== (cur.memo || '') && <button className="esave" onClick={() => { saveMemo(); setDocEdit(false); }}>문서 저장</button>}
-              </>) : (
+              </>) : cur.category === '리서치' && memoVal.trim() ? (
+                <div className="secboard">{mdSections(memoVal).map((s, i) => (
+                  <div key={i} className="secitem">
+                    <button className="sechead" onClick={() => setOpenSec(openSec === i ? null : i)}><span className="secarr">{openSec === i ? '▼' : '▸'}</span>{s.h || '개요'}</button>
+                    {openSec === i && <div className="mddoc">{renderMarkdown(s.body)}</div>}
+                  </div>
+                ))}</div>
+              ) : (
                 <div className="mddoc">{memoVal.trim() ? renderMarkdown(memoVal) : <div className="note">내용 없음 — ✏️ 편집으로 작성하세요. (마크다운 지원)</div>}</div>
               )}
             </>)}
