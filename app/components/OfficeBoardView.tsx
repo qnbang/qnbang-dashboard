@@ -176,9 +176,15 @@ function stepDday(md: string): number | null {
 }
 // 카드가 실제로 보여주는 D-day = 지금 단계의 @날짜(있으면) 아니면 과업 기한. 정렬·뱃지·urgent 모두 이걸로.
 function cardDday(t: { todos?: string[]; status?: string; due?: string; dday?: number | null }): number | null {
-  const c = effTodos(t).map(parseStep).find((s) => !s.done);
+  const c = currentStep(t);
   const sd = c && c.date ? stepDday(c.date) : null;
   return sd != null ? sd : (t.due && t.dday != null ? t.dday : null);
+}
+// 지금 단계 = 미완료 중 날짜 가장 이른 것(무날짜는 뒤). 패널 ▶·카드 큰글씨·D-day 모두 이걸로 일치.
+function currentStep(t: { todos?: string[]; status?: string }) {
+  const undone = effTodos(t).map(parseStep).filter((s) => !s.done);
+  if (!undone.length) return null;
+  return [...undone].sort((a, b) => (a.date ? (stepDday(a.date) ?? 99999) : 99999) - (b.date ? (stepDday(b.date) ?? 99999) : 99999))[0];
 }
 
 export default function OfficeBoardView() {
@@ -349,7 +355,7 @@ export default function OfficeBoardView() {
   // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
   // 프로젝트=과업. 큰 글씨 = 지금 할 일(현재 단계) → 없으면 현재상태 → 그것도 없으면 프로젝트.
   const bigTask = (t: Task) => {
-    const cur = (t.todos || []).map(parseStep).find((s) => !s.done);
+    const cur = currentStep(t);
     return (cur && cur.text) || t.status || t.project;
   };
   const Card = (t: Task) => {
@@ -534,9 +540,17 @@ export default function OfficeBoardView() {
             <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span>
               {DOC_LABEL[cur.category || ''] && (() => { const dn = effTodos(cur).map(parseStep).filter((s) => s.done).length; return dn > 0 ? <button className="docbtn" onClick={() => setShowDone((v) => !v)}>✓ 완료 {dn}개 {showDone ? '숨기기' : '보기'}</button> : null; })()}</div>
             {(() => {
-              const steps = effTodos(cur).map(parseStep);
-              const firstUndone = steps.findIndex((s) => !s.done);
-              return steps.map((st, i) => (DOC_LABEL[cur.category || ''] && st.done && !showDone) ? null : editStepIdx === i ? (
+              const raw = effTodos(cur).map(parseStep);
+              // 날짜순으로 보여주되 토글·편집은 원본 인덱스(i)로 — 완료는 위(원래순서), 미완료는 날짜 오름차순(무날짜 뒤).
+              const order = raw.map((st, i) => ({ st, i })).sort((a, b) => {
+                if (a.st.done !== b.st.done) return a.st.done ? -1 : 1;
+                if (a.st.done) return a.i - b.i;
+                const da = a.st.date ? (stepDday(a.st.date) ?? 99999) : 99999;
+                const db = b.st.date ? (stepDday(b.st.date) ?? 99999) : 99999;
+                return da !== db ? da - db : a.i - b.i;
+              });
+              const firstUndone = order.find((o) => !o.st.done)?.i ?? -1;
+              return order.map(({ st, i }) => (DOC_LABEL[cur.category || ''] && st.done && !showDone) ? null : editStepIdx === i ? (
                 <div key={i} className="jstep editing">
                   <input className="jein2" value={editStepVal} autoFocus onChange={(e) => setEditStepVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveStepEdit(cur, i); if (e.key === 'Escape') setEditStepIdx(null); }} placeholder="단계 내용 (날짜 @6/25)" />
                   <button className="jbtn ok" disabled={busy} onClick={() => saveStepEdit(cur, i)}>저장</button>
