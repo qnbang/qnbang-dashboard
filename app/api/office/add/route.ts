@@ -52,8 +52,10 @@ export async function POST(req: Request) {
   try {
     const b = await req.json().catch(() => ({}));
     // 구조 입력(폼) 우선, 없으면 line 약식 파싱
+    // 받은일(inbox)은 빈 공위치로 저장(office.ts 규칙: unset=받은일 바구니). 그 외는 라벨 그대로.
+    const ball0 = b.ball === '받은일' || b.ball === 'inbox' ? '' : (b.ball || '내작업');
     const p = b.line ? parseLine(String(b.line)) : {
-      프로젝트: b.project || '', 과업명: b.task || '', 공위치: b.ball || '내작업', 기한: b.due || '',
+      프로젝트: b.project || '', 과업명: b.task || '', 공위치: ball0, 기한: b.due || '',
     };
     if (!p.프로젝트 && !p.과업명) {
       return NextResponse.json({ ok: false, error: '프로젝트나 과업명 중 하나는 있어야 해요' }, { status: 400 });

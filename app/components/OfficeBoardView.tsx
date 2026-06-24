@@ -112,6 +112,12 @@ const CSS = `
 .qb .labcard{flex:1;min-width:200px;background:#fff;border:1px dashed #e0a8e8;border-radius:14px;padding:10px 13px}.qb .labcard .ln{font-size:13px;font-weight:700;color:var(--ink)}.qb .labcard .lg{font-size:10.5px;color:#a04ca0;margin-top:3px}
 .qb .divider{display:flex;align-items:center;gap:10px;margin:22px 0 10px;color:#7a8098;font-size:12.5px;font-weight:800}.qb .divider::after{content:"";flex:1;height:1px;background:#dde0ec}
 .qb .empty{color:#b0b5c6;font-size:12px;padding:12px;text-align:center;width:100%}
+.qb .qa{margin-bottom:8px;display:flex;flex-direction:column;gap:5px}
+.qb .qa input{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:7px;padding:6px 9px;font-size:12px;background:#fff;color:var(--ink)}
+.qb .qa input:focus{outline:none;border-color:#6366f1}
+.qb .qa-btns{display:flex;gap:5px}
+.qb .qa-btns button{flex:1;font-size:11px;padding:5px 4px;border-radius:6px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:var(--ink)}
+.qb .qa-btns button:hover{background:#eef2ff;border-color:#a5b4fc}
 .qb .ovl{position:fixed;inset:0;background:#1e225566;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:40}
 .qb .panel{position:fixed;top:0;right:0;width:400px;max-width:92vw;height:100%;background:#ffffffe8;backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);border-left:1px solid #ffffffcc;box-shadow:-14px 0 50px #1e225528;z-index:50;display:flex;flex-direction:column}
 .qb .ph{padding:18px 20px 12px;border-bottom:1px solid #eef0f7;position:relative}.qb .pcli{font-size:11.5px;font-weight:700;color:#3a3d44}.qb .pproj{font-size:18px;font-weight:800;margin:3px 0 2px;color:#15182a}.qb .pmeta{font-size:11.5px;color:#6b7088}
@@ -204,6 +210,18 @@ export default function OfficeBoardView() {
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
 
+  const [qa, setQa] = useState(''); // 받은일/처리 빠른추가 입력(단건)
+  const [qaBusy, setQaBusy] = useState(false);
+  const quickAdd = async (ball: string) => {
+    const txt = qa.trim();
+    if (!txt || qaBusy) return;
+    setQaBusy(true);
+    try {
+      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: txt, ball }) });
+      const j = await r.json();
+      if (j.ok) { setQa(''); load(); } else alert(j.error || '추가 실패');
+    } catch (e) { alert(String(e)); } finally { setQaBusy(false); }
+  };
   const load = useCallback(() => {
     fetch('/api/office').then((r) => r.json()).then((j) => {
       if (j.ok) {
@@ -380,6 +398,10 @@ export default function OfficeBoardView() {
 
       <div className="board">
         <section className="room inbox-room"><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">미분류</span></div>
+          <div className="qa">
+            <input value={qa} onChange={(e) => setQa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) quickAdd('받은일'); }} placeholder="+ 받은/처리한 일 한 줄… (Enter=받은일)" disabled={qaBusy} />
+            {qa.trim() && <div className="qa-btns"><button onClick={() => quickAdd('받은일')} disabled={qaBusy}>📥 받은일로</button><button onClick={() => quickAdd('완수')} disabled={qaBusy}>✅ 처리됨으로</button></div>}
+          </div>
           <div className="tkts">{inbox.length ? inbox.map(Card) : <div className="empty">📭 비움</div>}</div></section>
         <section className="room proc"><div className="rh">🧾 처리 <span className="cnt">{proc.length}</span><span className="hint">영업·연락·결재</span></div>
           <div className="tkts">{proc.length ? proc.map(Card) : <Empty />}</div></section>

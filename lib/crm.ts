@@ -24,7 +24,7 @@ export interface CRMClient {
   단계?: string;          // 영업 단계(영업중일 때)
   예상금액?: number | null;
   과업수?: number;         // 진행중 과업 수
-  프로젝트들?: { 이름: string; 금액: number; 미수: number }[];   // 고객의 프로젝트별 금액 — 카드 클릭 펼침용
+  프로젝트들?: { 이름: string; 금액: number; 미수: number; 단계?: string }[];   // 고객의 프로젝트별 금액·지금 단계 — 카드 클릭 펼침용
   공위치?: string[];
   담당?: string[];
   계약금액?: number;       // 매출 계약 합
@@ -47,6 +47,21 @@ export async function buildCRM(): Promise<CRMData> {
   const 매출 = objs(sh['매출']);
   const 아카이브 = objs(sh['아카이브']);
 
+  // 프로젝트별 '지금 단계' = 첫 미완료 할일(✓ 아님) → 없으면 다음할일/현재상태. 보드 카드의 '지금 단계'와 같은 개념.
+  const sq = (s: string) => String(s || '').replace(/\s+/g, '');
+  const stepOf = (t: Record<string, unknown>) => {
+    const steps = String(t['할일'] || '').split(';').map((s) => s.trim()).filter(Boolean);
+    const undone = steps.find((s) => !s.startsWith('✓'));
+    return (undone || String(t['다음할일'] || '').trim() || String(t['현재상태'] || '').trim()).trim();
+  };
+  const 프로젝트단계: Record<string, string> = {};
+  for (const t of 과업) {
+    if (t['공위치'] === '완수' || t['공위치'] === '보류') continue;
+    const pj = sq((t['프로젝트'] as string) || (t['과업명'] as string) || '');
+    const st = stepOf(t);
+    if (pj && st && !프로젝트단계[pj]) 프로젝트단계[pj] = st;
+  }
+
   const 미수of = (name: string) => 매출.filter((c) => same(name, c['클라이언트'] || c['계약명']))
     .reduce((s, c) => s + Math.max(0, num(c['계약금액']) - num(c['입금액'])), 0);
   const 계약of = (name: string) => 매출.filter((c) => same(name, c['클라이언트'] || c['계약명']))
@@ -54,9 +69,9 @@ export async function buildCRM(): Promise<CRMData> {
   // 고객의 프로젝트별 {이름·금액·미수} — 매출 계약 우선, 매출 없는 과업(작업)은 금액 0으로 추가.
   const 프로젝트들of = (name: string, 과업이름: string[] = []) => {
     const list = 매출.filter((c) => same(name, c['클라이언트'] || c['계약명']))
-      .map((c) => ({ 이름: c['계약명'], 금액: num(c['계약금액']), 미수: Math.max(0, num(c['계약금액']) - num(c['입금액'])) }));
+      .map((c) => ({ 이름: c['계약명'], 금액: num(c['계약금액']), 미수: Math.max(0, num(c['계약금액']) - num(c['입금액'])), 단계: 프로젝트단계[sq(c['계약명'])] }));
     for (const pj of 과업이름) {
-      if (pj && !list.some((x) => x.이름.includes(pj) || pj.includes(x.이름))) list.push({ 이름: pj, 금액: 0, 미수: 0 });
+      if (pj && !list.some((x) => x.이름.includes(pj) || pj.includes(x.이름))) list.push({ 이름: pj, 금액: 0, 미수: 0, 단계: 프로젝트단계[sq(pj)] });
     }
     return list;
   };
