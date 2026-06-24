@@ -79,7 +79,8 @@ const CSS = `
 .qb .room.inbox-room{border-left:3px solid #4b5563}.qb .room.proc{border-left:3px solid #586070}.qb .room.work{border-left:3px solid #6b7280}.qb .room.wait{border-left:3px solid #828a98}.qb .room.todo{border-left:3px solid #9aa1ad}.qb .room.someday{border-left:3px solid #9aa1ad}.qb .room.hold{border-left:3px solid #b8bdc8}.qb .room.product{border-left:3px solid #6b7280}
 .qb .rh{font-size:13.5px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;color:var(--ink)}
 .qb .rh .cnt{background:#0000000d;border-radius:999px;padding:1px 8px;font-size:11px;color:#475569;font-weight:700}.qb .rh .cnt.red{background:#ef4444;color:#fff}.qb .rh .hint{font-weight:500;color:#9298ac;font-size:11px;margin-left:auto}
-.qb .board{display:grid;grid-template-columns:1.05fr 1fr;gap:14px;align-items:start;margin-top:14px}
+.qb .board{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;margin-top:14px}
+.qb .room.work .tkt{flex:1 1 280px}
 .qb .board3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:start;margin-top:14px}
 .qb .tkts{display:flex;flex-direction:column;gap:8px}.qb .rowwrap{display:flex;gap:10px;flex-wrap:wrap}
 .qb .tkt{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid #e7e9f3;border-radius:13px;padding:9px 12px;cursor:pointer;box-shadow:0 2px 8px -6px #1e225522;transition:box-shadow .12s,transform .12s}
@@ -159,6 +160,8 @@ export default function OfficeBoardView() {
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState<'all' | '회사' | 'jy'>('all');
   const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
+  useEffect(() => { try { const c = localStorage.getItem('qb-cat'); if (c) setCat(c as typeof cat); } catch { /**/ } }, []); // 새로고침 유지
+  useEffect(() => { try { localStorage.setItem('qb-cat', cat); } catch { /**/ } }, [cat]);
   const [moneyList, setMoneyList] = useState<'rev' | 'due' | null>(null); // 스코어카드 클릭→계약 리스트
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
@@ -280,13 +283,14 @@ export default function OfficeBoardView() {
     : vis.filter((t) => (t.category || '') === cat);
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
-  const inbox = board.filter((t) => t.ball === 'inbox');
-  const proc = board.filter((t) => t.ball === 'myreply');
-  const work = board.filter((t) => t.ball === 'mywork').sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
-  const wait = board.filter((t) => t.ball === 'client');
-  const todo = board.filter((t) => t.ball === 'start' && t.due);
+  const byDday = (a: Task, b: Task) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0) || (a.dday ?? 9999) - (b.dday ?? 9999); // 급함→임박순(없으면 뒤)
+  const inbox = board.filter((t) => t.ball === 'inbox').sort(byDday);
+  const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
+  const work = board.filter((t) => t.ball === 'mywork').sort(byDday);
+  const wait = board.filter((t) => t.ball === 'client').sort(byDday);
+  const todo = board.filter((t) => t.ball === 'start' && t.due).sort(byDday);
   const some = board.filter((t) => t.ball === 'start' && !t.due);
-  const hold = board.filter((t) => t.ball === 'hold');
+  const hold = board.filter((t) => t.ball === 'hold').sort(byDday);
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
   const cur = sel; // 패널은 sel 직접 사용 — 단계/이력은 낙관적 업데이트로 즉시 반영(캐시 지연 우회)
 
@@ -340,19 +344,19 @@ export default function OfficeBoardView() {
       <div className="filters" style={{ marginTop: -6 }}>
         <div className={`chip${cat === 'all' ? ' on' : ''}`} onClick={() => setCat('all')}>전체 분류</div>
         {(['대행', '도구', '리서치', '자체사업', '내부'] as const).map((k) => (
-          <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(k)}>{CAT[k].e} {k}</div>
+          <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
       </div>
 
-      <section className="room inbox-room"><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">라크·메일·DM에서 들어온 미분류</span></div>
-        <div className="rowwrap">{inbox.length ? inbox.map(Card) : <div className="empty">📭 받은 일 비움</div>}</div></section>
-
       <div className="board">
-        <section className="room proc"><div className="rh">🧾 처리 <span className="cnt">{proc.length}</span><span className="hint">영업·연락·결재·발행</span></div>
+        <section className="room inbox-room"><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">미분류</span></div>
+          <div className="tkts">{inbox.length ? inbox.map(Card) : <div className="empty">📭 비움</div>}</div></section>
+        <section className="room proc"><div className="rh">🧾 처리 <span className="cnt">{proc.length}</span><span className="hint">영업·연락·결재</span></div>
           <div className="tkts">{proc.length ? proc.map(Card) : <Empty />}</div></section>
-        <section className="room work"><div className="rh">🖥️ 작업 <span className="cnt">{work.length}</span><span className="hint">제작·디자인</span></div>
-          <div className="tkts">{work.length ? work.map(Card) : <Empty />}</div></section>
       </div>
+
+      <section className="room work" style={{ marginTop: 14 }}><div className="rh">🖥️ 작업 <span className="cnt">{work.length}</span><span className="hint">제작·디자인</span></div>
+        <div className="rowwrap">{work.length ? work.map(Card) : <Empty />}</div></section>
 
       <section className="room wait" style={{ marginTop: 14 }}><div className="rh">🚪 대기 <span className="cnt">{wait.length}</span><span className="hint">상대 답·결과 기다림</span></div>
         <div className="rowwrap">{wait.length ? wait.map(Card) : <Empty />}</div></section>
@@ -430,6 +434,11 @@ export default function OfficeBoardView() {
             <div className="statebtns"><button disabled={busy} onClick={() => patch(cur.id, { patch: { 담당자: cur.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {cur.owner === '김지영' ? '종호' : '지영'}</button></div>
           </div>
           <div className="pbody">
+            {cur.category === '리서치' && (<>
+              <div className="psec">📄 리서치 문서 <span className="hint2">조사 내용·링크 (메인)</span></div>
+              <textarea className="memoarea" style={{ minHeight: 220 }} value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="조사한 내용, 문서 링크, 전체 정리를 여기에…" />
+              {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>문서 저장</button>}
+            </>)}
             <button className="editbtn" onClick={() => setShowEdit((v) => !v)}>✏️ 정보 수정 {showEdit ? '▲' : '▼'}</button>
             {showEdit && (<div className="editbox">
               <input className="ein" value={edit.고객} onChange={(e) => setEdit({ ...edit, 고객: e.target.value })} placeholder="고객사 (자체면 비움)" />
@@ -478,9 +487,11 @@ export default function OfficeBoardView() {
               <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStep(cur)} placeholder="+ 단계 추가 (날짜 @6/25)" />
               <button disabled={busy || !newStep.trim()} onClick={() => addStep(cur)}>추가</button>
             </div>
-            <div className="psec" style={{ marginTop: 16 }}>📝 메모 <span className="hint2">현재 정리·문서 링크 (살아있는 기록)</span></div>
-            <textarea className="memoarea" value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="진행 정리, 문서 링크, 메모를 자유롭게…" />
-            {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>메모 저장</button>}
+            {cur.category !== '리서치' && (<>
+              <div className="psec" style={{ marginTop: 16 }}>📝 메모 <span className="hint2">현재 정리·문서 링크 (살아있는 기록)</span></div>
+              <textarea className="memoarea" value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="진행 정리, 문서 링크, 메모를 자유롭게…" />
+              {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>메모 저장</button>}
+            </>)}
             <button className="editbtn" style={{ marginTop: 16 }} onClick={() => setShowHist((v) => !v)}>🕘 이력{cur.history && cur.history.length ? ` (${cur.history.length})` : ''} {showHist ? '▲' : '▼'}</button>
             {showHist && (cur.history && cur.history.length ? (
               <div className="tl">{cur.history.map((e, i) => (
