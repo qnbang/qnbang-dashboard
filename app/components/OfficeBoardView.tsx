@@ -3,6 +3,7 @@
 // 관제탑 보드 — 시안 I 그대로(리퀴드 글라스). 받은일·처리·작업·대기·예정·언젠가·보류 + 제품.
 // 시트의 flat 공위치(ball)를 시안 I 칸으로 매핑해 실데이터로 그린다. 카드 클릭=슬라이드 패널.
 import { useEffect, useState, useCallback } from 'react';
+import { renderMarkdown } from '@/lib/md';
 
 type Task = {
   id: string; project: string; task: string; owner: string;
@@ -133,6 +134,8 @@ const CSS = `
 .qb .addstep{display:flex;gap:6px;margin:8px 0 4px}.qb .addstep input{flex:1;font-size:12.5px;background:#fff;border:1px solid #e0e3ee;border-radius:10px;padding:8px 11px}.qb .addstep input:focus{outline:none;border-color:#3a3d44}
 .qb .addstep button{font-size:12px;font-weight:700;background:#eef0f7;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;color:#3a3d44}.qb .addstep button:disabled{opacity:.4}
 .qb .memoarea{width:100%;min-height:68px;font-size:12.5px;line-height:1.5;background:#fff;border:1px solid #e0e3ee;border-radius:10px;padding:8px 11px;resize:vertical;font-family:inherit;color:#1a1e30;box-sizing:border-box}.qb .memoarea:focus{outline:none;border-color:#3a3d44}
+.qb .docbtn{float:right;font-size:11px;font-weight:700;background:#eef0f7;border:none;border-radius:7px;padding:3px 9px;cursor:pointer;color:#3a3d44}
+.qb .mddoc{background:#fafbfe;border:1px solid #eef0f6;border-radius:12px;padding:12px 15px;margin-top:4px}.qb .mddoc>:first-child{margin-top:0}
 .qb .ev{display:flex;gap:10px;padding:6px 0;font-size:12.5px;align-items:baseline;border-bottom:1px dashed #f0f2f8}.qb .ev .when{color:#9298ac;font-size:10.5px;flex-shrink:0;width:64px}.qb .ev .what{color:#23283c}
 `;
 
@@ -173,6 +176,7 @@ export default function OfficeBoardView() {
   const [newStep, setNewStep] = useState('');
   const [memoVal, setMemoVal] = useState(''); // 📝 메모(현재 정리·링크)
   const [showHist, setShowHist] = useState(false); // 🕘 이력 아코디언
+  const [docEdit, setDocEdit] = useState(false); // 📄 문서 읽기/편집
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
 
@@ -198,7 +202,7 @@ export default function OfficeBoardView() {
         과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
       });
       setShowEdit(false); setShowMoney(false); setEditStepIdx(null);
-      setMemoVal(sel.memo || ''); setShowHist(false);
+      setMemoVal(sel.memo || ''); setShowHist(false); setDocEdit(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel?.id]);
@@ -425,7 +429,7 @@ export default function OfficeBoardView() {
 
       {cur && (<>
         <div className="ovl" onClick={() => setSel(null)} />
-        <aside className="panel">
+        <aside className="panel" style={DOC_LABEL[cur.category || ''] ? { width: 600 } : undefined}>
           <div className="ph"><button className="pclose" onClick={() => setSel(null)}>✕</button>
             <div className="pcli">{cur.client && cur.client !== cur.project ? `${cur.client} · ` : ''}{cur.project}</div><div className="pproj">{bigTask(cur)}</div>
             <div className="pmeta">{WHO[cur.owner] || cur.owner}{cur.due && cur.dday != null ? ` · ${ddText(cur.dday)}` : ''}</div>
@@ -436,9 +440,14 @@ export default function OfficeBoardView() {
           </div>
           <div className="pbody">
             {DOC_LABEL[cur.category || ''] && (<>
-              <div className="psec">{DOC_LABEL[cur.category!].t} <span className="hint2">{DOC_LABEL[cur.category!].h}</span></div>
-              <textarea className="memoarea" style={{ minHeight: 220 }} value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder={DOC_LABEL[cur.category!].p} />
-              {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>문서 저장</button>}
+              <div className="psec">{DOC_LABEL[cur.category!].t} <span className="hint2">{DOC_LABEL[cur.category!].h}</span>
+                <button className="docbtn" onClick={() => setDocEdit((v) => !v)}>{docEdit ? '✓ 보기' : '✏️ 편집'}</button></div>
+              {docEdit ? (<>
+                <textarea className="memoarea" style={{ minHeight: 300 }} value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder={DOC_LABEL[cur.category!].p + ' (마크다운 # ## - **굵게** [링크](url) 지원)'} />
+                {memoVal !== (cur.memo || '') && <button className="esave" onClick={() => { saveMemo(); setDocEdit(false); }}>문서 저장</button>}
+              </>) : (
+                <div className="mddoc">{memoVal.trim() ? renderMarkdown(memoVal) : <div className="note">내용 없음 — ✏️ 편집으로 작성하세요. (마크다운 지원)</div>}</div>
+              )}
             </>)}
             <button className="editbtn" onClick={() => setShowEdit((v) => !v)}>✏️ 정보 수정 {showEdit ? '▲' : '▼'}</button>
             {showEdit && (<div className="editbox">
