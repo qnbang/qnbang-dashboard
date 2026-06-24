@@ -355,8 +355,15 @@ export default function OfficeBoardView() {
   // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
   // 프로젝트=과업. 큰 글씨 = 지금 할 일(현재 단계) → 없으면 현재상태 → 그것도 없으면 프로젝트.
   const bigTask = (t: Task) => {
-    const cur = currentStep(t);
-    return (cur && cur.text) || t.status || t.project;
+    const cur = currentStep(t); // 가장 이른 미완료 = 지금 할 일
+    if (cur) return cur.text;
+    // 미완료가 없음(대기·완료 상태) → '마지막으로 한 일'을 대표로. 고객대기면 "→ 대기중" 꼬리.
+    const done = effTodos(t).map(parseStep).filter((s) => s.done);
+    if (done.length) {
+      const lastDone = [...done].sort((a, b) => (a.date ? (stepDday(a.date) ?? -1e9) : -1e9) - (b.date ? (stepDday(b.date) ?? -1e9) : -1e9)).pop()!;
+      return t.ball === 'client' ? `${lastDone.text} → 대기중` : lastDone.text;
+    }
+    return t.status || t.project;
   };
   const Card = (t: Task) => {
     const cli = t.client && t.client !== t.project ? t.client : '';
