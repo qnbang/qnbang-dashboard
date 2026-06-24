@@ -233,12 +233,13 @@ export default function OfficeBoardView() {
     fetch('/api/office/contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(() => load()).catch(() => load());
   };
   // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
-  const stepPost = async (id: string, todos: string[], 내용: string) => {
-    await fetch('/api/office/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 할일: todos.join(';'), 내용 }) }).catch(() => null);
-    load(); // 보드 카드도 갱신(시트API ~0.4초)
+  const stepPost = (id: string, todos: string[], 내용: string) => { // 시트는 백그라운드 저장(over로 보드 즉시 반영, load 안 함=무플래시)
+    fetch('/api/office/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 할일: todos.join(';'), 내용 }) }).catch(() => null);
   };
-  const optimistic = (t: Task, todos: string[], 내용: string) =>
-    setSel({ ...t, todos, history: [{ when: '방금', what: 내용 }, ...(t.history || [])] }); // 클릭 즉시 화면 반영
+  const optimistic = (t: Task, todos: string[], 내용: string) => { // 패널 + 보드(over) 동시 즉시 반영 — 체크·되돌리기 둘 다
+    setSel({ ...t, todos, history: [{ when: '방금', what: 내용 }, ...(t.history || [])] });
+    setOver((o) => ({ ...o, [t.id]: { ...o[t.id], todos } }));
+  };
   const toggleStep = (t: Task, i: number) => {
     const todos = [...effTodos(t)];
     const st = parseStep(todos[i]);
