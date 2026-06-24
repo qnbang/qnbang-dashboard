@@ -95,7 +95,7 @@ const CSS = `
 .qb .smalltk{display:flex;gap:7px;align-items:center;background:#fff;border:1px solid #e7e9f3;border-radius:12px;padding:8px 11px;margin-bottom:6px;cursor:pointer;font-size:12px;box-shadow:0 2px 8px -6px #1e225522}
 .qb .smalltk:hover{border-color:#c4c8d2}.qb .smalltk .task{font-size:12.5px;white-space:normal}.qb .smalltk .c{font-size:10px;color:#9298ac;font-weight:600;margin-top:1px}
 .qb .waitfor{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:6px;flex-shrink:0;background:#ede5ff;color:#6d4cd0}
-.qb .prodcard{flex:1;min-width:200px;background:#fff;border:1px solid #e0e3ee;border-radius:14px;padding:10px 13px;box-shadow:0 4px 14px -8px #2a335522}.qb .prodcard .pn{font-size:13px;font-weight:800;color:var(--ink)}.qb .prodcard .pv{font-size:10.5px;color:#3a3d44;font-weight:700;margin-top:2px}.qb .prodcard .pnext{font-size:10.5px;color:#9298ac;margin-top:4px}
+.qb .prodcard{flex:1;min-width:200px;background:#fff;border:1px solid #e0e3ee;border-radius:14px;padding:10px 13px;box-shadow:0 4px 14px -8px #2a335522}.qb .prodcard .pn{font-size:13px;font-weight:800;color:var(--ink)}.qb .prodcard .pv{font-size:10.5px;color:#3a3d44;font-weight:700;margin-top:2px}.qb .prodcard .pnext{font-size:10.5px;color:#9298ac;margin-top:4px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .qb .labcard{flex:1;min-width:200px;background:#fff;border:1px dashed #e0a8e8;border-radius:14px;padding:10px 13px}.qb .labcard .ln{font-size:13px;font-weight:700;color:var(--ink)}.qb .labcard .lg{font-size:10.5px;color:#a04ca0;margin-top:3px}
 .qb .divider{display:flex;align-items:center;gap:10px;margin:22px 0 10px;color:#7a8098;font-size:12.5px;font-weight:800}.qb .divider::after{content:"";flex:1;height:1px;background:#dde0ec}
 .qb .empty{color:#b0b5c6;font-size:12px;padding:12px;text-align:center;width:100%}
@@ -277,9 +277,9 @@ export default function OfficeBoardView() {
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
   const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
-  const ACTIVE_BALLS = new Set(['inbox', 'mywork', 'myreply', 'client']); // 흐르는 중 = 작업 보드에도 (멈춘 건 포트폴리오에만)
+  // 포트폴리오 분류(도구·리서치·자체사업)는 작업 보드 아닌 아래 포트폴리오 섹션에만. 보드는 대행+내부.
   const board = cat === 'all'
-    ? vis.filter((t) => !PORTFOLIO_CATS.has(t.category || '') || ACTIVE_BALLS.has(t.ball))
+    ? vis.filter((t) => !PORTFOLIO_CATS.has(t.category || ''))
     : vis.filter((t) => (t.category || '') === cat);
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
@@ -374,17 +374,17 @@ export default function OfficeBoardView() {
       {cat === 'all' && filter !== 'jy' && (<>
         <div className="divider" style={{ color: CAT['도구'].c }}>🧰 도구 백로그 — 판매 제품 ({도구들.length}) · 누르면 설명·사용법</div>
         <section className="room product"><div className="rowwrap">{도구들.length ? 도구들.map((t) => (
-          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['도구'].c }}>🧰 {t.project || t.task}</div><div className="pnext">{t.status || bigTask(t)}</div></div>
+          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['도구'].c }}>🧰 {t.project || t.task}</div><div className="pnext">{(t.memo || '').split('\n')[0] || t.status || '설명 비어있음'}</div></div>
         )) : <div className="empty">없음</div>}</div></section>
 
         <div className="divider" style={{ color: CAT['자체사업'].c }}>🚀 자체사업 — 시장 벤처 → 브랜드 ({자체사업들.length})</div>
         <section className="room product"><div className="rowwrap">{자체사업들.length ? 자체사업들.map((t) => (
-          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['자체사업'].c }}>🚀 {t.project || t.task}</div><div className="pnext">{bigTask(t)}</div></div>
+          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['자체사업'].c }}>🚀 {t.project || t.task}</div><div className="pnext">{(t.memo || '').split('\n')[0] || t.status || '설명 비어있음'}</div></div>
         )) : <div className="empty">없음</div>}</div></section>
 
         <div className="divider" style={{ color: CAT['리서치'].c }}>🔬 리서치 풀 — 탐색·자산 (쌓여 프로젝트 자산) ({리서치들.length})</div>
         <section className="room product"><div className="rowwrap">{리서치들.length ? 리서치들.map((t) => (
-          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['리서치'].c }}>🔬 {t.project || t.task}</div><div className="pnext">{bigTask(t)}</div></div>
+          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['리서치'].c }}>🔬 {t.project || t.task}</div><div className="pnext">{(t.memo || '').split('\n')[0] || t.status || '설명 비어있음'}</div></div>
         )) : <div className="empty">없음</div>}</div></section>
 
         <div className="divider">🧪 실험실 — 개인·미공식 (공식화 게이트)</div>
