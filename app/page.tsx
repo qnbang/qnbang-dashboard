@@ -31,7 +31,6 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 const TABS = [
   { key: 'office', label: '🏢 사무실', ready: true },
   { key: 'crm', label: '👥 고객·영업', ready: true },
-  { key: 'projects', label: '프로젝트', ready: true },
   { key: 'hubs', label: '협업 허브', ready: true },
   { key: 'shares', label: '공유된 문서', ready: true },
   { key: 'finance', label: '정산', ready: true },
@@ -153,7 +152,6 @@ export default function Home() {
       <main className="max-w-5xl mx-auto px-4 py-6">
         {tab === 'office' && <OfficeBoardView />}
         {tab === 'crm' && <CRMView />}
-        {tab === 'projects' && <ProjectsView />}
         {tab === 'finance' && <FinanceView data={data} loading={loading} error={error} />}
         {tab === 'shares' && <SharesView />}
         {tab === 'hubs' && <HubsView />}
@@ -329,9 +327,108 @@ function SalesView() {
 // 고객 관리 CRM(#5) — 영업/과업/매출을 고객 기준으로 묶은 생애주기 overview(읽기 중심).
 type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number; 프로젝트들?: { 이름: string; 금액: number; 미수: number }[] };
 type CRMD = { 영업중: CRMClient[]; 진행중: CRMClient[]; 완수: CRMClient[]; source: string };
+// 프로젝트 문서 뷰(읽기 전용) — CRM에서 프로젝트 누르면 그 GitHub 저장소의 작업로그·현황·문서를 보여줌(옛 프로젝트 탭 대체).
+function ProjectDocs({ name, onClose }: { name: string; onClose: () => void }) {
+  const [repo, setRepo] = useState<string | null>(null);
+  const [state, setState] = useState<'loading' | 'notfound' | 'ok'>('loading');
+  const [workLog, setWorkLog] = useState<string | null>(null);
+  const [statusBoard, setStatusBoard] = useState<string | null>(null);
+  const [docs, setDocs] = useState<DocItem[]>([]);
+  const [openLog, setOpenLog] = useState<number | null>(null);
+  const [openD, setOpenD] = useState<{ title: string; content: string } | null>(null);
+  useEffect(() => {
+    (async () => {
+      const sq = (s: string) => (s || '').replace(/\s+/g, '');
+      const n = sq(name);
+      const j = await fetch('/api/git-projects').then((r) => r.json()).catch(() => null);
+      const m = j?.ok && (j.projects as ProjectRepo[]).find((p) => { const q = sq(p.title); return !!q && (q.includes(n) || n.includes(q)); });
+      if (!m) { setState('notfound'); return; }
+      setRepo(m.repo);
+      const d = await fetch(`/api/git-projects/${m.repo}`).then((r) => r.json()).catch(() => null);
+      if (d?.ok) { setWorkLog(d.workLog); setStatusBoard(d.statusBoard || null); setDocs(d.docs || []); }
+      setState('ok');
+    })();
+  }, [name]);
+  const readDoc = async (doc: DocItem) => {
+    if (!repo) return;
+    setOpenD({ title: doc.title, content: '불러오는 중…' });
+    const j = await fetch(`/api/git-projects/${repo}/doc?path=${encodeURIComponent(doc.path)}`).then((r) => r.json()).catch(() => null);
+    setOpenD({ title: doc.title, content: j?.content || '내용을 불러오지 못했어요.' });
+  };
+  const entries = workLog ? parseWorkLog(workLog) : [];
+  const status = statusBoard ? parseStatusBoard(statusBoard) : null;
+  const grouped: Record<string, DocItem[]> = {};
+  for (const d of docs) (grouped[d.group] ||= []).push(d);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 overflow-y-auto p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-2xl mx-auto my-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 sticky top-0 bg-white rounded-t-2xl z-10">
+          <h3 className="text-sm font-bold text-slate-800">📁 {name}</h3>
+          <button onClick={onClose} className="text-xs text-slate-400 hover:text-slate-600">닫기 ✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          {state === 'loading' && <p className="text-slate-400 text-sm text-center py-8">불러오는 중…</p>}
+          {state === 'notfound' && <p className="text-slate-400 text-sm text-center py-8">연결된 GitHub 저장소를 못 찾았어요.<br /><span className="text-xs">(프로젝트.json·qnbang-project 토픽 확인)</span></p>}
+          {state === 'ok' && (<>
+            {status && status.total > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-slate-500 mb-1">진행률 {Math.round((status.done / status.total) * 100)}% ({status.done}/{status.total})</div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-400" style={{ width: `${(status.done / status.total) * 100}%` }} /></div>
+              </div>
+            )}
+            {entries.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-slate-500 mb-2">🕘 작업로그</div>
+                <div className="space-y-1.5">
+                  {entries.map((e, i) => (
+                    <div key={i} className="border border-slate-100 rounded-lg">
+                      <button onClick={() => setOpenLog(openLog === i ? null : i)} className="w-full text-left px-3 py-2 flex items-baseline gap-2">
+                        <span className="text-[11px] text-slate-400 shrink-0">{e.date}</span>
+                        <span className="text-[12.5px] text-slate-700 font-medium flex-1">{e.summary}</span>
+                        <span className="text-[10px] text-slate-300">{openLog === i ? '▲' : '▾'}</span>
+                      </button>
+                      {openLog === i && e.body && <div className="px-3 pb-2 border-t border-slate-50 pt-2">{renderMarkdown(e.body)}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {docs.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-slate-500 mb-2">📄 문서</div>
+                {Object.entries(grouped).map(([g, items]) => (
+                  <div key={g} className="mb-2">
+                    <div className="text-[11px] text-slate-400 mb-1">{g}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {items.map((d) => <button key={d.path} onClick={() => readDoc(d)} className="text-[12px] px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50">{d.title}</button>)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {entries.length === 0 && docs.length === 0 && <p className="text-slate-400 text-sm text-center py-6">문서·로그가 없어요.</p>}
+          </>)}
+        </div>
+      </div>
+      {openD && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => setOpenD(null)}>
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 sticky top-0 bg-white">
+              <h3 className="text-sm font-bold text-slate-800">{openD.title}</h3>
+              <button onClick={() => setOpenD(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+            </div>
+            <div className="p-5">{renderMarkdown(openD.content)}</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CRMView() {
   const [crm, setCrm] = useState<CRMD | null>(null);
   const [openClient, setOpenClient] = useState<string | null>(null); // 고객 클릭→프로젝트 펼침
+  const [projDoc, setProjDoc] = useState<string | null>(null); // 프로젝트 클릭→문서 뷰
   const [err, setErr] = useState('');
   useEffect(() => {
     fetch('/api/crm').then((r) => r.json()).then((j) => { if (j.ok) setCrm(j.crm); else setErr(j.error || '불러오기 실패'); }).catch((e) => setErr(String(e)));
@@ -381,7 +478,7 @@ function CRMView() {
                     <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
                       {x.프로젝트들.map((p) => (
                         <div key={p.이름} className="text-[12px] flex items-center justify-between gap-2">
-                          <span className="text-slate-600 truncate flex items-center gap-1.5"><span className="text-slate-300">▸</span>{p.이름}</span>
+                          <button onClick={(e) => { e.stopPropagation(); setProjDoc(p.이름); }} className="text-slate-600 truncate flex items-center gap-1.5 min-w-0 text-left hover:text-indigo-600"><span className="text-slate-300">▸</span>{p.이름}<span className="text-[10px] text-slate-300 shrink-0">📄</span></button>
                           {p.금액 > 0 && <span className="text-slate-500 shrink-0 tabular-nums">{won(p.금액)}{p.미수 > 0 ? <span className="text-rose-500"> · 미수 {won(p.미수)}</span> : ''}</span>}
                         </div>
                       ))}
@@ -394,6 +491,7 @@ function CRMView() {
           </div>
         ))}
       </section>
+      {projDoc && <ProjectDocs name={projDoc} onClose={() => setProjDoc(null)} />}
     </div>
   );
 }
