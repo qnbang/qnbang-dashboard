@@ -11,7 +11,7 @@ const WRITE_URL = process.env.SHEET_WRITE_URL
 const KEY = process.env.SHEET_KEY || 'qnbang2026';
 const HEADER = ['id', '프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일',
   '기한', '고객', '돈종류', '할일', '판정근거', '갱신일', '출처', '계약여부'];
-const PATCHABLE = ['프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일', '기한', '고객', '돈종류', '할일'];
+const PATCHABLE = ['프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일', '기한', '고객', '돈종류', '할일', '메모'];
 
 function normCell(v: unknown): string {
   const s = String(v ?? '');

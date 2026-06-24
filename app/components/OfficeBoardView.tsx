@@ -10,6 +10,7 @@ type Task = {
   urgent: boolean; client?: string; status?: string; nextStep?: string;
   todos?: string[]; staleDays?: number | null; stale?: boolean;
   category?: string;
+  memo?: string;
   history?: { when: string; what: string }[];
 };
 // 분류별 색·이모지 — 카드 프로젝트명 색, 칩, 포트폴리오 공통.
@@ -135,6 +136,7 @@ const CSS = `
 .qb .mrow{display:flex;align-items:center;gap:8px}.qb .mrow span{font-size:11.5px;color:#6a7088;width:38px;flex-shrink:0}.qb .mrow input{flex:1}
 .qb .addstep{display:flex;gap:6px;margin:8px 0 4px}.qb .addstep input{flex:1;font-size:12.5px;background:#fff;border:1px solid #e0e3ee;border-radius:10px;padding:8px 11px}.qb .addstep input:focus{outline:none;border-color:#3a3d44}
 .qb .addstep button{font-size:12px;font-weight:700;background:#eef0f7;border:none;border-radius:8px;padding:6px 12px;cursor:pointer;color:#3a3d44}.qb .addstep button:disabled{opacity:.4}
+.qb .memoarea{width:100%;min-height:68px;font-size:12.5px;line-height:1.5;background:#fff;border:1px solid #e0e3ee;border-radius:10px;padding:8px 11px;resize:vertical;font-family:inherit;color:#1a1e30;box-sizing:border-box}.qb .memoarea:focus{outline:none;border-color:#3a3d44}
 .qb .ev{display:flex;gap:10px;padding:6px 0;font-size:12.5px;align-items:baseline;border-bottom:1px dashed #f0f2f8}.qb .ev .when{color:#9298ac;font-size:10.5px;flex-shrink:0;width:64px}.qb .ev .what{color:#23283c}
 `;
 
@@ -166,6 +168,8 @@ export default function OfficeBoardView() {
   const [showMoney, setShowMoney] = useState(false);
   const [mForm, setMForm] = useState({ 종류: '매출', 금액: '', 입금상태: '입금대기', 계약일: '', 마감일: '', 시작월: '', 종료월: '' });
   const [newStep, setNewStep] = useState('');
+  const [memoVal, setMemoVal] = useState(''); // 📝 메모(현재 정리·링크)
+  const [showHist, setShowHist] = useState(false); // 🕘 이력 아코디언
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
 
@@ -191,6 +195,7 @@ export default function OfficeBoardView() {
         과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
       });
       setShowEdit(false); setShowMoney(false); setEditStepIdx(null);
+      setMemoVal(sel.memo || ''); setShowHist(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sel?.id]);
@@ -207,6 +212,13 @@ export default function OfficeBoardView() {
     fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).then(() => load()).catch(() => load());
   };
   const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트 } });
+  const saveMemo = () => { // 메모는 패널 닫지 않고 저장(현재 정리 갱신)
+    if (!sel) return;
+    const v = memoVal;
+    setSel({ ...sel, memo: v });
+    setOver((o) => ({ ...o, [sel.id]: { ...o[sel.id], memo: v } }));
+    fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sel.id, patch: { 메모: v } }) }).then(() => load()).catch(() => load());
+  };
   const saveContract = () => {
     if (!sel || !mForm.금액.trim()) return;
     const body = { 종류: mForm.종류, 계약명: sel.project, 클라이언트: (sel.client && sel.client !== sel.project) ? sel.client : '', 금액: mForm.금액, 입금상태: mForm.입금상태, 계약일: mForm.계약일, 마감일: mForm.마감일, 시작월: mForm.시작월, 종료월: mForm.종료월 };
@@ -466,12 +478,15 @@ export default function OfficeBoardView() {
               <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addStep(cur)} placeholder="+ 단계 추가 (날짜 @6/25)" />
               <button disabled={busy || !newStep.trim()} onClick={() => addStep(cur)}>추가</button>
             </div>
-            <div className="psec" style={{ marginTop: 18 }}>🕘 이력</div>
-            {cur.history && cur.history.length ? (
+            <div className="psec" style={{ marginTop: 16 }}>📝 메모 <span className="hint2">현재 정리·문서 링크 (살아있는 기록)</span></div>
+            <textarea className="memoarea" value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="진행 정리, 문서 링크, 메모를 자유롭게…" />
+            {memoVal !== (cur.memo || '') && <button className="esave" onClick={saveMemo}>메모 저장</button>}
+            <button className="editbtn" style={{ marginTop: 16 }} onClick={() => setShowHist((v) => !v)}>🕘 이력{cur.history && cur.history.length ? ` (${cur.history.length})` : ''} {showHist ? '▲' : '▼'}</button>
+            {showHist && (cur.history && cur.history.length ? (
               <div className="tl">{cur.history.map((e, i) => (
                 <div key={i} className="ev"><span className="when">{e.when}</span><span className="what">{e.what}</span></div>
               ))}</div>
-            ) : <div className="note">아직 이력 없음. 단계를 완료하면 여기 쌓입니다.</div>}
+            ) : <div className="note">아직 이력 없음. 단계를 완료하면 여기 쌓입니다.</div>)}
           </div>
         </aside>
       </>)}

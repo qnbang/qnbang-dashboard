@@ -23,6 +23,7 @@ export interface OfficeTask {
   money: string; ball: string; due: string; dday: number | null;
   urgent: boolean; todos: string[];
   category: string;        // 분류(대행/도구/리서치/자체사업/내부) — 시트 칸. 카드 색·칩 필터·포트폴리오.
+  memo: string;            // 📝 메모(살아있는 현재 정리·문서 링크) — 시트 칸. 리서치 등 진행 기록.
   status: string;          // 현재상태(지금 무슨 상황) — 시트 칸
   nextStep: string;        // 다음할일(다음 한 수) — 시트 칸, 없으면 todos[0]
   reason: string;          // 판정근거(공위치 왜) — P6가 채움
@@ -89,7 +90,7 @@ function roomOf(t: OfficeTask): string {
 type Seed = {
   id: string; project: string; task: string; owner: string;
   ball: string; due: string; money: string; customer: string; todos: string[];
-  status?: string; nextStep?: string; reason?: string; updatedAt?: string; category?: string;
+  status?: string; nextStep?: string; reason?: string; updatedAt?: string; category?: string; memo?: string;
   history?: { when: string; what: string }[];
 };
 
@@ -107,7 +108,7 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
       id: col('id'), project: col('프로젝트'), task: col('과업명'), owner: col('담당자'),
       pos: col('공위치'), due: col('기한'), money: col('돈종류'),
       customer: col('고객'), todos: col('할일'),
-      status: col('현재상태'), nextStep: col('다음할일'), reason: col('판정근거'), updatedAt: col('갱신일'), category: col('분류'),
+      status: col('현재상태'), nextStep: col('다음할일'), reason: col('판정근거'), updatedAt: col('갱신일'), category: col('분류'), memo: col('메모'),
     };
 
     // 🕘 이력 탭 → 과업id별 이벤트(최신순). 탭 없으면 빈 history.
@@ -149,6 +150,7 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
         reason: get(ci.reason),
         updatedAt: get(ci.updatedAt),
         category: get(ci.category),
+        memo: get(ci.memo),
       });
     }
     return out.length ? out : null;
@@ -188,6 +190,7 @@ export async function buildOffice(): Promise<OfficeData> {
       money: s.money, ball: s.ball, due: s.due, dday: dd, urgent,
       todos: s.todos || [],
       category: s.category || '',
+      memo: s.memo || '',
       status: s.status || '',
       nextStep: s.nextStep || (s.todos && s.todos[0]) || '',
       reason: s.reason || '',
