@@ -398,8 +398,7 @@ export default function OfficeBoardView() {
   const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
   const work = board.filter((t) => t.ball === 'mywork').sort(byDday);
   const wait = board.filter((t) => t.ball === 'client').sort(byDday);
-  const todo = board.filter((t) => t.ball === 'start' && t.due).sort(byDday);
-  const some = board.filter((t) => t.ball === 'start' && !t.due);
+  const todo = board.filter((t) => t.ball === 'start').sort(byDday); // 예정 = 시작전 전부(날짜 있는 것 먼저, 없는 건 뒤) — 언젠가 통합
   const hold = board.filter((t) => t.ball === 'hold').sort(byDday);
   const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
   const cur = sel; // 패널은 sel 직접 사용 — 단계/이력은 낙관적 업데이트로 즉시 반영(캐시 지연 우회)
@@ -407,16 +406,19 @@ export default function OfficeBoardView() {
   // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
   // 대기에선 "지금 기다리는 상황(현재상태)"이 곧 과업 → 그걸 메인 텍스트로. 그 외엔 과업명.
   // 프로젝트=과업. 큰 글씨 = 지금 할 일(현재 단계) → 없으면 현재상태 → 그것도 없으면 프로젝트.
+  // "진행 중" 류 빈 껍데기 상태 — 단계·대표글로 쓰지 않음(카드가 "진행 중"만 뜨는 것 방지)
+  const NOISE = new Set(['진행 중', '진행중', '착수 예정', '(프로젝트 등록)', '진행', '']);
   const bigTask = (t: Task) => {
     const cur = currentStep(t); // 가장 이른 미완료 = 지금 할 일
-    if (cur) return cur.text;
-    // 미완료가 없음(대기·완료 상태) → '마지막으로 한 일'을 대표로. 고객대기면 "→ 대기중" 꼬리.
+    if (cur && !NOISE.has(cur.text.trim())) return cur.text; // 진짜 단계/상태면 그걸로
+    // 빈 껍데기 → '마지막으로 한 일' → 과업명 → 프로젝트명. 고객대기면 "→ 대기중" 꼬리.
     const done = effTodos(t).map(parseStep).filter((s) => s.done);
     if (done.length) {
       const lastDone = [...done].sort((a, b) => (a.date ? (stepDday(a.date) ?? -1e9) : -1e9) - (b.date ? (stepDday(b.date) ?? -1e9) : -1e9)).pop()!;
       return t.ball === 'client' ? `${lastDone.text} → 대기중` : lastDone.text;
     }
-    return t.status || t.project;
+    const task = t.task && t.task !== '(프로젝트 등록)' ? t.task : '';
+    return task || t.project;
   };
   const Card = (t: Task) => {
     const cli = t.client && t.client !== t.project ? t.client : '';
@@ -482,11 +484,9 @@ export default function OfficeBoardView() {
       <section className="room wait" style={{ marginTop: 14 }} {...dropTo('고객대기')}><div className="rh">🚪 대기 <span className="cnt">{wait.length}</span><span className="hint">상대 답·결과 기다림</span></div>
         <div className="rowwrap">{wait.length ? wait.map(Card) : <Empty />}</div></section>
 
-      <div className="board3">
-        <section className="room todo" {...dropTo('시작전')}><div className="rh">📅 예정 <span className="cnt">{todo.length}</span><span className="hint">날짜 있음</span></div>
-          {todo.length ? todo.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>📅</span><div><div className="task">{t.project}</div><div className="c">{ddText(t.dday)} · {t.task}</div></div></div>) : <Empty />}</section>
-        <section className="room someday" {...dropTo('시작전')}><div className="rh">💭 언젠가 <span className="cnt">{some.length}</span><span className="hint">날짜 없음</span></div>
-          {some.length ? some.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>💭</span><div><div className="task">{t.project}</div><div className="c">{t.client || '날짜 없음'}</div></div></div>) : <Empty />}</section>
+      <div className="board">
+        <section className="room todo" {...dropTo('시작전')}><div className="rh">📅 예정 <span className="cnt">{todo.length}</span><span className="hint">시작 전(날짜 있으면 임박순)</span></div>
+          {todo.length ? todo.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>📅</span><div><div className="task">{t.project}</div><div className="c">{t.dday != null ? ddText(t.dday) + ' · ' : ''}{t.task || t.client || '날짜 미정'}</div></div></div>) : <Empty />}</section>
         <section className="room hold" {...dropTo('보류')}><div className="rh">⏸️ 보류 <span className="cnt">{hold.length}</span><span className="hint">멈춤</span></div>
           {hold.length ? hold.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
       </div>
