@@ -166,6 +166,7 @@ const CSS = `
 .qb .npform{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;background:#fff;border:1px solid #e7e9f3;border-radius:12px;padding:10px 12px}
 .qb .npform input,.qb .npform select{border:1px solid #e0e3ee;border-radius:8px;padding:6px 10px;font-size:13px;color:#23283c}
 .qb .npform>input:first-of-type{flex:1;min-width:180px}
+.qb .npcli{width:160px}
 .qb .nplbl{font-size:11.5px;color:#9298ac;display:flex;align-items:center;gap:5px}
 .qb .npok{background:#10b981;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer}.qb .npok:disabled{opacity:.5;cursor:default}.qb .npok:not(:disabled):hover{background:#0ea372}
 .qb .jstep.editing{padding:6px 8px;gap:6px}
@@ -264,16 +265,17 @@ export default function OfficeBoardView() {
   };
   // 웹 새 프로젝트 등록 — 프로젝트명+마감+담당 → 예정(시작전) 칸에 카드 1개
   const [showNP, setShowNP] = useState(false);
-  const [np, setNP] = useState({ name: '', due: '', owner: '신종호' });
+  const [np, setNP] = useState({ name: '', due: '', owner: '신종호', client: '' });
   const [npBusy, setNPBusy] = useState(false);
   const addProject = async () => {
     const name = np.name.trim();
     if (!name || npBusy) return;
     setNPBusy(true);
     try {
-      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: name, task: name, owner: np.owner, ball: '시작전', due: np.due, 출처: '웹새프로젝트' }) });
+      const client = np.client.trim();
+      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: name, task: name, owner: np.owner, ball: '시작전', due: np.due, customer: client, money: client ? '매출' : '투자', 출처: '웹새프로젝트' }) });
       const j = await r.json();
-      if (j.ok) { setNP({ name: '', due: '', owner: np.owner }); setShowNP(false); load(true); } else alert(j.error || '등록 실패');
+      if (j.ok) { setNP({ name: '', due: '', owner: np.owner, client: '' }); setShowNP(false); load(true); } else alert(j.error || '등록 실패');
     } catch (e) { alert(String(e)); } finally { setNPBusy(false); }
   };
   const load = useCallback((fresh = false) => {
@@ -503,6 +505,7 @@ export default function OfficeBoardView() {
         {showNP && (
           <div className="npform">
             <input autoFocus value={np.name} onChange={(e) => setNP({ ...np, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addProject(); }} placeholder="프로젝트명" />
+            <input className="npcli" value={np.client} onChange={(e) => setNP({ ...np, client: e.target.value })} placeholder="고객사 (자체면 비움)" />
             <label className="nplbl">마감<input type="date" value={np.due} onChange={(e) => setNP({ ...np, due: e.target.value })} /></label>
             <select value={np.owner} onChange={(e) => setNP({ ...np, owner: e.target.value })}><option value="신종호">담당 신종호</option><option value="김지영">담당 김지영</option></select>
             <button className="npok" disabled={npBusy || !np.name.trim()} onClick={addProject}>예정에 등록</button>
