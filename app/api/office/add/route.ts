@@ -72,10 +72,10 @@ export async function POST(req: Request) {
       기한: p.기한 || '',
       고객: b.customer || '',
       돈종류: b.money || '매출',
-      할일: '',
+      할일: String(b.할일 || b.steps || ''), // 액션플랜(단계 @날짜, ;로 구분) — 새프로젝트 등록 시 한 번에
       판정근거: '',
       갱신일: today,
-      출처: '대시보드',
+      출처: String(b.출처 || '대시보드'),
     };
     const res = await fetch(WRITE_URL, {
       method: 'POST',
