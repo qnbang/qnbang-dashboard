@@ -153,6 +153,14 @@ const CSS = `
 .qb .jwho{font-size:10px;font-weight:700;border:none;border-radius:6px;padding:2px 4px;flex-shrink:0;cursor:pointer;background:#f1f3fa;color:#9298ac;opacity:.5;transition:opacity .1s;-webkit-appearance:none;appearance:none}
 .qb .jstep:hover .jwho{opacity:1}.qb .jwho:hover{opacity:1}
 .qb .jwho.set{opacity:1;color:#5a6078}.qb .jwho.set.out{color:#0d9488;background:#ccfbf1}
+.qb .arcwrap{margin-top:18px}
+.qb .arctoggle{background:#fff;border:1px solid #e7e9f3;border-radius:10px;padding:9px 14px;font-size:12.5px;font-weight:700;color:#5a6078;cursor:pointer}.qb .arctoggle:hover{border-color:#c4c8da}
+.qb .arcload{font-size:12px;color:#9298ac;padding:10px 4px}
+.qb .arcbody{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}
+.qb .arch{font-size:12.5px;font-weight:700;color:#2a2f44;margin-bottom:6px}.qb .arccnt{background:#0000000d;border-radius:999px;padding:1px 7px;font-size:11px;color:#475569;margin-left:4px}
+.qb .arcrow{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #eef0f7;border-radius:8px;padding:6px 10px;margin-bottom:5px;font-size:12px}
+.qb .arcnm{font-weight:700;color:#23283c;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .arccli{color:#9298ac;font-size:11px}.qb .arcown{font-size:10px;font-weight:700;color:#5a6078;background:#f1f3fa;border-radius:5px;padding:1px 5px}.qb .arcdate{font-size:10.5px;color:#9aa0b0;flex-shrink:0}
+.qb .arcempty{font-size:11.5px;color:#b8bdc8;padding:6px 4px}
 .qb .jstep.editing{padding:6px 8px;gap:6px}
 .qb .jein2{flex:1;font-size:13px;border:1px solid #3a3d44;border-radius:7px;padding:6px 9px;outline:none}
 .qb .jbtn{font-size:11px;font-weight:700;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;flex-shrink:0}
@@ -219,6 +227,9 @@ export default function OfficeBoardView() {
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState<Record<string, Partial<Task>>>({}); // 낙관적 덮어쓰기(서버 반영 전 즉시 화면)
+  type ArcItem = { project: string; task: string; owner: string; client: string; status: string; date: string; kind: string };
+  const [arc, setArc] = useState<ArcItem[] | null>(null);
+  const [showArc, setShowArc] = useState(false);
   const [edit, setEdit] = useState({ 고객: '', 프로젝트: '', 과업명: '' });
   const [showEdit, setShowEdit] = useState(false);
   const [showMoney, setShowMoney] = useState(false);
@@ -512,6 +523,24 @@ export default function OfficeBoardView() {
           <div key={x.n} className="labcard"><div className="ln">🧪 {x.n}</div><div className="lg">{x.g}</div></div>
         ))}</div></section>
       </>)}
+
+      {/* 아카이브 — 완수·폐기 프로젝트(접이식, 열 때 온디맨드 로드) */}
+      <div className="arcwrap">
+        <button className="arctoggle" onClick={() => { const n = !showArc; setShowArc(n); if (n && arc === null) fetch('/api/office/archive').then((r) => r.json()).then((j) => setArc(j.ok ? j.items : [])).catch(() => setArc([])); }}>
+          📦 아카이브 (완수·폐기) {showArc ? '▲' : '▼'}
+        </button>
+        {showArc && (arc === null ? <div className="arcload">불러오는 중…</div> : (() => {
+          const done = arc.filter((a) => a.kind === 'done');
+          const disc = arc.filter((a) => a.kind === 'discard');
+          const Row = (a: ArcItem, i: number) => (
+            <div key={i} className="arcrow"><span className="arcnm">{a.project || a.task}</span>{a.client && a.client !== a.project && <span className="arccli">{a.client}</span>}{a.owner && a.owner !== '신종호' && <span className="arcown">{a.owner}</span>}<span className="arcdate">{a.date}</span></div>
+          );
+          return (<div className="arcbody">
+            <div className="arccol"><div className="arch">✅ 완수 <span className="arccnt">{done.length}</span></div>{done.length ? done.map(Row) : <div className="arcempty">없음</div>}</div>
+            <div className="arccol"><div className="arch">🗑 폐기(접음) <span className="arccnt">{disc.length}</span></div>{disc.length ? disc.map(Row) : <div className="arcempty">없음</div>}</div>
+          </div>);
+        })())}
+      </div>
 
       {moneyList && (() => {
         const cs = money?.계약목록 || [];
