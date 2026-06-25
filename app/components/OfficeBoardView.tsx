@@ -161,6 +161,13 @@ const CSS = `
 .qb .arcrow{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #eef0f7;border-radius:8px;padding:6px 10px;margin-bottom:5px;font-size:12px}
 .qb .arcnm{font-weight:700;color:#23283c;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .arccli{color:#9298ac;font-size:11px}.qb .arcown{font-size:10px;font-weight:700;color:#5a6078;background:#f1f3fa;border-radius:5px;padding:1px 5px}.qb .arcdate{font-size:10.5px;color:#9aa0b0;flex-shrink:0}
 .qb .arcempty{font-size:11.5px;color:#b8bdc8;padding:6px 4px}
+.qb .npwrap{margin:-6px 0 14px}
+.qb .npbtn{background:#14182a;color:#fff;border:none;border-radius:999px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer}.qb .npbtn:hover{background:#23283c}
+.qb .npform{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;background:#fff;border:1px solid #e7e9f3;border-radius:12px;padding:10px 12px}
+.qb .npform input,.qb .npform select{border:1px solid #e0e3ee;border-radius:8px;padding:6px 10px;font-size:13px;color:#23283c}
+.qb .npform>input:first-of-type{flex:1;min-width:180px}
+.qb .nplbl{font-size:11.5px;color:#9298ac;display:flex;align-items:center;gap:5px}
+.qb .npok{background:#10b981;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer}.qb .npok:disabled{opacity:.5;cursor:default}.qb .npok:not(:disabled):hover{background:#0ea372}
 .qb .jstep.editing{padding:6px 8px;gap:6px}
 .qb .jein2{flex:1;font-size:13px;border:1px solid #3a3d44;border-radius:7px;padding:6px 9px;outline:none}
 .qb .jbtn{font-size:11px;font-weight:700;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;flex-shrink:0}
@@ -254,6 +261,20 @@ export default function OfficeBoardView() {
       const j = await r.json();
       if (j.ok) { setQa(''); load(); } else alert(j.error || '추가 실패');
     } catch (e) { alert(String(e)); } finally { setQaBusy(false); }
+  };
+  // 웹 새 프로젝트 등록 — 프로젝트명+마감+담당 → 예정(시작전) 칸에 카드 1개
+  const [showNP, setShowNP] = useState(false);
+  const [np, setNP] = useState({ name: '', due: '', owner: '신종호' });
+  const [npBusy, setNPBusy] = useState(false);
+  const addProject = async () => {
+    const name = np.name.trim();
+    if (!name || npBusy) return;
+    setNPBusy(true);
+    try {
+      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: name, task: name, owner: np.owner, ball: '시작전', due: np.due, 출처: '웹새프로젝트' }) });
+      const j = await r.json();
+      if (j.ok) { setNP({ name: '', due: '', owner: np.owner }); setShowNP(false); load(true); } else alert(j.error || '등록 실패');
+    } catch (e) { alert(String(e)); } finally { setNPBusy(false); }
   };
   const load = useCallback((fresh = false) => {
     fetch(fresh ? '/api/office?fresh=1' : '/api/office').then((r) => r.json()).then((j) => {
@@ -476,6 +497,17 @@ export default function OfficeBoardView() {
         {(['대행', '도구', '리서치', '자체사업', '내부'] as const).map((k) => (
           <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
+      </div>
+      <div className="npwrap">
+        <button className="npbtn" onClick={() => setShowNP((v) => !v)}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
+        {showNP && (
+          <div className="npform">
+            <input autoFocus value={np.name} onChange={(e) => setNP({ ...np, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addProject(); }} placeholder="프로젝트명" />
+            <label className="nplbl">마감<input type="date" value={np.due} onChange={(e) => setNP({ ...np, due: e.target.value })} /></label>
+            <select value={np.owner} onChange={(e) => setNP({ ...np, owner: e.target.value })}><option value="신종호">담당 신종호</option><option value="김지영">담당 김지영</option></select>
+            <button className="npok" disabled={npBusy || !np.name.trim()} onClick={addProject}>예정에 등록</button>
+          </div>
+        )}
       </div>
 
       <div className="board">
