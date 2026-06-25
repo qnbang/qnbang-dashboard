@@ -161,9 +161,8 @@ const CSS = `
 .qb .arcrow{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #eef0f7;border-radius:8px;padding:6px 10px;margin-bottom:5px;font-size:12px}
 .qb .arcnm{font-weight:700;color:#23283c;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .arccli{color:#9298ac;font-size:11px}.qb .arcown{font-size:10px;font-weight:700;color:#5a6078;background:#f1f3fa;border-radius:5px;padding:1px 5px}.qb .arcdate{font-size:10.5px;color:#9aa0b0;flex-shrink:0}
 .qb .arcempty{font-size:11.5px;color:#b8bdc8;padding:6px 4px}
-.qb .npwrap{margin:-6px 0 14px}
-.qb .npbtn{background:#14182a;color:#fff;border:none;border-radius:999px;padding:7px 16px;font-size:12.5px;font-weight:700;cursor:pointer}.qb .npbtn:hover{background:#23283c}
-.qb .npform{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;background:#fff;border:1px solid #e7e9f3;border-radius:12px;padding:10px 12px}
+.qb .npbtn{margin-left:auto;background:#14182a;color:#fff;border:none;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer}.qb .npbtn:hover{background:#23283c}
+.qb .npform{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 16px;background:#fff;border:1px solid #e7e9f3;border-radius:12px;padding:10px 12px}
 .qb .npform input,.qb .npform select{border:1px solid #e0e3ee;border-radius:8px;padding:6px 10px;font-size:13px;color:#23283c}
 .qb .npform>input:first-of-type{flex:1;min-width:180px}
 .qb .npcli{width:160px}
@@ -499,19 +498,17 @@ export default function OfficeBoardView() {
         {(['대행', '도구', '리서치', '자체사업', '내부'] as const).map((k) => (
           <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
-      </div>
-      <div className="npwrap">
         <button className="npbtn" onClick={() => setShowNP((v) => !v)}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
-        {showNP && (
-          <div className="npform">
+      </div>
+      {showNP && (
+        <div className="npform">
             <input autoFocus value={np.name} onChange={(e) => setNP({ ...np, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addProject(); }} placeholder="프로젝트명" />
             <input className="npcli" value={np.client} onChange={(e) => setNP({ ...np, client: e.target.value })} placeholder="고객사 (자체면 비움)" />
             <label className="nplbl">마감<input type="date" value={np.due} onChange={(e) => setNP({ ...np, due: e.target.value })} /></label>
             <select value={np.owner} onChange={(e) => setNP({ ...np, owner: e.target.value })}><option value="신종호">담당 신종호</option><option value="김지영">담당 김지영</option></select>
             <button className="npok" disabled={npBusy || !np.name.trim()} onClick={addProject}>예정에 등록</button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="board">
         <section className="room inbox-room" {...dropTo('받은일')}><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">미분류</span></div>
