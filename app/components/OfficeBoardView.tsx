@@ -96,6 +96,8 @@ const CSS = `
 .qb .board3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:start;margin-top:14px}
 .qb .tkts{display:flex;flex-direction:column;gap:8px}.qb .rowwrap{display:flex;gap:10px;flex-wrap:wrap}
 .qb .tkt{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid #e7e9f3;border-radius:13px;padding:9px 12px;cursor:pointer;box-shadow:0 2px 8px -6px #1e225522;transition:box-shadow .12s,transform .12s}
+.qb .tkt[draggable],.qb .smalltk[draggable]{cursor:grab}.qb .tkt:active,.qb .smalltk:active{cursor:grabbing}
+.qb.dragging .room{outline:2px dashed #c4c8da;outline-offset:-5px;transition:outline .1s}.qb.dragging .room:hover{outline-color:#3a3d44;background:#3a3d440a}
 .qb .tkt:hover{box-shadow:0 8px 20px -10px #2a335533;transform:translateY(-1px)}.qb .tkt.sel{border-color:#3a3d44;box-shadow:0 0 0 1px #3a3d4488}
 .qb .tkt.urgent{border-left:3px solid #ef4458}
 .qb .ic{font-size:17px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:#f1f3fa;border-radius:10px;flex-shrink:0}
@@ -128,6 +130,7 @@ const CSS = `
 .qb .ph{padding:18px 20px 12px;border-bottom:1px solid #eef0f7;position:relative}.qb .pcli{font-size:11.5px;font-weight:700;color:#3a3d44}.qb .pproj{font-size:18px;font-weight:800;margin:3px 0 2px;color:#15182a}.qb .pmeta{font-size:11.5px;color:#6b7088}
 .qb .pclose{position:absolute;top:14px;right:16px;border:none;background:#f1f3fa;width:30px;height:30px;border-radius:9px;font-size:16px;cursor:pointer;color:#5a6078}
 .qb .statebtns{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}.qb .statebtns button{font-size:11px;font-weight:700;border:1px solid #e0e3ee;background:#f7f8fc;border-radius:8px;padding:5px 10px;cursor:pointer;color:#5a6078}.qb .statebtns button:hover{background:#fff;border-color:#3a3d44}.qb .statebtns button.cur{background:#3a3d44;color:#fff;border-color:#3a3d44}
+.qb .statebtns button.discard{color:#e0364a;border-color:#fadde2}.qb .statebtns button.discard:hover{background:#fde8eb;border-color:#e0364a}
 .qb .pbody{flex:1;overflow-y:auto;padding:16px 20px}.qb .psec{font-size:12px;font-weight:800;color:#1a1e30;margin:0 0 6px}
 .qb .mli{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #eef0f6}
 .qb .mli-t{font-size:13px;font-weight:700;color:#1a1e30;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -241,8 +244,8 @@ export default function OfficeBoardView() {
       if (j.ok) { setQa(''); load(); } else alert(j.error || '추가 실패');
     } catch (e) { alert(String(e)); } finally { setQaBusy(false); }
   };
-  const load = useCallback(() => {
-    fetch('/api/office').then((r) => r.json()).then((j) => {
+  const load = useCallback((fresh = false) => {
+    fetch(fresh ? '/api/office?fresh=1' : '/api/office').then((r) => r.json()).then((j) => {
       if (j.ok) {
         setOffice(j.office); setMoney(j.money); setOver({});
         try { localStorage.setItem('qb-office', JSON.stringify({ office: j.office, money: j.money })); } catch {}
@@ -272,12 +275,26 @@ export default function OfficeBoardView() {
     const p = (body as { patch?: Record<string, string> }).patch;
     if (p) setOver((o) => ({ ...o, [id]: { ...o[id], ...toOver(p) } })); // 즉시 화면
     setSel(null);
-    fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...body }) }).then(() => load()).catch(() => load());
+    fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...body }) }).then(() => load(true)).catch(() => load(true));
   };
+  // 드래그로 공위치 변경 — 카드를 칸에 끌어 놓으면 그 칸의 공위치로 patch
+  const [dragId, setDragId] = useState<string | null>(null);
+  const dragStart = (id: string) => (e: React.DragEvent) => { e.dataTransfer.setData('text/plain', id); e.dataTransfer.effectAllowed = 'move'; setDragId(id); };
+  const dropTo = (공위치: string) => ({
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; },
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain') || dragId; setDragId(null); if (id) patch(id, { patch: { 공위치 } }); },
+  });
   const complete = (id: string) => {
     setOver((o) => ({ ...o, [id]: { ...o[id], ball: 'done' } })); // 완수=보드서 즉시 사라짐
     setSel(null);
-    fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).then(() => load()).catch(() => load());
+    fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }).then(() => load(true)).catch(() => load(true));
+  };
+  // 폐기(접기) — 완수와 같은 아카이브 이동이지만 사유=폐기로 구분(부활 안 함). 되돌리려면 아카이브에서 복구.
+  const discard = (id: string, name: string) => {
+    if (!confirm(`"${name}" 프로젝트를 폐기(접기)할까요?\n보드에서 사라지고 아카이브로 갑니다. (완수와 달리 '폐기'로 기록)`)) return;
+    setOver((o) => ({ ...o, [id]: { ...o[id], ball: 'done' } }));
+    setSel(null);
+    fetch('/api/office/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 사유: '폐기(접음)' }) }).then(() => load(true)).catch(() => load(true));
   };
   const saveEdit = () => sel && patch(sel.id, { patch: { 고객: edit.고객, 프로젝트: edit.프로젝트 } });
   const saveMemo = () => { // 메모는 패널 닫지 않고 저장(현재 정리 갱신)
@@ -285,13 +302,13 @@ export default function OfficeBoardView() {
     const v = memoVal;
     setSel({ ...sel, memo: v });
     setOver((o) => ({ ...o, [sel.id]: { ...o[sel.id], memo: v } }));
-    fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sel.id, patch: { 메모: v } }) }).then(() => load()).catch(() => load());
+    fetch('/api/office/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sel.id, patch: { 메모: v } }) }).then(() => load(true)).catch(() => load(true));
   };
   const saveContract = () => {
     if (!sel || !mForm.금액.trim()) return;
     const body = { 종류: mForm.종류, 계약명: sel.project, 클라이언트: (sel.client && sel.client !== sel.project) ? sel.client : '', 금액: mForm.금액, 입금상태: mForm.입금상태, 계약일: mForm.계약일, 마감일: mForm.마감일, 시작월: mForm.시작월, 종료월: mForm.종료월 };
     setShowMoney(false); setMForm({ 종류: '매출', 금액: '', 입금상태: '입금대기', 계약일: '', 마감일: '', 시작월: '', 종료월: '' });
-    fetch('/api/office/contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(() => load()).catch(() => load());
+    fetch('/api/office/contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(() => load(true)).catch(() => load(true));
   };
   // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
   const stepPost = (id: string, todos: string[], 내용: string) => { // 시트는 백그라운드 저장(over로 보드 즉시 반영, load 안 함=무플래시)
@@ -407,7 +424,7 @@ export default function OfficeBoardView() {
     const showProj = big !== t.project; // 큰글씨가 프로젝트면 윗줄에 또 안 씀
     const cat = CAT[t.category || '']; // 분류 색·이모지
     return (
-    <div key={t.id} className={`tkt${(cardDday(t) ?? 99) <= 3 ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
+    <div key={t.id} draggable onDragStart={dragStart(t.id)} className={`tkt${(cardDday(t) ?? 99) <= 3 ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
         {(cli || showProj) && <div className="cli-proj">{cli && <span>{cli}{showProj ? ' · ' : ''}</span>}{showProj && <span className="proj" style={cat ? { color: cat.c } : undefined}>{cat ? cat.e + ' ' : ''}{t.project}</span>}</div>}
@@ -427,7 +444,7 @@ export default function OfficeBoardView() {
   const Empty = () => <div className="empty">— 없음 —</div>;
 
   return (
-    <div className="qb">
+    <div className={`qb${dragId ? ' dragging' : ''}`} onDragEnd={() => setDragId(null)}>
       <style>{CSS}</style>
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-emerald-200 transition" onClick={() => setMoneyList('rev')}><div className="text-xs text-slate-500 mb-1">순매출 누계 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-emerald-600">{won(money?.순매출누계 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약 {money?.계약건수 ?? 0}건 · 클릭=목록</div></div>
@@ -449,29 +466,29 @@ export default function OfficeBoardView() {
       </div>
 
       <div className="board">
-        <section className="room inbox-room"><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">미분류</span></div>
+        <section className="room inbox-room" {...dropTo('받은일')}><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">미분류</span></div>
           <div className="qa">
             <input value={qa} onChange={(e) => setQa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) quickAdd('받은일'); }} placeholder="+ 받은/처리한 일 한 줄… (Enter=받은일)" disabled={qaBusy} />
             {qa.trim() && <div className="qa-btns"><button onClick={() => quickAdd('받은일')} disabled={qaBusy}>📥 받은일로</button><button onClick={() => quickAdd('완수')} disabled={qaBusy}>✅ 처리됨으로</button></div>}
           </div>
           <div className="tkts">{inbox.length ? inbox.map(Card) : <div className="empty">📭 비움</div>}</div></section>
-        <section className="room proc"><div className="rh">🧾 처리 <span className="cnt">{proc.length}</span><span className="hint">영업·연락·결재</span></div>
+        <section className="room proc" {...dropTo('내회신')}><div className="rh">🧾 처리 <span className="cnt">{proc.length}</span><span className="hint">영업·연락·결재</span></div>
           <div className="tkts">{proc.length ? proc.map(Card) : <Empty />}</div></section>
       </div>
 
-      <section className="room work" style={{ marginTop: 14 }}><div className="rh">🖥️ 작업 <span className="cnt">{work.length}</span><span className="hint">제작·디자인</span></div>
+      <section className="room work" style={{ marginTop: 14 }} {...dropTo('내작업')}><div className="rh">🖥️ 작업 <span className="cnt">{work.length}</span><span className="hint">제작·디자인</span></div>
         <div className="rowwrap">{work.length ? work.map(Card) : <Empty />}</div></section>
 
-      <section className="room wait" style={{ marginTop: 14 }}><div className="rh">🚪 대기 <span className="cnt">{wait.length}</span><span className="hint">상대 답·결과 기다림</span></div>
+      <section className="room wait" style={{ marginTop: 14 }} {...dropTo('고객대기')}><div className="rh">🚪 대기 <span className="cnt">{wait.length}</span><span className="hint">상대 답·결과 기다림</span></div>
         <div className="rowwrap">{wait.length ? wait.map(Card) : <Empty />}</div></section>
 
       <div className="board3">
-        <section className="room todo"><div className="rh">📅 예정 <span className="cnt">{todo.length}</span><span className="hint">날짜 있음</span></div>
-          {todo.length ? todo.map((t) => <div key={t.id} className="smalltk" onClick={() => setSel(t)}><span>📅</span><div><div className="task">{t.project}</div><div className="c">{ddText(t.dday)} · {t.task}</div></div></div>) : <Empty />}</section>
-        <section className="room someday"><div className="rh">💭 언젠가 <span className="cnt">{some.length}</span><span className="hint">날짜 없음</span></div>
-          {some.length ? some.map((t) => <div key={t.id} className="smalltk" onClick={() => setSel(t)}><span>💭</span><div><div className="task">{t.project}</div><div className="c">{t.client || '날짜 없음'}</div></div></div>) : <Empty />}</section>
-        <section className="room hold"><div className="rh">⏸️ 보류 <span className="cnt">{hold.length}</span><span className="hint">멈춤</span></div>
-          {hold.length ? hold.map((t) => <div key={t.id} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
+        <section className="room todo" {...dropTo('시작전')}><div className="rh">📅 예정 <span className="cnt">{todo.length}</span><span className="hint">날짜 있음</span></div>
+          {todo.length ? todo.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>📅</span><div><div className="task">{t.project}</div><div className="c">{ddText(t.dday)} · {t.task}</div></div></div>) : <Empty />}</section>
+        <section className="room someday" {...dropTo('시작전')}><div className="rh">💭 언젠가 <span className="cnt">{some.length}</span><span className="hint">날짜 없음</span></div>
+          {some.length ? some.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>💭</span><div><div className="task">{t.project}</div><div className="c">{t.client || '날짜 없음'}</div></div></div>) : <Empty />}</section>
+        <section className="room hold" {...dropTo('보류')}><div className="rh">⏸️ 보류 <span className="cnt">{hold.length}</span><span className="hint">멈춤</span></div>
+          {hold.length ? hold.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
       </div>
 
       {cat === 'all' && filter !== 'jy' && (<>
@@ -535,7 +552,7 @@ export default function OfficeBoardView() {
             <div className="statebtns">{POS_BTN.map((p) => (
               <button key={p} className={BALL2KO[cur.ball] === p ? 'cur' : ''} disabled={busy} onClick={() => p === '완수' ? complete(cur.id) : patch(cur.id, { patch: { 공위치: p } })}>{p}</button>
             ))}</div>
-            <div className="statebtns"><button disabled={busy} onClick={() => patch(cur.id, { patch: { 담당자: cur.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {cur.owner === '김지영' ? '종호' : '지영'}</button></div>
+            <div className="statebtns"><button disabled={busy} onClick={() => patch(cur.id, { patch: { 담당자: cur.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {cur.owner === '김지영' ? '종호' : '지영'}</button><button className="discard" disabled={busy} onClick={() => discard(cur.id, cur.project || cur.task || '이 프로젝트')}>🗑 폐기(접기)</button></div>
           </div>
           <div className="pbody">
             {DOC_LABEL[cur.category || ''] && (<>

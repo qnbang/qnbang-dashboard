@@ -37,7 +37,7 @@ async function postSheet(body: object) {
 
 export async function POST(req: Request) {
   try {
-    const { id } = await req.json().catch(() => ({}));
+    const { id, 사유 } = await req.json().catch(() => ({})); // 사유='폐기' 등 — 있으면 아카이브 행 현재상태에 표시(완수와 구분)
     if (!id || !READ_URL) return NextResponse.json({ ok: false, error: 'id 필요' }, { status: 400 });
 
     const j = await (await fetch(`${READ_URL}?key=${encodeURIComponent(KEY)}`, { cache: 'no-store' })).json();
@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     const done: Record<string, string> = {};
     head.forEach((h, i) => { done[h] = normCell(target[i]); });
     done['공위치'] = '완수';
+    if (사유) done['현재상태'] = String(사유); // 폐기(접음)면 사유로 덮어 — 아카이브에서 완수/폐기 구분
     done['갱신일'] = todayKST();
 
     // 과업 탭 = active만 다시(덮어쓰기) — 실제 헤더로 써서 칼럼 보존 → 아카이브에 완수행 append
