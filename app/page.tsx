@@ -178,7 +178,7 @@ type RevMoney = {
 };
 
 function parseM(d: string) {
-  const m = d.replace(/\./g, '-').replace(/\s/g, '').match(/\d{4}-(\d{1,2})/);
+  const m = d.replace(/[./]/g, '-').replace(/\s/g, '').match(/\d{4}-(\d{1,2})/);
   return m ? parseInt(m[1]) : 0;
 }
 

@@ -35,12 +35,14 @@ function parseDate(raw: string): { iso: string; label: string } {
     const iso = d.toISOString().split('T')[0];
     return { iso, label: d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }) };
   }
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return { iso: raw, label: raw };
-  return {
-    iso: d.toISOString().split('T')[0],
-    label: d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }),
-  };
+  // 슬래시·점 구분자 날짜를 수동 파싱 (new Date()는 UTC 변환 시 KST 하루 오차 발생)
+  const parts = raw.replace(/[./]/g, '-').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (parts) {
+    const iso = `${parts[1]}-${parts[2].padStart(2, '0')}-${parts[3].padStart(2, '0')}`;
+    const d = new Date(`${iso}T12:00:00+09:00`);
+    return { iso, label: d.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'long', day: 'numeric' }) };
+  }
+  return { iso: raw, label: raw };
 }
 
 export async function fetchExpenseData(): Promise<DashboardData> {
