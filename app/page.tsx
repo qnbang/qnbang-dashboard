@@ -181,6 +181,7 @@ function parseM(d: string) {
 // 정산 탭 — 매출·지출 통합 목록, 월별 필터 + 전체/매출/지출 버튼
 function FinanceView({ data, loading, error }: { data: DashboardData | null; loading: boolean; error: string }) {
   const [money, setMoney] = useState<RevMoney | null>(null);
+  const [moneyLoading, setMoneyLoading] = useState(true);
   const [moneyErr, setMoneyErr] = useState('');
   const [filter, setFilter] = useState<'all' | 'rev' | 'exp'>('all');
   const [selMonth, setSelMonth] = useState<'all' | number>('all');
@@ -189,10 +190,10 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
     fetch('/api/office').then(r => r.json()).then(j => {
       if (j.ok) setMoney(j.money);
       else setMoneyErr(j.error || '매출 불러오기 실패');
-    }).catch(e => setMoneyErr(String(e)));
+    }).catch(e => setMoneyErr(String(e))).finally(() => setMoneyLoading(false));
   }, []);
 
-  if (loading || !data) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
+  if (loading || !data || moneyLoading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
   if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
 
   type Row = { date: string; label: string; extra: string; amount: number; type: 'rev' | 'exp'; month: number };
