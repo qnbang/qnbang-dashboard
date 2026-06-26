@@ -7,7 +7,7 @@ import { getSheets } from './sheetCache';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
 const ym = (v: unknown) => {
-  const s = String(v ?? '');
+  const s = String(v ?? '').replace(/\s/g, '');
   const m = s.match(/(\d{4})[-/.](\d{1,2})/);
   return m ? `${m[1]}-${m[2].padStart(2, '0')}` : '';
 };

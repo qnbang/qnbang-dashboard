@@ -161,35 +161,135 @@ export default function Home() {
   );
 }
 
-// 정산 탭 — 지출/매출을 한 곳에서 토글
+type RevContract = {
+  계약일: string; 계약명: string; 클라이언트: string;
+  계약금액: number; 부가세: number; 공급가: number; 입금액: number; 미수금: number;
+  입금상태: string; 입금일: string; 입금예정일: string; 미수종류: '받을예정' | '단순미수' | ''; 순매출: number;
+};
+type RevMoney = {
+  순매출누계: number; 미수금합: number; 받을예정합: number; 단순미수합: number;
+  고정비월합: number; 계약건수: number;
+  월별: { 월: string; 순매출: number; 계약액: number; 실현: number }[];
+  계약목록: RevContract[];
+};
+
+function parseM(d: string) {
+  const m = d.replace(/\./g, '-').replace(/\s/g, '').match(/\d{4}-(\d{1,2})/);
+  return m ? parseInt(m[1]) : 0;
+}
+
+// 정산 탭 — 매출·지출 통합 목록, 월별 필터 + 전체/매출/지출 버튼
 function FinanceView({ data, loading, error }: { data: DashboardData | null; loading: boolean; error: string }) {
-  const [sub, setSub] = useState<'expense' | 'revenue'>('expense');
+  const [money, setMoney] = useState<RevMoney | null>(null);
+  const [moneyErr, setMoneyErr] = useState('');
+  const [filter, setFilter] = useState<'all' | 'rev' | 'exp'>('all');
+  const [selMonth, setSelMonth] = useState<'all' | number>('all');
+
+  useEffect(() => {
+    fetch('/api/office').then(r => r.json()).then(j => {
+      if (j.ok) setMoney(j.money);
+      else setMoneyErr(j.error || '매출 불러오기 실패');
+    }).catch(e => setMoneyErr(String(e)));
+  }, []);
+
+  if (loading || !data) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
+  if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
+
+  type Row = { date: string; label: string; extra: string; amount: number; type: 'rev' | 'exp'; month: number };
+
+  const revRows: Row[] = (money?.계약목록 || [])
+    .filter(c => c.입금액 > 0)
+    .map(c => ({
+      date: (c.입금일 || '').replace(/\.\s*/g, '-').replace(/-$/, '').trim(),
+      label: c.계약명,
+      extra: c.클라이언트 || '',
+      amount: c.입금액,
+      type: 'rev',
+      month: parseM(c.입금일 || ''),
+    }));
+
+  const expRows: Row[] = (data.expenses || []).map(e => ({
+    date: e.date,
+    label: e.content,
+    extra: e.category,
+    amount: e.cost,
+    type: 'exp',
+    month: e.month,
+  }));
+
+  const allMonths = Array.from(new Set([
+    ...revRows.map(r => r.month),
+    ...expRows.map(r => r.month),
+  ].filter(m => m > 0))).sort((a, b) => a - b);
+
+  const filtRev = selMonth === 'all' ? revRows : revRows.filter(r => r.month === selMonth);
+  const filtExp = selMonth === 'all' ? expRows : expRows.filter(r => r.month === selMonth);
+
+  const revTotal = filtRev.reduce((s, r) => s + r.amount, 0);
+  const expTotal = filtExp.reduce((s, r) => s + r.amount, 0);
+  const net = revTotal - expTotal;
+
+  const combined = [...filtRev, ...filtExp].sort((a, b) => b.date.localeCompare(a.date));
+  const shown = filter === 'all' ? combined : combined.filter(r => r.type === filter);
+
   return (
     <div className="space-y-5">
-      {/* 지출/매출 토글 */}
-      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-        {([['expense', '지출'], ['revenue', '매출']] as const).map(([k, label]) => (
-          <button
-            key={k}
-            onClick={() => setSub(k)}
-            className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
-              sub === k ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <select value={String(selMonth)}
+          onChange={e => setSelMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500">
+          <option value="all">올해 전체</option>
+          {allMonths.map(m => <option key={m} value={m}>{m}월</option>)}
+        </select>
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+          {([['all', '전체'], ['rev', '매출만'], ['exp', '지출만']] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setFilter(k)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${filter === k ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {sub === 'expense' && (
-        <>
-          {loading && <p className="text-slate-400 text-center py-20">불러오는 중…</p>}
-          {error && <p className="text-red-500 text-center py-20">⚠️ {error}</p>}
-          {!loading && !error && data && <ExpenseView data={data} />}
-        </>
-      )}
+      <div className="grid grid-cols-3 gap-3">
+        <Scorecard label="매출 합계" value={won(revTotal)} sub={`${filtRev.length}건`} tone="text-emerald-600" />
+        <Scorecard label="지출 합계" value={won(expTotal)} sub={`${filtExp.length}건`} tone="text-slate-700" />
+        <Scorecard label="손익" value={won(net)} sub={net >= 0 ? '흑자' : '적자'} tone={net >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
+      </div>
 
-      {sub === 'revenue' && <RevenueView data={data} />}
+      {moneyErr && <p className="text-rose-500 text-sm">⚠️ 매출 데이터 오류: {moneyErr}</p>}
+
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-slate-400 border-b border-slate-100 bg-slate-50">
+              <th className="py-2 px-3 font-medium">날짜</th>
+              <th className="py-2 px-3 font-medium">내용</th>
+              <th className="py-2 px-3 font-medium">분류</th>
+              <th className="py-2 px-3 font-medium text-right">금액</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.length === 0 && (
+              <tr><td colSpan={4} className="py-10 text-center text-slate-400">이 기간에 내역이 없어요.</td></tr>
+            )}
+            {shown.map((r, i) => (
+              <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                <td className="py-2 px-3 text-slate-500 whitespace-nowrap text-xs">{r.date || '날짜 없음'}</td>
+                <td className="py-2 px-3 text-slate-700">{r.label}</td>
+                <td className="py-2 px-3">
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${r.type === 'rev' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {r.type === 'rev' ? '매출' : '지출'}{r.extra ? ` · ${r.extra}` : ''}
+                  </span>
+                </td>
+                <td className={`py-2 px-3 text-right font-medium whitespace-nowrap ${r.type === 'rev' ? 'text-emerald-600' : 'text-slate-700'}`}>
+                  {r.type === 'rev' ? '+' : ''}{won(r.amount)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -401,222 +501,6 @@ function CRMView() {
         </section>
       </>)}
       {projDoc && <ProjectDocs name={projDoc} onClose={() => setProjDoc(null)} />}
-    </div>
-  );
-}
-
-// 정산 매출 화면(P4) — money 데이터(계약목록·미수금·월별)로 스코어카드+손익+월별차트+미수금 계약테이블.
-// 미수금↔과업 연결: 각 미수 계약에 그 돈 받을 과업이 사무실에 있는지 매칭해 보여줌.
-type RevContract = {
-  계약일: string; 계약명: string; 클라이언트: string;
-  계약금액: number; 부가세: number; 공급가: number; 입금액: number; 미수금: number;
-  입금상태: string; 입금예정일: string; 미수종류: '받을예정' | '단순미수' | ''; 순매출: number;
-};
-type RevMoney = {
-  순매출누계: number; 미수금합: number; 받을예정합: number; 단순미수합: number;
-  고정비월합: number; 계약건수: number;
-  월별: { 월: string; 순매출: number; 계약액: number; 실현: number }[];
-  계약목록: RevContract[];
-};
-function RevenueView({ data }: { data: DashboardData | null }) {
-  const [money, setMoney] = useState<RevMoney | null>(null);
-  const [tasks, setTasks] = useState<{ project: string; task: string; ball: string }[]>([]);
-  const [err, setErr] = useState('');
-  const [listView, setListView] = useState<'due' | 'all'>('due');
-  useEffect(() => {
-    fetch('/api/office').then((r) => r.json()).then((j) => {
-      if (j.ok) {
-        setMoney(j.money);
-        setTasks((j.office?.rooms || []).flatMap((r: { tasks: { project: string; task: string; ball: string }[] }) => r.tasks));
-      } else setErr(j.error || '불러오기 실패');
-    }).catch((e) => setErr(String(e)));
-  }, []);
-  if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
-  if (!money) return <p className="text-slate-400 text-center py-10">매출 불러오는 중…</p>;
-
-  const 미수 = money.계약목록.filter((c) => c.미수금 > 0).sort((a, b) => b.미수금 - a.미수금);
-  const 지출연 = data?.yearTotal ?? 0;
-  const 손익 = money.순매출누계 - 지출연;
-  const bars = money.월별.filter((m) => m.월).map((m) => ({ month: m.월.slice(2), total: m.순매출 }));
-  // 미수금↔과업 매칭은 클라이언트명 양방향 부분일치로만(계약명 단어 매칭은 '디자인/보고서' 같은
-  // 일반어로 오매칭되므로 제외). 클라이언트=프로젝트가 서로 포함하거나 과업명에 들어가면 그 과업.
-  const matchTask = (c: RevContract) => {
-    const cli = (c.클라이언트 || '').trim();
-    if (!cli) return undefined;
-    return tasks.find((t) => {
-      const proj = (t.project || '').trim();
-      return (proj && (proj.includes(cli) || cli.includes(proj))) || (t.task || '').includes(cli);
-    });
-  };
-
-  return (
-    <div className="space-y-5">
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Scorecard label="순매출 누계" value={won(money.순매출누계)} sub={`계약 ${money.계약건수}건`} tone="text-emerald-600" />
-        <Scorecard label="미수금 ●" value={won(money.미수금합)} sub={`받을예정 ${won(money.받을예정합)} · 미정 ${won(money.단순미수합)}`} tone="text-rose-600" />
-        <Scorecard label="올해 지출" value={won(지출연)} sub="지출 탭 합계" tone="text-slate-700" />
-        <Scorecard label="손익 (순매출−지출)" value={won(손익)} sub={손익 >= 0 ? '흑자' : '적자'} tone={손익 >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
-      </section>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="text-sm font-medium text-slate-600 mb-2">월별 순매출(계약일 기준)</div>
-        <MonthlyBar data={bars} />
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-medium text-slate-600">계약 내역 · 받을 과업 연결</div>
-          <div className="inline-flex rounded-lg border border-slate-200 p-0.5 text-xs">
-            <button onClick={() => setListView('due')} className={`px-2.5 py-1 rounded-md font-medium ${listView === 'due' ? 'bg-rose-500 text-white' : 'text-slate-500'}`}>미수만 {미수.length}</button>
-            <button onClick={() => setListView('all')} className={`px-2.5 py-1 rounded-md font-medium ${listView === 'all' ? 'bg-slate-700 text-white' : 'text-slate-500'}`}>전체 {money.계약목록.length}</button>
-          </div>
-        </div>
-        {(() => {
-          const list = listView === 'due' ? 미수
-            : [...money.계약목록].sort((a, b) => (b.미수금 - a.미수금) || (a.계약일 < b.계약일 ? 1 : -1));
-          if (list.length === 0) return <p className="text-sm text-slate-400 py-4 text-center">미수금 없음 — 다 입금됐어요 👍</p>;
-          return (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-[11px] text-slate-400 text-left border-b border-slate-100">
-                    <th className="py-1 font-normal">클라이언트</th><th className="font-normal">계약</th>
-                    <th className="font-normal text-right">계약금액</th><th className="font-normal text-right">입금</th>
-                    <th className="font-normal text-right">미수</th><th className="font-normal pl-2">예정일</th><th className="font-normal pl-2">상태</th><th className="font-normal pl-2">받을 과업</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.map((c, i) => {
-                    const mt = c.미수금 > 0 ? matchTask(c) : undefined;
-                    return (
-                      <tr key={i} className={`border-b border-slate-50 ${c.미수금 > 0 ? '' : 'text-slate-400'}`}>
-                        <td className="py-1.5 font-medium truncate max-w-[7rem]">{c.클라이언트 || '—'}</td>
-                        <td className="text-[12px] truncate max-w-[11rem]">{c.계약명}</td>
-                        <td className="text-right tabular-nums">{won(c.계약금액)}</td>
-                        <td className="text-right tabular-nums text-slate-400">{won(c.입금액)}</td>
-                        <td className={`text-right tabular-nums ${c.미수금 > 0 ? 'text-rose-600 font-semibold' : ''}`}>{c.미수금 > 0 ? won(c.미수금) : '–'}</td>
-                        <td className="pl-2 text-[11px] whitespace-nowrap">
-                          {c.미수종류 === '받을예정' ? <span className="text-emerald-600">📅 {c.입금예정일}</span>
-                            : c.미수종류 === '단순미수' ? <span className="text-amber-500">미정</span> : ''}
-                        </td>
-                        <td className="pl-2"><span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 whitespace-nowrap">{c.입금상태 || '–'}</span></td>
-                        <td className="pl-2 text-[11px]">{c.미수금 > 0 ? (mt ? <span className="text-emerald-600">▸ {mt.task}</span> : <span className="text-amber-500">⚠️ 없음</span>) : ''}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
-  );
-}
-
-function ExpenseView({ data }: { data: DashboardData }) {
-  const [sel, setSel] = useState<'all' | number>('all');
-
-  const monthsWithData = Array.from(new Set(data.expenses.map((e) => e.month))).sort(
-    (a, b) => a - b
-  );
-
-  const filtered = sel === 'all' ? data.expenses : data.expenses.filter((e) => e.month === sel);
-  const total = filtered.reduce((s, e) => s + e.cost, 0);
-
-  const catMap: Record<string, number> = {};
-  for (const e of filtered) {
-    const k = e.category || '미분류';
-    catMap[k] = (catMap[k] || 0) + e.cost;
-  }
-  const byCategory = Object.entries(catMap)
-    .map(([category, t]) => ({ category, total: t }))
-    .sort((a, b) => b.total - a.total);
-
-  const list = [...filtered].sort((a, b) => (a.date < b.date ? 1 : -1));
-
-  const periodLabel = sel === 'all' ? '올해 누적 지출' : `${sel}월 지출`;
-
-  return (
-    <div className="space-y-6">
-      {/* 월 선택창 */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-slate-500">기간 선택</span>
-        <select
-          value={String(sel)}
-          onChange={(e) => setSel(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500"
-        >
-          <option value="all">전체 (올해 누적)</option>
-          {monthsWithData.map((m) => (
-            <option key={m} value={m}>
-              {m}월
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* 요약 카드 */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <SummaryCard label={periodLabel} value={won(total)} accent />
-        <SummaryCard label="기록 건수" value={`${filtered.length}건`} />
-        <SummaryCard label="카테고리 수" value={`${byCategory.length}개`} />
-      </div>
-
-      {/* 차트 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title="월별 지출 (전체 비교)">
-          <MonthlyBar data={data.monthly} />
-        </Card>
-        <Card title={sel === 'all' ? '카테고리별 지출 (전체)' : `카테고리별 지출 (${sel}월)`}>
-          {byCategory.length ? (
-            <CategoryPie data={byCategory} />
-          ) : (
-            <p className="text-slate-400 text-center py-20">데이터 없음</p>
-          )}
-        </Card>
-      </div>
-
-      {/* 지출 내역 */}
-      <Card title={sel === 'all' ? '지출 내역 (전체)' : `${sel}월 지출 내역`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-400 border-b border-slate-100">
-                <th className="py-2 pr-3 font-medium">날짜</th>
-                <th className="py-2 pr-3 font-medium">카테고리</th>
-                <th className="py-2 pr-3 font-medium">내용</th>
-                <th className="py-2 pr-3 font-medium text-right">금액</th>
-                <th className="py-2 font-medium">비고</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((e, i) => (
-                <tr key={i} className="border-b border-slate-50">
-                  <td className="py-2 pr-3 text-slate-500 whitespace-nowrap">{e.dateLabel}</td>
-                  <td className="py-2 pr-3">
-                    <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                      {e.category}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-3 text-slate-700">{e.content}</td>
-                  <td className="py-2 pr-3 text-right font-medium text-slate-800 whitespace-nowrap">
-                    {won(e.cost)}
-                  </td>
-                  <td className="py-2 text-slate-400 text-xs">{e.note}</td>
-                </tr>
-              ))}
-              {list.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-slate-400">
-                    이 기간에는 지출이 없어요.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   );
 }

@@ -27,7 +27,7 @@ function refresh(): Promise<Sheets> {
       const sheets = api();
       const meta = await sheets.spreadsheets.get({ spreadsheetId: SHEET_ID!, fields: 'sheets.properties.title' });
       const titles = (meta.data.sheets || []).map((s) => s.properties?.title).filter((t): t is string => !!t);
-      const res = await sheets.spreadsheets.values.batchGet({ spreadsheetId: SHEET_ID!, ranges: titles, dateTimeRenderOption: 'FORMATTED_STRING' });
+      const res = await sheets.spreadsheets.values.batchGet({ spreadsheetId: SHEET_ID!, ranges: titles, valueRenderOption: 'FORMATTED_VALUE' });
       const out: Sheets = {};
       (res.data.valueRanges || []).forEach((vr, i) => { out[titles[i]] = (vr.values as unknown[][]) || []; });
       cache = { at: Date.now(), sheets: out };
