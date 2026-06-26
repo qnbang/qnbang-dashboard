@@ -102,7 +102,10 @@ export default function ProjectArchiveView() {
                     <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded ${p.분류 === '자체' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-600'}`}>
                       {p.분류 === '자체' ? '🏢 자체' : '🤝 대행'}
                     </span>
-                    <span className="text-[14px] font-extrabold text-emerald-600">{won(p.계약)}</span>
+                    {/* 프로젝트는 전체 계약금액 기준 — 미수 있으면 입금/전체(예: 55만/110만) */}
+                    {p.미수 > 0
+                      ? <span className="text-[14px] font-extrabold"><span className="text-emerald-600">{won(p.입금)}</span><span className="text-slate-400 font-bold">/{won(p.계약)}</span></span>
+                      : <span className="text-[14px] font-extrabold text-emerald-600">{won(p.계약)}</span>}
                   </div>
                   <div className="text-[13.5px] font-bold leading-snug mb-1 text-slate-800">{p.name}</div>
                   <div className="text-[11.5px] text-slate-500">

@@ -489,8 +489,11 @@ export default function OfficeBoardView() {
   return (
     <div className={`qb${dragId ? ' dragging' : ''}`} onDragEnd={() => setDragId(null)}>
       <style>{CSS}</style>
-      {/* 정산(순매출·미수·고정비·정산내역)은 정산 탭으로 통일 — 사무실뷰엔 업무 지표(가동률)만 남김 */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+      {/* 스코어카드(누계·미수·고정비·가동률)는 유지 — 매출 숫자는 정산 탭과 동일(입금 기준). 정산'내역' 모달만 정산 탭으로 통일 */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-emerald-200 transition" onClick={() => setMoneyList('rev')}><div className="text-xs text-slate-500 mb-1">순매출 누계 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-emerald-600">{won(money?.순매출누계 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">실입금 기준 · 클릭=목록</div></div>
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-rose-200 transition" onClick={() => setMoneyList('due')}><div className="text-xs text-slate-500 mb-1">미수금 ● <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-rose-600">{won(money?.미수금합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약금액 − 입금액 · 클릭=목록</div></div>
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('fixed')}><div className="text-xs text-slate-500 mb-1">월 고정비 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-slate-700">{won(money?.고정비월합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">매달 나가는 돈 · 클릭=목록</div></div>
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('util')}><div className="text-xs text-slate-500 mb-1">가동률 (프로젝트) <span className="text-slate-300">▸</span></div><div className="text-xl font-bold text-slate-800">{가동}</div><div className="text-[11px] text-slate-400 mt-1">대행·자체사업·내부·리서치 · 클릭=목록</div></div>
       </section>
       <p className="note0">실시간 업무 현황 — 받은일 · 처리 · 작업 · 대기 · 예정 · 언젠가 · 제품 {office.source === 'sheet' ? `· ✓ ${office.syncedAt} 기준` : office.source === 'seed' ? '· ⚠️ 미리보기 시드' : ''}</p>
@@ -581,6 +584,35 @@ export default function OfficeBoardView() {
       </div>
 
       {moneyList && (() => {
+        if (moneyList === 'fixed') {
+          const fl = money?.고정비목록 || [];
+          return (<>
+            <div className="ovl" onClick={() => setMoneyList(null)} />
+            <aside className="panel">
+              <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
+                <div className="pproj">🏦 월 고정비 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{fl.length}항목</span></div>
+                <div className="pmeta">매달 고정으로 나가는 비용</div>
+              </div>
+              <div className="pbody">
+                {fl.length === 0 ? <div className="empty">없음</div> : fl.map((f, i) => (
+                  <div key={i} className="mli">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="mli-t">{f.항목}</div>
+                      <div className="mli-s">{f.종류}{f.납부일 ? ' · 매월 ' + f.납부일 + '일' : ''}</div>
+                    </div>
+                    <div className="mli-r">
+                      <span className="mli-amt" style={{ color: '#475569' }}>{won(f.금액)}</span>
+                    </div>
+                  </div>
+                ))}
+                <div className="mli" style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 12 }}>
+                  <div style={{ flex: 1 }}><div className="mli-t" style={{ fontWeight: 700 }}>합계</div></div>
+                  <div className="mli-r"><span className="mli-amt" style={{ color: '#1e293b', fontWeight: 700 }}>{won(money?.고정비월합 ?? 0)}</span></div>
+                </div>
+              </div>
+            </aside>
+          </>);
+        }
         if (moneyList === 'util') {
           // 프로젝트 단위 — 카테고리별 고유 프로젝트명 목록 (대행·자체사업·내부·리서치만)
           const PANEL_CATS = ['대행', '자체사업', '내부', '리서치'] as const;
@@ -617,7 +649,57 @@ export default function OfficeBoardView() {
             </aside>
           </>);
         }
-        return null;
+        const cs = money?.계약목록 || [];
+        const list = moneyList === 'due'
+          ? cs.filter((c) => c.미수금 > 0 && c.미수종류 !== '단순미수').sort((a, b) => b.미수금 - a.미수금)
+          : cs.slice().sort((a, b) => b.순매출 - a.순매출);
+        const saveContract = () => {
+          if (!editingContract) return;
+          fetch('/api/office/contract/update', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(editingContract),
+          }).then(() => { setEditingContract(null); load(true); });
+        };
+        return (<>
+          <div className="ovl" onClick={() => { setMoneyList(null); setEditingContract(null); }} />
+          <aside className="panel">
+            <div className="ph"><button className="pclose" onClick={() => { setMoneyList(null); setEditingContract(null); }}>✕</button>
+              <div className="pproj">{moneyList === 'due' ? '🔴 미수금 계약' : '💰 순매출 계약'} <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{list.length}건</span></div>
+              <div className="pmeta">{moneyList === 'due' ? '아직 못 받은 돈 (계약금액 − 입금액)' : '계약별 순매출 = 부가세 뺀 실매출 · ✏️=입금 수정'}</div>
+            </div>
+            <div className="pbody">
+              {list.length === 0 ? <div className="empty">없음</div> : list.map((c, i) => (
+                <div key={i}>
+                  <div className="mli">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="mli-t">{c.계약명}</div>
+                      <div className="mli-s">{c.클라이언트}{c.계약일 ? ' · ' + c.계약일 : ''}</div>
+                    </div>
+                    <div className="mli-r">
+                      <span className="mli-amt" style={{ color: moneyList === 'due' ? '#e0364a' : '#059669' }}>{won(moneyList === 'due' ? c.미수금 : c.순매출)}</span>
+                      <span className="mli-tag" style={{ cursor: 'pointer' }}
+                        onClick={() => setEditingContract(editingContract?.계약명 === c.계약명 ? null : { 계약명: c.계약명, 계약금액: c.계약금액, 입금액: String(c.입금액 || ''), 입금일: c.입금일 || '', 입금상태: c.입금상태 || '입금대기' })}>
+                        {moneyList === 'due' ? (c.미수종류 === '받을예정' ? '예정 ' + (c.입금예정일 || '') : '미정') : c.입금상태} ✏️</span>
+                    </div>
+                  </div>
+                  {editingContract?.계약명 === c.계약명 && (
+                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <input className="ein" placeholder="입금액" value={editingContract.입금액} onChange={(e) => setEditingContract({ ...editingContract, 입금액: e.target.value })} />
+                        <input className="ein" placeholder="입금일 (2026-06)" value={editingContract.입금일} onChange={(e) => setEditingContract({ ...editingContract, 입금일: e.target.value })} />
+                        <select className="ein" value={editingContract.입금상태} onChange={(e) => setEditingContract({ ...editingContract, 입금상태: e.target.value })} style={{ gridColumn: '1/-1' }}>
+                          {['입금대기','입금완료','부분입금','입금예정'].map((v) => <option key={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={saveContract} style={{ marginTop: 8, width: '100%', padding: '6px', borderRadius: 6, background: '#059669', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>저장</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </aside>
+        </>);
       })()}
 
       {cur && (<>

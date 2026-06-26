@@ -115,7 +115,7 @@ export async function fetchMoneyData(): Promise<MoneyData> {
   }
 
   return {
-    순매출누계: 계약목록.reduce((s, c) => s + c.순매출, 0),
+    순매출누계: 계약목록.reduce((s, c) => s + c.입금액, 0),  // 정산 탭과 동일하게 실입금 기준(통장)
     미수금합: 계약목록.reduce((s, c) => s + c.미수금, 0),
     받을예정합: 계약목록.filter((c) => c.미수종류 === '받을예정').reduce((s, c) => s + c.미수금, 0),
     단순미수합: 계약목록.filter((c) => c.미수종류 === '단순미수').reduce((s, c) => s + c.미수금, 0),
