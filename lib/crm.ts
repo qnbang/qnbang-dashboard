@@ -99,7 +99,8 @@ export async function buildCRM(): Promise<CRMData> {
     if (pj && !c.이름들.includes(pj)) c.이름들.push(pj);
     if (공 && !c.공위치.includes(공)) c.공위치.push(공);
     const o = t['담당자']; if (o && !c.담당.includes(o)) c.담당.push(o);
-    if (t['계약여부'] === '진행' || t['계약여부'] === '완료') c._진행 = true;
+    // 계약여부='영업'만 영업중으로 분류, 빈값·진행·완료 등 나머지는 진행중
+    if (t['계약여부'] !== '영업') c._진행 = true;
   }
 
   const 진행중: CRMClient[] = [];
