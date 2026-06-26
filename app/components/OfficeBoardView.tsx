@@ -444,7 +444,13 @@ export default function OfficeBoardView() {
   const wait = board.filter((t) => t.ball === 'client').sort(byDday);
   const todo = board.filter((t) => t.ball === 'start').sort(byDday); // 예정 = 시작전 전부(날짜 있는 것 먼저, 없는 건 뒤) — 언젠가 통합
   const hold = board.filter((t) => t.ball === 'hold').sort(byDday);
-  const 가동 = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a).map(([k, v]) => `${k} ${v}`).join(' · ') || '–';
+  const ACTIVE_SET = new Set(['inbox', 'mywork', 'myreply', 'client', 'hold']);
+  const SHOW_CATS = ['대행', '자체사업', '내부', '리서치'] as const;
+  // 활성 과업 중 카테고리별 고유 프로젝트 수
+  const catProjects = Object.fromEntries(SHOW_CATS.map((k) => [
+    k, [...new Set(all.filter((t) => ACTIVE_SET.has(t.ball) && (t.category || '') === k).map((t) => t.project || t.id))],
+  ]));
+  const 가동 = SHOW_CATS.map((k) => catProjects[k].length > 0 ? `${CAT[k].e}${catProjects[k].length}` : null).filter(Boolean).join(' · ') || '–';
   const cur = sel; // 패널은 sel 직접 사용 — 단계/이력은 낙관적 업데이트로 즉시 반영(캐시 지연 우회)
 
   // 통일 카드: [고객사 · 프로젝트명](프로젝트명 굵게) 한 줄 + 과업 크게(1~2줄). 작업·대기 같은 순서.
@@ -496,8 +502,14 @@ export default function OfficeBoardView() {
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-emerald-200 transition" onClick={() => setMoneyList('rev')}><div className="text-xs text-slate-500 mb-1">순매출 누계 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-emerald-600">{won(money?.순매출누계 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약 {money?.계약건수 ?? 0}건 · 클릭=목록</div></div>
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-rose-200 transition" onClick={() => setMoneyList('due')}><div className="text-xs text-slate-500 mb-1">미수금 ● <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-rose-600">{won(money?.미수금합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약금액 − 입금액 · 클릭=목록</div></div>
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('fixed')}><div className="text-xs text-slate-500 mb-1">월 고정비 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-slate-700">{won(money?.고정비월합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">매달 나가는 돈 · 클릭=목록</div></div>
-        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('util')}><div className="text-xs text-slate-500 mb-1">가동률 (담당 과업) <span className="text-slate-300">▸</span></div><div className="text-xl font-bold text-slate-800">{가동}</div><div className="text-[11px] text-slate-400 mt-1">진행 중 과업 {office.과업수 ?? 0}개 · 클릭=목록</div></div>
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('util')}><div className="text-xs text-slate-500 mb-1">가동률 (프로젝트) <span className="text-slate-300">▸</span></div><div className="text-xl font-bold text-slate-800">{가동}</div><div className="text-[11px] text-slate-400 mt-1">대행·자체사업·내부·리서치 · 클릭=목록</div></div>
       </section>
+      <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 8 }}>
+        <button onClick={() => { setMoneyList('expense'); loadExp(expMonth); }}
+          style={{ fontSize: 12, color: '#64748b', background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
+          💸 지출 내역 관리
+        </button>
+      </div>
       <p className="note0">실시간 업무 현황 — 받은일 · 처리 · 작업 · 대기 · 예정 · 언젠가 · 제품 {office.source === 'sheet' ? `· ✓ ${office.syncedAt} 기준` : office.source === 'seed' ? '· ⚠️ 미리보기 시드' : ''}</p>
       <div className="filters">
         {([['all', '전체'], ['jh', '🧑‍💼 신종호'], ['jy', '🎨 김지영'], ['out', '🤝 외주']] as const).map(([k, lb]) => (
@@ -510,7 +522,6 @@ export default function OfficeBoardView() {
           <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
         <button className="npbtn" onClick={() => setShowNP((v) => !v)}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
-        <button className="npbtn" style={{ marginLeft: 6 }} onClick={() => { setMoneyList('expense'); loadExp(expMonth); }}>💸 지출 관리</button>
       </div>
       {showNP && (
         <div className="npform">
@@ -617,46 +628,37 @@ export default function OfficeBoardView() {
           </>);
         }
         if (moneyList === 'util') {
-          const ACTIVE = new Set(['inbox', 'mywork', 'myreply', 'client', 'hold']);
-          const active = all.filter((t) => ACTIVE.has(t.ball));
-          const CAT_ORDER = ['대행', '자체사업', '내부', '도구', '리서치', ''];
-          const grouped: Record<string, Task[]> = {};
-          for (const t of active) {
-            const k = t.category || '';
-            (grouped[k] ||= []).push(t);
-          }
-          const BALL_KO: Record<string, string> = { inbox: '받은일', mywork: '작업중', myreply: '회신대기', client: '고객대기', hold: '보류' };
+          // 프로젝트 단위 — 카테고리별 고유 프로젝트명 목록 (대행·자체사업·내부·리서치만)
+          const PANEL_CATS = ['대행', '자체사업', '내부', '리서치'] as const;
+          const totalProjs = PANEL_CATS.reduce((s, k) => s + catProjects[k].length, 0);
           return (<>
             <div className="ovl" onClick={() => setMoneyList(null)} />
             <aside className="panel">
               <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
-                <div className="pproj">📊 지금 팀 가동률 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>진행 중 {active.length}개</span></div>
-                <div className="pmeta">활성 과업 — 분야별 현황</div>
+                <div className="pproj">📊 팀 가동률 — 진행 중 프로젝트 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{totalProjs}개</span></div>
+                <div className="pmeta">활성 프로젝트를 분야별로</div>
               </div>
               <div className="pbody">
-                {active.length === 0 ? <div className="empty">진행 중인 과업 없음</div>
-                  : CAT_ORDER.filter((k) => grouped[k]?.length).map((k) => {
-                    const info = CAT[k] || { c: '#64748b', e: '📌' };
-                    return (
-                      <div key={k || '_etc'}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: info.c, padding: '10px 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>
-                          {info.e} {k || '미분류'} <span style={{ fontWeight: 400, color: '#94a3b8' }}>{grouped[k].length}개</span>
-                        </div>
-                        {grouped[k].map((t, i) => (
-                          <div key={i} className="mli" style={{ cursor: 'pointer' }} onClick={() => { setSel(t); setMoneyList(null); }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div className="mli-t" style={{ color: '#1e293b' }}>{t.task || t.project}</div>
-                              <div className="mli-s">{t.project}{t.client && t.client !== t.project ? ' · ' + t.client : ''}</div>
-                            </div>
-                            <div className="mli-r" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-                              <span style={{ fontSize: 10, color: '#94a3b8' }}>{WHO[t.owner] || t.owner || '종호'}</span>
-                              <span className="mli-tag">{BALL_KO[t.ball] || t.ball}</span>
-                            </div>
-                          </div>
-                        ))}
+                {totalProjs === 0 ? <div className="empty">진행 중 프로젝트 없음</div>
+                  : PANEL_CATS.filter((k) => catProjects[k].length > 0).map((k) => (
+                    <div key={k}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: CAT[k].c, padding: '10px 0 4px', letterSpacing: 0.5 }}>
+                        {CAT[k].e} {k} <span style={{ fontWeight: 400, color: '#94a3b8' }}>{catProjects[k].length}개</span>
                       </div>
-                    );
-                  })}
+                      {catProjects[k].map((proj, i) => {
+                        const t = all.find((x) => (x.project || x.id) === proj && ACTIVE_SET.has(x.ball));
+                        return (
+                          <div key={i} className="mli" style={t ? { cursor: 'pointer' } : {}} onClick={() => t && (setSel(t), setMoneyList(null))}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className="mli-t">{proj}</div>
+                              {t?.client && t.client !== proj && <div className="mli-s">{t.client}</div>}
+                            </div>
+                            {t && <span className="mli-tag">{WHO[t.owner] || t.owner || '종호'}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
               </div>
             </aside>
           </>);

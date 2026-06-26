@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     if (!MONTHS.includes(month)) return NextResponse.json({ ok: false, error: '월 파라미터 필요 (예: 4월)' }, { status: 400 });
 
     const sheets = api();
-    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID!, range: month });
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID!, range: month, dateTimeRenderOption: 'FORMATTED_STRING' });
     const rows = (res.data.values || []).slice(1); // 헤더 제외
     const items = rows.map((r, i) => ({
       _row: i + 2, // 시트 행 번호 (헤더=1, 데이터 시작=2)

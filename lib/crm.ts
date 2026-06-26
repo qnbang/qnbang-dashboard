@@ -82,7 +82,7 @@ export async function buildCRM(): Promise<CRMData> {
     const 공 = t['공위치'];
     if (공 === '보류' || 공 === '완수') continue;
     if (t['돈종류'] === '투자' || t['계약여부'] === '내부') continue;   // 내부는 고객 아님
-    const key = (t['고객'] || t['프로젝트'] || '').trim();
+    const key = t['고객'].trim(); // 고객 필드 없으면 CRM 제외 — 프로젝트명을 고객명으로 오해하던 버그 수정
     if (!key) continue;
     const c = (byClient[key] ||= { 고객: key, 과업수: 0, 공위치: [], 담당: [], _과업이름: [], _진행: false });
     c.과업수! += 1;
