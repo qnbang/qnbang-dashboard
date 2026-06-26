@@ -81,7 +81,7 @@ export async function buildArchive(): Promise<ArchiveData> {
     if (!base) continue;
     const cur = map.get(base) || {
       name: base, client: c['클라이언트'] || '', 분류: (c['분류'] === '자체' ? '자체' : '대행') as '자체' | '대행',
-      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: '', 작업: '', 상태: '',
+      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: '', 작업: '', 상태: '', 링크: '',
     };
     cur.계약 += num(c['계약금액']);
     cur.입금 += num(c['입금액']);
