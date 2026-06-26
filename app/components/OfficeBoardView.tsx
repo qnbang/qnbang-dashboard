@@ -707,7 +707,7 @@ export default function OfficeBoardView() {
                 <div className="pmeta">매출(+) · 지출(−) 통합</div>
                 {/* 월 탭 */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                  {months.filter((m) => parseInt(m) >= 4 && parseInt(m) <= 12).map((m) => (
+                  {months.map((m) => (
                     <button key={m} onClick={() => { setExpMonth(m); loadExp(m); }}
                       style={{ padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: expMonth === m ? 700 : 400,
                         background: expMonth === m ? '#1e293b' : '#f1f5f9', color: expMonth === m ? '#fff' : '#475569', border: 'none', cursor: 'pointer' }}>{m}</button>
