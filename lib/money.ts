@@ -31,6 +31,7 @@ export interface MoneyData {
   월별: { 월: string; 계약액: number; 순매출: number; 실현: number }[];
   계약목록: Contract[];
   고정비목록: { 항목: string; 금액: number; 납부일: string; 종류: string }[];
+  잔고: { 통장잔고: number; 세이프박스: number; 보유현금: number; 업데이트: string };
 }
 
 // 시트 탭을 객체배열로 (헤더 행 기준), _row = 실제 시트 행 번호
@@ -101,6 +102,18 @@ export async function fetchMoneyData(): Promise<MoneyData> {
   const 월별 = Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
     .map(([월, v]) => ({ 월, ...v }));
 
+  // 잔고
+  const 잔고sheet = sheets['잔고'];
+  let 통장잔고 = 0, 세이프박스 = 0, 잔고업데이트 = '';
+  if (Array.isArray(잔고sheet)) {
+    for (const r of 잔고sheet.slice(1)) {
+      const row = r as unknown[];
+      const 항목 = String(row[0] ?? '');
+      if (항목 === '통장잔고') { 통장잔고 = num(row[1]); 잔고업데이트 = String(row[2] ?? ''); }
+      if (항목 === '세이프박스') 세이프박스 = num(row[1]);
+    }
+  }
+
   return {
     순매출누계: 계약목록.reduce((s, c) => s + c.순매출, 0),
     미수금합: 계약목록.reduce((s, c) => s + c.미수금, 0),
@@ -111,5 +124,6 @@ export async function fetchMoneyData(): Promise<MoneyData> {
     월별,
     계약목록,
     고정비목록,
+    잔고: { 통장잔고, 세이프박스, 보유현금: 통장잔고 + 세이프박스, 업데이트: 잔고업데이트 },
   };
 }

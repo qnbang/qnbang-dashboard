@@ -174,6 +174,7 @@ type RevMoney = {
   고정비월합: number; 계약건수: number;
   월별: { 월: string; 순매출: number; 계약액: number; 실현: number }[];
   계약목록: RevContract[];
+  잔고?: { 통장잔고: number; 세이프박스: number; 보유현금: number; 업데이트: string };
 };
 
 function parseM(d: string) {
@@ -335,10 +336,11 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
     <>
       <div className="space-y-4">
         {/* 상단 스코어카드 */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Scorecard label="순매출" value={won(revTotal)} sub={`${filtRev.length}건`} tone="text-emerald-600" />
           <Scorecard label="순지출" value={won(expTotal)} sub={`${filtExp.length}건`} tone="text-slate-700" />
           <Scorecard label="손익" value={won(net)} sub={net >= 0 ? '흑자' : '적자'} tone={net >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
+          <Scorecard label="보유현금" value={won(money?.잔고?.보유현금 ?? 0)} sub={money?.잔고?.업데이트 ? `${money.잔고.업데이트} 기준` : '잔고 탭에서 업데이트'} tone="text-indigo-600" />
         </div>
 
         {/* 필터 바 + 추가 버튼 */}
@@ -382,7 +384,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
               )}
               {shown.map((r, i) => (
                 <tr key={i} className="group border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                  <td className="py-2 px-3 text-slate-400 text-xs whitespace-nowrap">{r.date || '—'}</td>
+                  <td className="py-2 px-3 text-slate-400 text-xs whitespace-nowrap w-14 min-w-[3.5rem]">{r.date || '—'}</td>
                   <td className="py-2 px-3 text-slate-700">{r.label}</td>
                   <td className="py-2 px-3">
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${r.type === 'rev' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
