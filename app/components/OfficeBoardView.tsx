@@ -58,7 +58,7 @@ function mdSections(md: string): { h: string; body: string }[] {
   return secs.map((s) => ({ h: s.h, body: s.body.join('\n') }));
 }
 type Office = { rooms: { tasks: Task[] }[]; 자체?: Task[]; 언젠가?: Task[]; 가동률?: Record<string, number>; 과업수?: number; source?: string; syncedAt?: string };
-type Contract = { 계약일: string; 계약명: string; 클라이언트: string; 계약금액: number; 순매출: number; 입금액: number; 미수금: number; 입금상태: string; 입금예정일: string; 미수종류?: string };
+type Contract = { 계약일: string; 계약명: string; 클라이언트: string; 계약금액: number; 순매출: number; 입금액: number; 입금일?: string; 미수금: number; 입금상태: string; 입금예정일: string; 미수종류?: string };
 type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number; 계약목록?: Contract[]; 고정비목록?: { 항목: string; 금액: number; 납부일: string; 종류: string }[] };
 const won = (n: number) => `${(n || 0).toLocaleString('ko-KR')}원`;
 
@@ -230,7 +230,18 @@ export default function OfficeBoardView() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const [moneyList, setMoneyList] = useState<'rev' | 'due' | 'fixed' | 'util' | null>(null); // 스코어카드 클릭→목록
+  const [moneyList, setMoneyList] = useState<'rev' | 'due' | 'fixed' | 'util' | 'expense' | null>(null); // 스코어카드 클릭→목록
+  const [editingContract, setEditingContract] = useState<{ 계약명: string; 계약금액: number; 입금액: string; 입금일: string; 입금상태: string } | null>(null);
+  const [expMonth, setExpMonth] = useState('6월');
+  type ExpItem = { _row: number; 날짜: string; 카테고리: string; 지출내용: string; 비용: number; 비고: string };
+  const [expItems, setExpItems] = useState<ExpItem[] | null>(null);
+  const [expLoading, setExpLoading] = useState(false);
+  const [expForm, setExpForm] = useState({ 날짜: '', 카테고리: '', 지출내용: '', 비용: '', 비고: '' });
+  const loadExp = (month: string) => {
+    setExpLoading(true);
+    fetch(`/api/office/expense?month=${encodeURIComponent(month)}`)
+      .then((r) => r.json()).then((d) => setExpItems(d.items || [])).finally(() => setExpLoading(false));
+  };
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState<Record<string, Partial<Task>>>({}); // 낙관적 덮어쓰기(서버 반영 전 즉시 화면)
@@ -499,6 +510,7 @@ export default function OfficeBoardView() {
           <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
         <button className="npbtn" onClick={() => setShowNP((v) => !v)}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
+        <button className="npbtn" style={{ marginLeft: 6 }} onClick={() => { setMoneyList('expense'); loadExp(expMonth); }}>💸 지출 관리</button>
       </div>
       {showNP && (
         <div className="npform">
@@ -605,21 +617,113 @@ export default function OfficeBoardView() {
           </>);
         }
         if (moneyList === 'util') {
-          const entries = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a);
+          const ACTIVE = new Set(['inbox', 'mywork', 'myreply', 'client', 'hold']);
+          const active = all.filter((t) => ACTIVE.has(t.ball));
+          const CAT_ORDER = ['대행', '자체사업', '내부', '도구', '리서치', ''];
+          const grouped: Record<string, Task[]> = {};
+          for (const t of active) {
+            const k = t.category || '';
+            (grouped[k] ||= []).push(t);
+          }
+          const BALL_KO: Record<string, string> = { inbox: '받은일', mywork: '작업중', myreply: '회신대기', client: '고객대기', hold: '보류' };
           return (<>
             <div className="ovl" onClick={() => setMoneyList(null)} />
             <aside className="panel">
               <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
-                <div className="pproj">👤 가동률 — 담당 과업 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{office.과업수 ?? 0}개</span></div>
-                <div className="pmeta">진행 중인 과업을 담당자별로 집계</div>
+                <div className="pproj">📊 지금 팀 가동률 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>진행 중 {active.length}개</span></div>
+                <div className="pmeta">활성 과업 — 분야별 현황</div>
               </div>
               <div className="pbody">
-                {entries.length === 0 ? <div className="empty">없음</div> : entries.map(([name, cnt], i) => (
-                  <div key={i} className="mli">
-                    <div style={{ flex: 1 }}><div className="mli-t">{WHO[name] || name}</div></div>
-                    <div className="mli-r"><span className="mli-amt" style={{ color: '#475569' }}>{cnt}개</span></div>
+                {active.length === 0 ? <div className="empty">진행 중인 과업 없음</div>
+                  : CAT_ORDER.filter((k) => grouped[k]?.length).map((k) => {
+                    const info = CAT[k] || { c: '#64748b', e: '📌' };
+                    return (
+                      <div key={k || '_etc'}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: info.c, padding: '10px 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>
+                          {info.e} {k || '미분류'} <span style={{ fontWeight: 400, color: '#94a3b8' }}>{grouped[k].length}개</span>
+                        </div>
+                        {grouped[k].map((t, i) => (
+                          <div key={i} className="mli" style={{ cursor: 'pointer' }} onClick={() => { setSel(t); setMoneyList(null); }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div className="mli-t" style={{ color: '#1e293b' }}>{t.task || t.project}</div>
+                              <div className="mli-s">{t.project}{t.client && t.client !== t.project ? ' · ' + t.client : ''}</div>
+                            </div>
+                            <div className="mli-r" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+                              <span style={{ fontSize: 10, color: '#94a3b8' }}>{WHO[t.owner] || t.owner || '종호'}</span>
+                              <span className="mli-tag">{BALL_KO[t.ball] || t.ball}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+              </div>
+            </aside>
+          </>);
+        }
+        if (moneyList === 'expense') {
+          const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+          const total = (expItems || []).reduce((s, it) => s + it.비용, 0);
+          const saveExp = () => {
+            if (!expForm.지출내용 || !expForm.비용) return;
+            fetch('/api/office/expense', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ month: expMonth, ...expForm, 비용: Number(expForm.비용.replace(/[^0-9]/g, '')) }),
+            }).then(() => { setExpForm({ 날짜: '', 카테고리: '', 지출내용: '', 비용: '', 비고: '' }); loadExp(expMonth); });
+          };
+          const delExp = (rowNum: number) => {
+            if (!confirm('삭제할까요?')) return;
+            fetch('/api/office/expense', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ month: expMonth, rowNum }),
+            }).then(() => loadExp(expMonth));
+          };
+          return (<>
+            <div className="ovl" onClick={() => setMoneyList(null)} />
+            <aside className="panel" style={{ width: 480 }}>
+              <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
+                <div className="pproj">💸 지출 관리</div>
+                <div className="pmeta">월별 지출 조회·추가·삭제</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  {months.filter((m) => parseInt(m) >= 4 && parseInt(m) <= 12).map((m) => (
+                    <button key={m} onClick={() => { setExpMonth(m); loadExp(m); }}
+                      style={{ padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: expMonth === m ? 700 : 400,
+                        background: expMonth === m ? '#1e293b' : '#f1f5f9', color: expMonth === m ? '#fff' : '#475569', border: 'none', cursor: 'pointer' }}>{m}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="pbody">
+                {expLoading ? <div className="empty">불러오는 중…</div> : expItems === null ? <div className="empty">월을 선택하세요</div> : (<>
+                  {expItems.length === 0 ? <div className="empty">내역 없음</div> : expItems.map((it, i) => (
+                    <div key={i} className="mli">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="mli-t">{it.지출내용}</div>
+                        <div className="mli-s">{it.날짜}{it.카테고리 ? ' · ' + it.카테고리 : ''}{it.비고 ? ' · ' + it.비고 : ''}</div>
+                      </div>
+                      <div className="mli-r">
+                        <span className="mli-amt" style={{ color: '#475569' }}>{won(it.비용)}</span>
+                        <button onClick={() => delExp(it._row)} style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>삭제</button>
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 10, fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 13, color: '#64748b' }}>합계 {expItems.length}건</span>
+                    <span style={{ color: '#1e293b' }}>{won(total)}</span>
                   </div>
-                ))}
+                  <div style={{ marginTop: 14, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>+ 지출 추가</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <input className="ein" placeholder="날짜 (2026/06/26)" value={expForm.날짜} onChange={(e) => setExpForm({ ...expForm, 날짜: e.target.value })} />
+                      <input className="ein" placeholder="카테고리 (구독, 외주…)" value={expForm.카테고리} onChange={(e) => setExpForm({ ...expForm, 카테고리: e.target.value })} />
+                      <input className="ein" placeholder="지출 내용 *" value={expForm.지출내용} onChange={(e) => setExpForm({ ...expForm, 지출내용: e.target.value })} style={{ gridColumn: '1/-1' }} />
+                      <input className="ein" placeholder="비용 *" value={expForm.비용} onChange={(e) => setExpForm({ ...expForm, 비용: e.target.value })} />
+                      <input className="ein" placeholder="비고" value={expForm.비고} onChange={(e) => setExpForm({ ...expForm, 비고: e.target.value })} />
+                    </div>
+                    <button onClick={saveExp} style={{ marginTop: 8, width: '100%', padding: '8px', borderRadius: 8, background: '#1e293b', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>저장</button>
+                  </div>
+                </>)}
               </div>
             </aside>
           </>);
@@ -628,24 +732,48 @@ export default function OfficeBoardView() {
         const list = moneyList === 'due'
           ? cs.filter((c) => c.미수금 > 0 && c.미수종류 !== '단순미수').sort((a, b) => b.미수금 - a.미수금)
           : cs.slice().sort((a, b) => b.순매출 - a.순매출);
+        const saveContract = () => {
+          if (!editingContract) return;
+          fetch('/api/office/contract/update', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(editingContract),
+          }).then(() => { setEditingContract(null); load(true); });
+        };
         return (<>
-          <div className="ovl" onClick={() => setMoneyList(null)} />
+          <div className="ovl" onClick={() => { setMoneyList(null); setEditingContract(null); }} />
           <aside className="panel">
-            <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
+            <div className="ph"><button className="pclose" onClick={() => { setMoneyList(null); setEditingContract(null); }}>✕</button>
               <div className="pproj">{moneyList === 'due' ? '🔴 미수금 계약' : '💰 순매출 계약'} <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{list.length}건</span></div>
-              <div className="pmeta">{moneyList === 'due' ? '아직 못 받은 돈 (계약금액 − 입금액)' : '계약별 순매출 = 부가세 뺀 실매출'}</div>
+              <div className="pmeta">{moneyList === 'due' ? '아직 못 받은 돈 (계약금액 − 입금액)' : '계약별 순매출 = 부가세 뺀 실매출 · ✏️=입금 수정'}</div>
             </div>
             <div className="pbody">
               {list.length === 0 ? <div className="empty">없음</div> : list.map((c, i) => (
-                <div key={i} className="mli">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="mli-t">{c.계약명}</div>
-                    <div className="mli-s">{c.클라이언트}{c.계약일 ? ' · ' + c.계약일 : ''}</div>
+                <div key={i}>
+                  <div className="mli">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="mli-t">{c.계약명}</div>
+                      <div className="mli-s">{c.클라이언트}{c.계약일 ? ' · ' + c.계약일 : ''}</div>
+                    </div>
+                    <div className="mli-r">
+                      <span className="mli-amt" style={{ color: moneyList === 'due' ? '#e0364a' : '#059669' }}>{won(moneyList === 'due' ? c.미수금 : c.순매출)}</span>
+                      <span className="mli-tag" style={{ cursor: 'pointer' }}
+                        onClick={() => setEditingContract(editingContract?.계약명 === c.계약명 ? null : { 계약명: c.계약명, 계약금액: c.계약금액, 입금액: String(c.입금액 || ''), 입금일: c.입금일 || '', 입금상태: c.입금상태 || '입금대기' })}>
+                        {moneyList === 'due' ? (c.미수종류 === '받을예정' ? '예정 ' + (c.입금예정일 || '') : '미정') : c.입금상태} ✏️</span>
+                    </div>
                   </div>
-                  <div className="mli-r">
-                    <span className="mli-amt" style={{ color: moneyList === 'due' ? '#e0364a' : '#059669' }}>{won(moneyList === 'due' ? c.미수금 : c.순매출)}</span>
-                    <span className="mli-tag">{moneyList === 'due' ? (c.미수종류 === '받을예정' ? '예정 ' + (c.입금예정일 || '') : '미정') : c.입금상태}</span>
-                  </div>
+                  {editingContract?.계약명 === c.계약명 && (
+                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <input className="ein" placeholder="입금액" value={editingContract.입금액} onChange={(e) => setEditingContract({ ...editingContract, 입금액: e.target.value })} />
+                        <input className="ein" placeholder="입금일 (2026-06)" value={editingContract.입금일} onChange={(e) => setEditingContract({ ...editingContract, 입금일: e.target.value })} />
+                        <select className="ein" value={editingContract.입금상태} onChange={(e) => setEditingContract({ ...editingContract, 입금상태: e.target.value })} style={{ gridColumn: '1/-1' }}>
+                          {['입금대기','입금완료','부분입금','입금예정'].map((v) => <option key={v}>{v}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={saveContract} style={{ marginTop: 8, width: '100%', padding: '6px', borderRadius: 6, background: '#059669', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>저장</button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
