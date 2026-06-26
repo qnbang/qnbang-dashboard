@@ -84,33 +84,42 @@ export async function buildCRM(): Promise<CRMData> {
     return list;
   };
 
-  // ── 진행중: 고객명 있는 활성 과업이 하나라도 있으면 무조건 진행중 ──
-  const byClient: Record<string, { 고객: string; 과업수: number; 공위치: string[]; 담당: string[]; 이름들: string[] }> = {};
+  // ── 활성 과업을 고객 기준으로 묶기 ──
+  // 고객명 비어있으면 CRM 제외(내부 과업). 계약여부로 진행중/영업중 구분.
+  const byClient: Record<string, { 고객: string; 과업수: number; 공위치: string[]; 담당: string[]; 이름들: string[]; _진행: boolean }> = {};
   for (const t of 과업) {
     const 공 = t['공위치'];
     if (공 === '완수' || 공 === '보류') continue;
-    if (t['돈종류'] === '투자') continue; // 내부 투자성 제외 (자체 개발 등)
+    if (t['돈종류'] === '투자') continue;
     const key = t['고객'].trim();
-    if (!key) continue; // 고객명 없으면 CRM 제외 (내부 과업)
-    const c = (byClient[key] ||= { 고객: key, 과업수: 0, 공위치: [], 담당: [], 이름들: [] });
+    if (!key) continue; // 고객명 없으면 CRM 제외
+    const c = (byClient[key] ||= { 고객: key, 과업수: 0, 공위치: [], 담당: [], 이름들: [], _진행: false });
     c.과업수 += 1;
     const pj = (t['프로젝트'] || t['과업명'] || '').trim();
     if (pj && !c.이름들.includes(pj)) c.이름들.push(pj);
     if (공 && !c.공위치.includes(공)) c.공위치.push(공);
     const o = t['담당자']; if (o && !c.담당.includes(o)) c.담당.push(o);
+    if (t['계약여부'] === '진행' || t['계약여부'] === '완료') c._진행 = true;
   }
-  const 진행중: CRMClient[] = Object.values(byClient).map((c) => ({
-    고객: c.고객, 과업수: c.과업수, 공위치: c.공위치, 담당: c.담당,
-    계약금액: 계약of(c.고객), 미수: 미수of(c.고객),
-    프로젝트들: 프로젝트들of(c.고객, c.이름들),
-  })).sort((a, b) => (b.미수 ?? 0) - (a.미수 ?? 0));
+
+  const 진행중: CRMClient[] = [];
+  const 과업영업: CRMClient[] = []; // 과업 있지만 계약 전(계약여부=영업)
+  for (const c of Object.values(byClient)) {
+    if (c._진행) {
+      진행중.push({ 고객: c.고객, 과업수: c.과업수, 공위치: c.공위치, 담당: c.담당, 계약금액: 계약of(c.고객), 미수: 미수of(c.고객), 프로젝트들: 프로젝트들of(c.고객, c.이름들) });
+    } else {
+      과업영업.push({ 고객: c.고객, 단계: c.공위치[0] || '제안', 담당: c.담당, 프로젝트들: 프로젝트들of(c.고객, c.이름들) });
+    }
+  }
+  진행중.sort((a, b) => (b.미수 ?? 0) - (a.미수 ?? 0));
   const 진행keys = new Set(진행중.map((c) => c.고객));
 
-  // ── 영업중: 영업 리드에만 있고 활성 과업 없는 신규 고객만 ──
-  const 영업중: CRMClient[] = 영업
+  // ── 영업중: 영업 리드 + 계약 전 과업 고객 (진행중과 중복 제외) ──
+  const 영업리드 = 영업
     .filter((l) => ['접촉', '제안', '계약대기'].includes(l['단계']))
     .filter((l) => ![...진행keys].some((k) => same(k, l['대상'])))
     .map((l) => ({ 고객: l['대상'], 단계: l['단계'], 예상금액: l['예상금액'] ? num(l['예상금액']) : null, staleDays: null as number | null }));
+  const 영업중 = [...영업리드, ...과업영업.filter((c) => ![...진행keys].some((k) => same(k, c.고객)))];
   const 영업keys = new Set(영업중.map((c) => c.고객));
 
   // ── 완수: 아카이브·입금완료 고객 중 진행/영업에 없는 곳 ──
