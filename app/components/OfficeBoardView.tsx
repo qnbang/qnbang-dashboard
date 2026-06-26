@@ -59,7 +59,7 @@ function mdSections(md: string): { h: string; body: string }[] {
 }
 type Office = { rooms: { tasks: Task[] }[]; 자체?: Task[]; 언젠가?: Task[]; 가동률?: Record<string, number>; 과업수?: number; source?: string; syncedAt?: string };
 type Contract = { 계약일: string; 계약명: string; 클라이언트: string; 계약금액: number; 순매출: number; 입금액: number; 미수금: number; 입금상태: string; 입금예정일: string; 미수종류?: string };
-type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number; 계약목록?: Contract[] };
+type Money = { 순매출누계: number; 미수금합: number; 고정비월합: number; 계약건수: number; 계약목록?: Contract[]; 고정비목록?: { 항목: string; 금액: number; 납부일: string; 종류: string }[] };
 const won = (n: number) => `${(n || 0).toLocaleString('ko-KR')}원`;
 
 // 공위치(ball) → 시안 I 칸. 내회신=처리(영업·연락·결재류) / 내작업=작업(제작) / 고객대기=대기 / 시작전=예정(날짜)·언젠가(무날짜) / 보류=보류.
@@ -230,7 +230,7 @@ export default function OfficeBoardView() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
-  const [moneyList, setMoneyList] = useState<'rev' | 'due' | null>(null); // 스코어카드 클릭→계약 리스트
+  const [moneyList, setMoneyList] = useState<'rev' | 'due' | 'fixed' | 'util' | null>(null); // 스코어카드 클릭→목록
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState<Record<string, Partial<Task>>>({}); // 낙관적 덮어쓰기(서버 반영 전 즉시 화면)
@@ -484,8 +484,8 @@ export default function OfficeBoardView() {
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-emerald-200 transition" onClick={() => setMoneyList('rev')}><div className="text-xs text-slate-500 mb-1">순매출 누계 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-emerald-600">{won(money?.순매출누계 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약 {money?.계약건수 ?? 0}건 · 클릭=목록</div></div>
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-rose-200 transition" onClick={() => setMoneyList('due')}><div className="text-xs text-slate-500 mb-1">미수금 ● <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-rose-600">{won(money?.미수금합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약금액 − 입금액 · 클릭=목록</div></div>
-        <div className="glass rounded-2xl p-4"><div className="text-xs text-slate-500 mb-1">월 고정비</div><div className="text-2xl font-bold text-slate-700">{won(money?.고정비월합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">매달 나가는 돈</div></div>
-        <div className="glass rounded-2xl p-4"><div className="text-xs text-slate-500 mb-1">가동률 (담당 과업)</div><div className="text-xl font-bold text-slate-800">{가동}</div><div className="text-[11px] text-slate-400 mt-1">진행 중 과업 {office.과업수 ?? 0}개</div></div>
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('fixed')}><div className="text-xs text-slate-500 mb-1">월 고정비 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-slate-700">{won(money?.고정비월합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">매달 나가는 돈 · 클릭=목록</div></div>
+        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('util')}><div className="text-xs text-slate-500 mb-1">가동률 (담당 과업) <span className="text-slate-300">▸</span></div><div className="text-xl font-bold text-slate-800">{가동}</div><div className="text-[11px] text-slate-400 mt-1">진행 중 과업 {office.과업수 ?? 0}개 · 클릭=목록</div></div>
       </section>
       <p className="note0">실시간 업무 현황 — 받은일 · 처리 · 작업 · 대기 · 예정 · 언젠가 · 제품 {office.source === 'sheet' ? `· ✓ ${office.syncedAt} 기준` : office.source === 'seed' ? '· ⚠️ 미리보기 시드' : ''}</p>
       <div className="filters">
@@ -575,6 +575,55 @@ export default function OfficeBoardView() {
       </div>
 
       {moneyList && (() => {
+        if (moneyList === 'fixed') {
+          const fl = money?.고정비목록 || [];
+          return (<>
+            <div className="ovl" onClick={() => setMoneyList(null)} />
+            <aside className="panel">
+              <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
+                <div className="pproj">🏦 월 고정비 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{fl.length}항목</span></div>
+                <div className="pmeta">매달 고정으로 나가는 비용</div>
+              </div>
+              <div className="pbody">
+                {fl.length === 0 ? <div className="empty">없음</div> : fl.map((f, i) => (
+                  <div key={i} className="mli">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="mli-t">{f.항목}</div>
+                      <div className="mli-s">{f.종류}{f.납부일 ? ' · 매월 ' + f.납부일 + '일' : ''}</div>
+                    </div>
+                    <div className="mli-r">
+                      <span className="mli-amt" style={{ color: '#475569' }}>{won(f.금액)}</span>
+                    </div>
+                  </div>
+                ))}
+                <div className="mli" style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 12 }}>
+                  <div style={{ flex: 1 }}><div className="mli-t" style={{ fontWeight: 700 }}>합계</div></div>
+                  <div className="mli-r"><span className="mli-amt" style={{ color: '#1e293b', fontWeight: 700 }}>{won(money?.고정비월합 ?? 0)}</span></div>
+                </div>
+              </div>
+            </aside>
+          </>);
+        }
+        if (moneyList === 'util') {
+          const entries = Object.entries(office.가동률 || {}).sort(([, a], [, b]) => b - a);
+          return (<>
+            <div className="ovl" onClick={() => setMoneyList(null)} />
+            <aside className="panel">
+              <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
+                <div className="pproj">👤 가동률 — 담당 과업 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{office.과업수 ?? 0}개</span></div>
+                <div className="pmeta">진행 중인 과업을 담당자별로 집계</div>
+              </div>
+              <div className="pbody">
+                {entries.length === 0 ? <div className="empty">없음</div> : entries.map(([name, cnt], i) => (
+                  <div key={i} className="mli">
+                    <div style={{ flex: 1 }}><div className="mli-t">{WHO[name] || name}</div></div>
+                    <div className="mli-r"><span className="mli-amt" style={{ color: '#475569' }}>{cnt}개</span></div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </>);
+        }
         const cs = money?.계약목록 || [];
         const list = moneyList === 'due'
           ? cs.filter((c) => c.미수금 > 0).sort((a, b) => b.미수금 - a.미수금)
