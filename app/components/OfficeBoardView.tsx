@@ -232,17 +232,7 @@ export default function OfficeBoardView() {
   }, []);
   const [moneyList, setMoneyList] = useState<'rev' | 'due' | 'fixed' | 'util' | 'expense' | null>(null); // 스코어카드 클릭→목록
   const [editingContract, setEditingContract] = useState<{ 계약명: string; 계약금액: number; 입금액: string; 입금일: string; 입금상태: string } | null>(null);
-  const [expMonth, setExpMonth] = useState('6월');
-  const [expFilter, setExpFilter] = useState<'all' | 'rev' | 'exp'>('all');
-  type ExpItem = { _row: number; 날짜: string; 카테고리: string; 지출내용: string; 비용: number; 비고: string };
-  const [expItems, setExpItems] = useState<ExpItem[] | null>(null);
-  const [expLoading, setExpLoading] = useState(false);
-  const [expForm, setExpForm] = useState({ 날짜: '', 카테고리: '', 지출내용: '', 비용: '', 비고: '' });
-  const loadExp = (month: string) => {
-    setExpLoading(true);
-    fetch(`/api/office/expense?month=${encodeURIComponent(month)}`)
-      .then((r) => r.json()).then((d) => setExpItems(d.items || [])).finally(() => setExpLoading(false));
-  };
+  // 정산(매출·지출 내역)은 정산 탭으로 통일 — 관련 state 제거
   const [sel, setSel] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState<Record<string, Partial<Task>>>({}); // 낙관적 덮어쓰기(서버 반영 전 즉시 화면)
@@ -499,18 +489,10 @@ export default function OfficeBoardView() {
   return (
     <div className={`qb${dragId ? ' dragging' : ''}`} onDragEnd={() => setDragId(null)}>
       <style>{CSS}</style>
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-emerald-200 transition" onClick={() => setMoneyList('rev')}><div className="text-xs text-slate-500 mb-1">순매출 누계 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-emerald-600">{won(money?.순매출누계 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약 {money?.계약건수 ?? 0}건 · 클릭=목록</div></div>
-        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-rose-200 transition" onClick={() => setMoneyList('due')}><div className="text-xs text-slate-500 mb-1">미수금 ● <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-rose-600">{won(money?.미수금합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">계약금액 − 입금액 · 클릭=목록</div></div>
-        <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('fixed')}><div className="text-xs text-slate-500 mb-1">월 고정비 <span className="text-slate-300">▸</span></div><div className="text-2xl font-bold text-slate-700">{won(money?.고정비월합 ?? 0)}</div><div className="text-[11px] text-slate-400 mt-1">매달 나가는 돈 · 클릭=목록</div></div>
+      {/* 정산(순매출·미수·고정비·정산내역)은 정산 탭으로 통일 — 사무실뷰엔 업무 지표(가동률)만 남김 */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
         <div className="glass rounded-2xl p-4 cursor-pointer hover:ring-2 hover:ring-slate-200 transition" onClick={() => setMoneyList('util')}><div className="text-xs text-slate-500 mb-1">가동률 (프로젝트) <span className="text-slate-300">▸</span></div><div className="text-xl font-bold text-slate-800">{가동}</div><div className="text-[11px] text-slate-400 mt-1">대행·자체사업·내부·리서치 · 클릭=목록</div></div>
       </section>
-      <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 8 }}>
-        <button onClick={() => { setMoneyList('expense'); loadExp(expMonth); }}
-          style={{ fontSize: 12, color: '#64748b', background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
-          📒 정산 내역
-        </button>
-      </div>
       <p className="note0">실시간 업무 현황 — 받은일 · 처리 · 작업 · 대기 · 예정 · 언젠가 · 제품 {office.source === 'sheet' ? `· ✓ ${office.syncedAt} 기준` : office.source === 'seed' ? '· ⚠️ 미리보기 시드' : ''}</p>
       <div className="filters">
         {([['all', '전체'], ['jh', '🧑‍💼 신종호'], ['jy', '🎨 김지영'], ['out', '🤝 외주']] as const).map(([k, lb]) => (
@@ -599,35 +581,6 @@ export default function OfficeBoardView() {
       </div>
 
       {moneyList && (() => {
-        if (moneyList === 'fixed') {
-          const fl = money?.고정비목록 || [];
-          return (<>
-            <div className="ovl" onClick={() => setMoneyList(null)} />
-            <aside className="panel">
-              <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
-                <div className="pproj">🏦 월 고정비 <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{fl.length}항목</span></div>
-                <div className="pmeta">매달 고정으로 나가는 비용</div>
-              </div>
-              <div className="pbody">
-                {fl.length === 0 ? <div className="empty">없음</div> : fl.map((f, i) => (
-                  <div key={i} className="mli">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="mli-t">{f.항목}</div>
-                      <div className="mli-s">{f.종류}{f.납부일 ? ' · 매월 ' + f.납부일 + '일' : ''}</div>
-                    </div>
-                    <div className="mli-r">
-                      <span className="mli-amt" style={{ color: '#475569' }}>{won(f.금액)}</span>
-                    </div>
-                  </div>
-                ))}
-                <div className="mli" style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 12 }}>
-                  <div style={{ flex: 1 }}><div className="mli-t" style={{ fontWeight: 700 }}>합계</div></div>
-                  <div className="mli-r"><span className="mli-amt" style={{ color: '#1e293b', fontWeight: 700 }}>{won(money?.고정비월합 ?? 0)}</span></div>
-                </div>
-              </div>
-            </aside>
-          </>);
-        }
         if (moneyList === 'util') {
           // 프로젝트 단위 — 카테고리별 고유 프로젝트명 목록 (대행·자체사업·내부·리서치만)
           const PANEL_CATS = ['대행', '자체사업', '내부', '리서치'] as const;
@@ -664,163 +617,7 @@ export default function OfficeBoardView() {
             </aside>
           </>);
         }
-        if (moneyList === 'expense') {
-          const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-          // 선택 월의 매출 내역 — 입금일 기준 (YYYY-MM, YYYY/MM 둘 다 처리)
-          const monthNum = parseInt(expMonth);
-          const revItems = (money?.계약목록 || []).filter((c) => {
-            const d = (c.입금일 || '').replace(/\./g, '-').replace(/\//g, '-');
-            const m = parseInt((d.match(/^\d{4}-(\d{1,2})/) || [])[1] || '0');
-            return m === monthNum && c.입금액 > 0;
-          });
-          // 합산
-          const expTotal = (expItems || []).reduce((s, it) => s + it.비용, 0);
-          const revTotal = revItems.reduce((s, c) => s + c.입금액, 0);
-          const net = revTotal - expTotal;
-          // 통합 리스트 — 날짜 정렬
-          type Row = { key: string; 날짜: string; 내용: string; 금액: number; 종류: 'rev' | 'exp'; _row?: number };
-          const merged: Row[] = [
-            ...revItems.map((c) => ({ key: 'r-' + c.계약명, 날짜: (c.입금일 || '').replace(/\//g, '-'), 내용: c.계약명, 금액: c.입금액, 종류: 'rev' as const })),
-            ...(expItems || []).map((it) => ({ key: 'e-' + it._row, 날짜: (it.날짜 || '').replace(/\./g, '-').replace(/\//g, '-'), 내용: it.지출내용, 금액: it.비용, 종류: 'exp' as const, _row: it._row })),
-          ].sort((a, b) => a.날짜.localeCompare(b.날짜));
-          const shown = expFilter === 'all' ? merged : merged.filter((r) => r.종류 === expFilter);
-
-          const saveExp = () => {
-            if (!expForm.지출내용 || !expForm.비용) return;
-            fetch('/api/office/expense', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ month: expMonth, ...expForm, 비용: Number(expForm.비용.replace(/[^0-9]/g, '')) }),
-            }).then(() => { setExpForm({ 날짜: '', 카테고리: '', 지출내용: '', 비용: '', 비고: '' }); loadExp(expMonth); });
-          };
-          const delExp = (rowNum: number) => {
-            if (!confirm('삭제할까요?')) return;
-            fetch('/api/office/expense', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: expMonth, rowNum }) })
-              .then(() => loadExp(expMonth));
-          };
-          const FTAB = [['all','전체'],['rev','매출'],['exp','지출']] as const;
-          return (<>
-            <div className="ovl" onClick={() => setMoneyList(null)} />
-            <aside className="panel" style={{ width: 480 }}>
-              <div className="ph">
-                <button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
-                <div className="pproj">📒 정산 내역</div>
-                <div className="pmeta">매출(+) · 지출(−) 통합</div>
-                {/* 월 탭 */}
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                  {months.map((m) => (
-                    <button key={m} onClick={() => { setExpMonth(m); loadExp(m); }}
-                      style={{ padding: '3px 10px', borderRadius: 6, fontSize: 12, fontWeight: expMonth === m ? 700 : 400,
-                        background: expMonth === m ? '#1e293b' : '#f1f5f9', color: expMonth === m ? '#fff' : '#475569', border: 'none', cursor: 'pointer' }}>{m}</button>
-                  ))}
-                </div>
-                {/* 분류 필터 */}
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  {FTAB.map(([v, label]) => (
-                    <button key={v} onClick={() => setExpFilter(v)}
-                      style={{ padding: '3px 12px', borderRadius: 6, fontSize: 12, fontWeight: expFilter === v ? 700 : 400,
-                        background: expFilter === v ? (v === 'rev' ? '#059669' : v === 'exp' ? '#e0364a' : '#2563eb') : '#f1f5f9',
-                        color: expFilter === v ? '#fff' : '#475569', border: 'none', cursor: 'pointer' }}>{label}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="pbody">
-                {expLoading ? <div className="empty">불러오는 중…</div> : (<>
-                  {shown.length === 0 ? <div className="empty">내역 없음</div> : shown.map((row) => (
-                    <div key={row.key} className="mli">
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="mli-t">{row.내용}</div>
-                        <div className="mli-s">{row.날짜}</div>
-                      </div>
-                      <div className="mli-r" style={{ alignItems: 'flex-end', gap: 4 }}>
-                        <span className="mli-amt" style={{ color: row.종류 === 'rev' ? '#059669' : '#e0364a' }}>
-                          {row.종류 === 'rev' ? '+' : '−'}{won(row.금액)}
-                        </span>
-                        {row.종류 === 'exp' && row._row && (
-                          <button onClick={() => delExp(row._row!)} style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>삭제</button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {/* 월 합계 */}
-                  <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b' }}>
-                      <span>매출 {revItems.length}건</span><span style={{ color: '#059669', fontWeight: 600 }}>+{won(revTotal)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b' }}>
-                      <span>지출 {(expItems||[]).length}건</span><span style={{ color: '#e0364a', fontWeight: 600 }}>−{won(expTotal)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, borderTop: '1px solid #f1f5f9', paddingTop: 6, marginTop: 2 }}>
-                      <span>순수지</span><span style={{ color: net >= 0 ? '#059669' : '#e0364a' }}>{net >= 0 ? '+' : '−'}{won(Math.abs(net))}</span>
-                    </div>
-                  </div>
-                  {/* 지출 추가 폼 */}
-                  <div style={{ marginTop: 14, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>+ 지출 추가</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                      <input className="ein" placeholder="날짜 (2026/06/26)" value={expForm.날짜} onChange={(e) => setExpForm({ ...expForm, 날짜: e.target.value })} />
-                      <input className="ein" placeholder="카테고리" value={expForm.카테고리} onChange={(e) => setExpForm({ ...expForm, 카테고리: e.target.value })} />
-                      <input className="ein" placeholder="지출 내용 *" value={expForm.지출내용} onChange={(e) => setExpForm({ ...expForm, 지출내용: e.target.value })} style={{ gridColumn: '1/-1' }} />
-                      <input className="ein" placeholder="비용 *" value={expForm.비용} onChange={(e) => setExpForm({ ...expForm, 비용: e.target.value })} />
-                      <input className="ein" placeholder="비고" value={expForm.비고} onChange={(e) => setExpForm({ ...expForm, 비고: e.target.value })} />
-                    </div>
-                    <button onClick={saveExp} style={{ marginTop: 8, width: '100%', padding: '8px', borderRadius: 8, background: '#1e293b', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>저장</button>
-                  </div>
-                </>)}
-              </div>
-            </aside>
-          </>);
-        }
-        const cs = money?.계약목록 || [];
-        const list = moneyList === 'due'
-          ? cs.filter((c) => c.미수금 > 0 && c.미수종류 !== '단순미수').sort((a, b) => b.미수금 - a.미수금)
-          : cs.slice().sort((a, b) => b.순매출 - a.순매출);
-        const saveContract = () => {
-          if (!editingContract) return;
-          fetch('/api/office/contract/update', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(editingContract),
-          }).then(() => { setEditingContract(null); load(true); });
-        };
-        return (<>
-          <div className="ovl" onClick={() => { setMoneyList(null); setEditingContract(null); }} />
-          <aside className="panel">
-            <div className="ph"><button className="pclose" onClick={() => { setMoneyList(null); setEditingContract(null); }}>✕</button>
-              <div className="pproj">{moneyList === 'due' ? '🔴 미수금 계약' : '💰 순매출 계약'} <span style={{ fontSize: 13, color: '#9298ac', fontWeight: 500 }}>{list.length}건</span></div>
-              <div className="pmeta">{moneyList === 'due' ? '아직 못 받은 돈 (계약금액 − 입금액)' : '계약별 순매출 = 부가세 뺀 실매출 · ✏️=입금 수정'}</div>
-            </div>
-            <div className="pbody">
-              {list.length === 0 ? <div className="empty">없음</div> : list.map((c, i) => (
-                <div key={i}>
-                  <div className="mli">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="mli-t">{c.계약명}</div>
-                      <div className="mli-s">{c.클라이언트}{c.계약일 ? ' · ' + c.계약일 : ''}</div>
-                    </div>
-                    <div className="mli-r">
-                      <span className="mli-amt" style={{ color: moneyList === 'due' ? '#e0364a' : '#059669' }}>{won(moneyList === 'due' ? c.미수금 : c.순매출)}</span>
-                      <span className="mli-tag" style={{ cursor: 'pointer' }}
-                        onClick={() => setEditingContract(editingContract?.계약명 === c.계약명 ? null : { 계약명: c.계약명, 계약금액: c.계약금액, 입금액: String(c.입금액 || ''), 입금일: c.입금일 || '', 입금상태: c.입금상태 || '입금대기' })}>
-                        {moneyList === 'due' ? (c.미수종류 === '받을예정' ? '예정 ' + (c.입금예정일 || '') : '미정') : c.입금상태} ✏️</span>
-                    </div>
-                  </div>
-                  {editingContract?.계약명 === c.계약명 && (
-                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 8 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                        <input className="ein" placeholder="입금액" value={editingContract.입금액} onChange={(e) => setEditingContract({ ...editingContract, 입금액: e.target.value })} />
-                        <input className="ein" placeholder="입금일 (2026-06)" value={editingContract.입금일} onChange={(e) => setEditingContract({ ...editingContract, 입금일: e.target.value })} />
-                        <select className="ein" value={editingContract.입금상태} onChange={(e) => setEditingContract({ ...editingContract, 입금상태: e.target.value })} style={{ gridColumn: '1/-1' }}>
-                          {['입금대기','입금완료','부분입금','입금예정'].map((v) => <option key={v}>{v}</option>)}
-                        </select>
-                      </div>
-                      <button onClick={saveContract} style={{ marginTop: 8, width: '100%', padding: '6px', borderRadius: 6, background: '#059669', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>저장</button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </aside>
-        </>);
+        return null;
       })()}
 
       {cur && (<>
