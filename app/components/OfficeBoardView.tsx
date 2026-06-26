@@ -626,7 +626,7 @@ export default function OfficeBoardView() {
         }
         const cs = money?.계약목록 || [];
         const list = moneyList === 'due'
-          ? cs.filter((c) => c.미수금 > 0).sort((a, b) => b.미수금 - a.미수금)
+          ? cs.filter((c) => c.미수금 > 0 && c.미수종류 !== '단순미수').sort((a, b) => b.미수금 - a.미수금)
           : cs.slice().sort((a, b) => b.순매출 - a.순매출);
         return (<>
           <div className="ovl" onClick={() => setMoneyList(null)} />
