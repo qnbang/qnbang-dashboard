@@ -54,16 +54,20 @@ export async function buildArchive(): Promise<ArchiveData> {
   const 매출 = objs(sh['매출']);
   const 과업 = objs(sh['과업']);
 
-  // 과업: 프로젝트명 → 작업 내역(할일·상태)
-  const 작업맵: Record<string, { 작업: string; 상태: string }> = {};
-  for (const t of 과업) {
-    const pj = t['프로젝트'] || t['과업명'] || '';
-    if (!pj) continue;
-    작업맵[pj] = { 작업: t['할일'] || t['다음할일'] || '', 상태: t['현재상태'] || '' };
-  }
-  const 작업of = (name: string) => {
-    for (const k of Object.keys(작업맵)) {
-      if (k && (k.includes(name) || name.includes(k))) return 작업맵[k];
+  // 과업: 프로젝트명·고객 → 작업 내역. 매출 프로젝트명/클라이언트와 '핵심 단어'로 매칭(흔한 단어 제외)
+  const 과업목록 = 과업.map((t) => ({
+    프로젝트: t['프로젝트'] || t['과업명'] || '', 고객: t['고객'] || '',
+    작업: t['할일'] || t['다음할일'] || '', 상태: t['현재상태'] || '',
+  })).filter((t) => t.프로젝트);
+  const STOP = new Set(['디자인', '제작', '개발', '작업', '대행', '프로젝트', '보고서', '인쇄', '발주', '정기', '콘텐츠', '브랜딩', '리서치', '키비주얼', '제안서']);
+  const toks = (s: string) => (String(s).match(/[가-힣]{2,}|[A-Za-z]{3,}/g) || []).filter((w) => !STOP.has(w));
+  const 작업of = (name: string, client: string) => {
+    const T = toks(name + ' ' + client);
+    for (const t of 과업목록) {
+      const P = toks(t.프로젝트 + ' ' + t.고객);
+      if (P.some((p) => T.some((x) => x === p || (x.length >= 3 && p.includes(x)) || (p.length >= 3 && x.includes(p))))) {
+        return { 작업: t.작업, 상태: t.상태 };
+      }
     }
     return { 작업: '', 상태: '' };
   };
@@ -88,7 +92,7 @@ export async function buildArchive(): Promise<ArchiveData> {
 
   // 미수·작업 채우기
   const projects = [...map.values()].map((p) => {
-    const w = 작업of(p.name);
+    const w = 작업of(p.name, p.client);
     return { ...p, 미수: Math.max(0, p.계약 - p.입금), 작업: w.작업, 상태: w.상태 };
   });
 
