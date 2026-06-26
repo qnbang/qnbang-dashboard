@@ -245,7 +245,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
     .filter(c => c.입금액 > 0)
     .map(c => ({
       date: fmtDate(c.입금일full || c.입금일),
-      dateFull: c.입금일full || c.입금일,
+      dateFull: (c.입금일full || c.입금일).replace(/[./]/g, '-'),
       label: c.계약명, extra: c.클라이언트 || '',
       amount: c.입금액, type: 'rev',
       month: parseM(c.입금일full || c.입금일),
