@@ -233,6 +233,7 @@ export default function OfficeBoardView() {
   const [moneyList, setMoneyList] = useState<'rev' | 'due' | 'fixed' | 'util' | 'expense' | null>(null); // 스코어카드 클릭→목록
   const [editingContract, setEditingContract] = useState<{ 계약명: string; 계약금액: number; 입금액: string; 입금일: string; 입금상태: string } | null>(null);
   const [expMonth, setExpMonth] = useState('6월');
+  const [expFilter, setExpFilter] = useState<'all' | 'rev' | 'exp'>('all');
   type ExpItem = { _row: number; 날짜: string; 카테고리: string; 지출내용: string; 비용: number; 비고: string };
   const [expItems, setExpItems] = useState<ExpItem[] | null>(null);
   const [expLoading, setExpLoading] = useState(false);
@@ -507,7 +508,7 @@ export default function OfficeBoardView() {
       <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 8 }}>
         <button onClick={() => { setMoneyList('expense'); loadExp(expMonth); }}
           style={{ fontSize: 12, color: '#64748b', background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }}>
-          💸 지출 내역 관리
+          📒 정산 내역
         </button>
       </div>
       <p className="note0">실시간 업무 현황 — 받은일 · 처리 · 작업 · 대기 · 예정 · 언젠가 · 제품 {office.source === 'sheet' ? `· ✓ ${office.syncedAt} 기준` : office.source === 'seed' ? '· ⚠️ 미리보기 시드' : ''}</p>
@@ -665,29 +666,46 @@ export default function OfficeBoardView() {
         }
         if (moneyList === 'expense') {
           const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-          const total = (expItems || []).reduce((s, it) => s + it.비용, 0);
+          // 선택 월의 매출 내역 — 입금일 기준 (YYYY-MM, YYYY/MM 둘 다 처리)
+          const monthNum = parseInt(expMonth);
+          const revItems = (money?.계약목록 || []).filter((c) => {
+            const d = (c.입금일 || '').replace(/\./g, '-').replace(/\//g, '-');
+            const m = parseInt((d.match(/^\d{4}-(\d{1,2})/) || [])[1] || '0');
+            return m === monthNum && c.입금액 > 0;
+          });
+          // 합산
+          const expTotal = (expItems || []).reduce((s, it) => s + it.비용, 0);
+          const revTotal = revItems.reduce((s, c) => s + c.입금액, 0);
+          const net = revTotal - expTotal;
+          // 통합 리스트 — 날짜 정렬
+          type Row = { key: string; 날짜: string; 내용: string; 금액: number; 종류: 'rev' | 'exp'; _row?: number };
+          const merged: Row[] = [
+            ...revItems.map((c) => ({ key: 'r-' + c.계약명, 날짜: (c.입금일 || '').replace(/\//g, '-'), 내용: c.계약명, 금액: c.입금액, 종류: 'rev' as const })),
+            ...(expItems || []).map((it) => ({ key: 'e-' + it._row, 날짜: (it.날짜 || '').replace(/\./g, '-').replace(/\//g, '-'), 내용: it.지출내용, 금액: it.비용, 종류: 'exp' as const, _row: it._row })),
+          ].sort((a, b) => a.날짜.localeCompare(b.날짜));
+          const shown = expFilter === 'all' ? merged : merged.filter((r) => r.종류 === expFilter);
+
           const saveExp = () => {
             if (!expForm.지출내용 || !expForm.비용) return;
             fetch('/api/office/expense', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ month: expMonth, ...expForm, 비용: Number(expForm.비용.replace(/[^0-9]/g, '')) }),
             }).then(() => { setExpForm({ 날짜: '', 카테고리: '', 지출내용: '', 비용: '', 비고: '' }); loadExp(expMonth); });
           };
           const delExp = (rowNum: number) => {
             if (!confirm('삭제할까요?')) return;
-            fetch('/api/office/expense', {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ month: expMonth, rowNum }),
-            }).then(() => loadExp(expMonth));
+            fetch('/api/office/expense', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month: expMonth, rowNum }) })
+              .then(() => loadExp(expMonth));
           };
+          const FTAB = [['all','전체'],['rev','매출'],['exp','지출']] as const;
           return (<>
             <div className="ovl" onClick={() => setMoneyList(null)} />
             <aside className="panel" style={{ width: 480 }}>
-              <div className="ph"><button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
-                <div className="pproj">💸 지출 관리</div>
-                <div className="pmeta">월별 지출 조회·추가·삭제</div>
+              <div className="ph">
+                <button className="pclose" onClick={() => setMoneyList(null)}>✕</button>
+                <div className="pproj">📒 정산 내역</div>
+                <div className="pmeta">매출(+) · 지출(−) 통합</div>
+                {/* 월 탭 */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                   {months.filter((m) => parseInt(m) >= 4 && parseInt(m) <= 12).map((m) => (
                     <button key={m} onClick={() => { setExpMonth(m); loadExp(m); }}
@@ -695,30 +713,52 @@ export default function OfficeBoardView() {
                         background: expMonth === m ? '#1e293b' : '#f1f5f9', color: expMonth === m ? '#fff' : '#475569', border: 'none', cursor: 'pointer' }}>{m}</button>
                   ))}
                 </div>
+                {/* 분류 필터 */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  {FTAB.map(([v, label]) => (
+                    <button key={v} onClick={() => setExpFilter(v)}
+                      style={{ padding: '3px 12px', borderRadius: 6, fontSize: 12, fontWeight: expFilter === v ? 700 : 400,
+                        background: expFilter === v ? (v === 'rev' ? '#059669' : v === 'exp' ? '#e0364a' : '#2563eb') : '#f1f5f9',
+                        color: expFilter === v ? '#fff' : '#475569', border: 'none', cursor: 'pointer' }}>{label}</button>
+                  ))}
+                </div>
               </div>
               <div className="pbody">
-                {expLoading ? <div className="empty">불러오는 중…</div> : expItems === null ? <div className="empty">월을 선택하세요</div> : (<>
-                  {expItems.length === 0 ? <div className="empty">내역 없음</div> : expItems.map((it, i) => (
-                    <div key={i} className="mli">
+                {expLoading ? <div className="empty">불러오는 중…</div> : (<>
+                  {shown.length === 0 ? <div className="empty">내역 없음</div> : shown.map((row) => (
+                    <div key={row.key} className="mli">
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="mli-t">{it.지출내용}</div>
-                        <div className="mli-s">{it.날짜}{it.카테고리 ? ' · ' + it.카테고리 : ''}{it.비고 ? ' · ' + it.비고 : ''}</div>
+                        <div className="mli-t">{row.내용}</div>
+                        <div className="mli-s">{row.날짜}</div>
                       </div>
-                      <div className="mli-r">
-                        <span className="mli-amt" style={{ color: '#475569' }}>{won(it.비용)}</span>
-                        <button onClick={() => delExp(it._row)} style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>삭제</button>
+                      <div className="mli-r" style={{ alignItems: 'flex-end', gap: 4 }}>
+                        <span className="mli-amt" style={{ color: row.종류 === 'rev' ? '#059669' : '#e0364a' }}>
+                          {row.종류 === 'rev' ? '+' : '−'}{won(row.금액)}
+                        </span>
+                        {row.종류 === 'exp' && row._row && (
+                          <button onClick={() => delExp(row._row!)} style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>삭제</button>
+                        )}
                       </div>
                     </div>
                   ))}
-                  <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 10, fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, color: '#64748b' }}>합계 {expItems.length}건</span>
-                    <span style={{ color: '#1e293b' }}>{won(total)}</span>
+                  {/* 월 합계 */}
+                  <div style={{ borderTop: '1px solid #e2e8f0', marginTop: 8, paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b' }}>
+                      <span>매출 {revItems.length}건</span><span style={{ color: '#059669', fontWeight: 600 }}>+{won(revTotal)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#64748b' }}>
+                      <span>지출 {(expItems||[]).length}건</span><span style={{ color: '#e0364a', fontWeight: 600 }}>−{won(expTotal)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, borderTop: '1px solid #f1f5f9', paddingTop: 6, marginTop: 2 }}>
+                      <span>순수지</span><span style={{ color: net >= 0 ? '#059669' : '#e0364a' }}>{net >= 0 ? '+' : '−'}{won(Math.abs(net))}</span>
+                    </div>
                   </div>
+                  {/* 지출 추가 폼 */}
                   <div style={{ marginTop: 14, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>+ 지출 추가</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                       <input className="ein" placeholder="날짜 (2026/06/26)" value={expForm.날짜} onChange={(e) => setExpForm({ ...expForm, 날짜: e.target.value })} />
-                      <input className="ein" placeholder="카테고리 (구독, 외주…)" value={expForm.카테고리} onChange={(e) => setExpForm({ ...expForm, 카테고리: e.target.value })} />
+                      <input className="ein" placeholder="카테고리" value={expForm.카테고리} onChange={(e) => setExpForm({ ...expForm, 카테고리: e.target.value })} />
                       <input className="ein" placeholder="지출 내용 *" value={expForm.지출내용} onChange={(e) => setExpForm({ ...expForm, 지출내용: e.target.value })} style={{ gridColumn: '1/-1' }} />
                       <input className="ein" placeholder="비용 *" value={expForm.비용} onChange={(e) => setExpForm({ ...expForm, 비용: e.target.value })} />
                       <input className="ein" placeholder="비고" value={expForm.비고} onChange={(e) => setExpForm({ ...expForm, 비고: e.target.value })} />
