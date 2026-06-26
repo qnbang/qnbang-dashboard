@@ -13,11 +13,13 @@ const ym = (v: unknown) => {
 };
 
 export interface Contract {
+  _row: number;        // 시트 행 번호 (수정/삭제용)
+  입금일full: string;   // 원본 날짜 문자열 (표시용)
   계약일: string; 계약명: string; 클라이언트: string;
   계약금액: number; 부가세: number; 공급가: number;
   입금상태: string; 입금일: string; 입금예정일: string; 입금액: number; 순매출: number;
   미수금: number;
-  미수종류: '받을예정' | '단순미수' | '';   // 미수 + 예정일 있으면 받을예정, 없으면 단순미수
+  미수종류: '받을예정' | '단순미수' | '';
 }
 export interface MoneyData {
   순매출누계: number;
@@ -31,13 +33,17 @@ export interface MoneyData {
   고정비목록: { 항목: string; 금액: number; 납부일: string; 종류: string }[];
 }
 
-// 시트 탭을 객체배열로 (헤더 행 기준)
+// 시트 탭을 객체배열로 (헤더 행 기준), _row = 실제 시트 행 번호
 function rows(sheet: unknown[][] | undefined): Record<string, unknown>[] {
   if (!Array.isArray(sheet) || sheet.length < 2) return [];
   const head = (sheet[0] as unknown[]).map((h) => String(h));
   return sheet.slice(1)
-    .filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''))
-    .map((r) => Object.fromEntries(head.map((h, i) => [h, (r as unknown[])[i]])));
+    .map((r, i) => {
+      const obj: Record<string, unknown> = Object.fromEntries(head.map((h, j) => [h, Array.isArray(r) ? (r as unknown[])[j] : undefined]));
+      obj['_row'] = i + 2; // 헤더=1행, 첫 데이터=2행
+      return obj;
+    })
+    .filter((r) => head.some((h) => h !== '_row' && String(r[h] ?? '').trim() !== ''));
 }
 
 export async function fetchMoneyData(): Promise<MoneyData> {
@@ -50,14 +56,17 @@ export async function fetchMoneyData(): Promise<MoneyData> {
     const 부가세 = num(r['부가세']);
     const 입금예정일 = ym(r['입금예정일']);
     const 미수금 = Math.max(0, 계약금액 - 입금액);
+    const 입금일raw = String(r['입금일'] ?? '');
     return {
+      _row: Number(r['_row']) || 0,
+      입금일full: 입금일raw,
       계약일: ym(r['계약일']),
       계약명: String(r['계약명'] ?? ''),
       클라이언트: String(r['클라이언트'] ?? ''),
       계약금액, 입금액, 부가세,
-      공급가: 부가세 > 0 ? 계약금액 - 부가세 : 계약금액,   // 관행=계약금액 VAT포함, 공급가=차감
+      공급가: 부가세 > 0 ? 계약금액 - 부가세 : 계약금액,
       입금상태: String(r['입금상태'] ?? ''),
-      입금일: ym(r['입금일']),
+      입금일: ym(입금일raw),
       입금예정일,
       순매출: num(r['순매출']),
       미수금,

@@ -8,6 +8,7 @@ import OfficeBoardView from './components/OfficeBoardView';
 import { renderMarkdown } from '@/lib/markdown';
 
 type Expense = {
+  _row: number;
   month: number;
   date: string;
   dateLabel: string;
@@ -162,6 +163,8 @@ export default function Home() {
 }
 
 type RevContract = {
+  _row: number;
+  입금일full: string;
   계약일: string; 계약명: string; 클라이언트: string;
   계약금액: number; 부가세: number; 공급가: number; 입금액: number; 미수금: number;
   입금상태: string; 입금일: string; 입금예정일: string; 미수종류: '받을예정' | '단순미수' | ''; 순매출: number;
@@ -178,120 +181,294 @@ function parseM(d: string) {
   return m ? parseInt(m[1]) : 0;
 }
 
-// 정산 탭 — 매출·지출 통합 목록, 월별 필터 + 전체/매출/지출 버튼
+// 날짜 문자열 → 폼 input[type=date] 용 ISO (YYYY-MM-DD)
+function toISO(s: string) {
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4}-\d{2}$/.test(s)) return `${s}-01`;
+  const n = s.replace(/[/.]/g, '-').replace(/\s/g, '');
+  return /^\d{4}-\d{1,2}-\d{1,2}$/.test(n) ? n.split('-').map((v, i) => i === 0 ? v : v.padStart(2, '0')).join('-') : s;
+}
+
+// 날짜 문자열 → 짧게 표시 (6/5 또는 6월)
+function fmtDate(s: string) {
+  if (!s) return '';
+  const m = s.replace(/[/.]/g, '-').match(/\d{4}-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${parseInt(m[1])}/${parseInt(m[2])}`;
+  const m2 = s.replace(/[/.]/g, '-').match(/\d{4}-(\d{1,2})/);
+  if (m2) return `${parseInt(m2[1])}월`;
+  return s;
+}
+
+// 정산 탭 — 매출·지출 통합, 수정 가능
 function FinanceView({ data, loading, error }: { data: DashboardData | null; loading: boolean; error: string }) {
   const [money, setMoney] = useState<RevMoney | null>(null);
   const [moneyLoading, setMoneyLoading] = useState(true);
   const [moneyErr, setMoneyErr] = useState('');
+  const [localExp, setLocalExp] = useState<Expense[] | null>(null);
   const [filter, setFilter] = useState<'all' | 'rev' | 'exp'>('all');
   const [selMonth, setSelMonth] = useState<'all' | number>('all');
+  const [panel, setPanel] = useState<{ isNew: boolean; formType: 'rev' | 'exp'; rowNum?: number; monthStr?: string } | null>(null);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  const reloadMoney = () => {
+    setMoneyLoading(true);
     fetch('/api/office').then(r => r.json()).then(j => {
       if (j.ok) setMoney(j.money);
-      else setMoneyErr(j.error || '매출 불러오기 실패');
-    }).catch(e => setMoneyErr(String(e))).finally(() => setMoneyLoading(false));
-  }, []);
+    }).catch(console.error).finally(() => setMoneyLoading(false));
+  };
+
+  const reloadExp = async () => {
+    const j = await fetch('/api/data').then(r => r.json()).catch(() => null);
+    if (j?.ok) setLocalExp(j.data.expenses);
+  };
+
+  useEffect(() => { reloadMoney(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading || !data || moneyLoading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
   if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
 
-  type Row = { date: string; label: string; extra: string; amount: number; type: 'rev' | 'exp'; month: number };
+  const expenses = localExp ?? (data.expenses || []);
+
+  type Row = {
+    date: string; dateFull: string; label: string; extra: string;
+    amount: number; type: 'rev' | 'exp'; month: number;
+    _rowNum: number; _monthStr: string; _cat: string; _note: string;
+    _client: string; _status: string; _contractDate: string;
+  };
 
   const revRows: Row[] = (money?.계약목록 || [])
     .filter(c => c.입금액 > 0)
     .map(c => ({
-      date: (c.입금일 || '').replace(/\.\s*/g, '-').replace(/-$/, '').trim(),
-      label: c.계약명,
-      extra: c.클라이언트 || '',
-      amount: c.입금액,
-      type: 'rev',
-      month: parseM(c.입금일 || ''),
+      date: fmtDate(c.입금일full || c.입금일),
+      dateFull: c.입금일full || c.입금일,
+      label: c.계약명, extra: c.클라이언트 || '',
+      amount: c.입금액, type: 'rev',
+      month: parseM(c.입금일full || c.입금일),
+      _rowNum: c._row, _monthStr: '', _cat: '', _note: '',
+      _client: c.클라이언트, _status: c.입금상태, _contractDate: c.계약일,
     }));
 
-  const expRows: Row[] = (data.expenses || []).map(e => ({
-    date: e.date,
-    label: e.content,
-    extra: e.category,
-    amount: e.cost,
-    type: 'exp',
+  const expRows: Row[] = expenses.map(e => ({
+    date: fmtDate(e.date) || e.dateLabel,
+    dateFull: e.date,
+    label: e.content, extra: e.category,
+    amount: e.cost, type: 'exp',
     month: e.month,
+    _rowNum: e._row, _monthStr: `${e.month}월`, _cat: e.category, _note: e.note,
+    _client: '', _status: '', _contractDate: '',
   }));
 
   const allMonths = Array.from(new Set([
-    ...revRows.map(r => r.month),
-    ...expRows.map(r => r.month),
+    ...revRows.map(r => r.month), ...expRows.map(r => r.month),
   ].filter(m => m > 0))).sort((a, b) => a - b);
 
   const filtRev = selMonth === 'all' ? revRows : revRows.filter(r => r.month === selMonth);
   const filtExp = selMonth === 'all' ? expRows : expRows.filter(r => r.month === selMonth);
-
   const revTotal = filtRev.reduce((s, r) => s + r.amount, 0);
   const expTotal = filtExp.reduce((s, r) => s + r.amount, 0);
   const net = revTotal - expTotal;
 
-  const combined = [...filtRev, ...filtExp].sort((a, b) => b.date.localeCompare(a.date));
+  const combined = [...filtRev, ...filtExp].sort((a, b) => b.dateFull.localeCompare(a.dateFull));
   const shown = filter === 'all' ? combined : combined.filter(r => r.type === filter);
 
+  const openAdd = (formType: 'rev' | 'exp') => {
+    const curM = selMonth === 'all' ? new Date().getMonth() + 1 : selMonth;
+    setForm({ monthStr: `${curM}월`, status: '입금완료' });
+    setPanel({ isNew: true, formType });
+  };
+
+  const openEdit = (row: Row) => {
+    setForm({
+      date: toISO(row.dateFull || row.date),
+      label: row.label, client: row._client,
+      amount: String(row.amount), cat: row._cat,
+      status: row._status || '입금완료', note: row._note,
+      monthStr: row._monthStr,
+      contractDate: toISO(row._contractDate),
+    });
+    setPanel({ isNew: false, formType: row.type, rowNum: row._rowNum, monthStr: row._monthStr });
+  };
+
+  const handleSave = async () => {
+    if (!panel) return;
+    setSaving(true);
+    try {
+      if (panel.formType === 'exp') {
+        const body: Record<string, string | number> = {
+          month: form.monthStr || panel.monthStr || '1월',
+          날짜: form.date || '', 카테고리: form.cat || '',
+          지출내용: form.label || '', 비용: Number(form.amount) || 0, 비고: form.note || '',
+        };
+        if (!panel.isNew) body.rowNum = panel.rowNum!;
+        await fetch('/api/office/expense', { method: panel.isNew ? 'POST' : 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+      } else {
+        const body: Record<string, string | number> = {
+          계약일: form.contractDate || '', 계약명: form.label || '',
+          클라이언트: form.client || '', 입금상태: form.status || '입금완료',
+          입금일: form.date || '', 입금액: Number(form.amount) || 0, 비고: form.note || '',
+        };
+        if (!panel.isNew) body.rowNum = panel.rowNum!;
+        await fetch('/api/office/revenue', { method: panel.isNew ? 'POST' : 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+      }
+      setPanel(null);
+      await Promise.all([reloadMoney(), reloadExp()]);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (row: Row) => {
+    if (!confirm(`"${row.label}" 삭제할까요?`)) return;
+    if (row.type === 'exp') {
+      await fetch('/api/office/expense', { method: 'DELETE', body: JSON.stringify({ month: row._monthStr, rowNum: row._rowNum }), headers: { 'Content-Type': 'application/json' } });
+    } else {
+      await fetch('/api/office/revenue', { method: 'DELETE', body: JSON.stringify({ rowNum: row._rowNum }), headers: { 'Content-Type': 'application/json' } });
+    }
+    await Promise.all([reloadMoney(), reloadExp()]);
+  };
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <select value={String(selMonth)}
-          onChange={e => setSelMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500">
-          <option value="all">올해 전체</option>
-          {allMonths.map(m => <option key={m} value={m}>{m}월</option>)}
-        </select>
-        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-          {([['all', '전체'], ['rev', '매출만'], ['exp', '지출만']] as const).map(([k, label]) => (
-            <button key={k} onClick={() => setFilter(k)}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${filter === k ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
-              {label}
-            </button>
-          ))}
+    <>
+      <div className="space-y-4">
+        {/* 상단 스코어카드 */}
+        <div className="grid grid-cols-3 gap-3">
+          <Scorecard label="순매출" value={won(revTotal)} sub={`${filtRev.length}건`} tone="text-emerald-600" />
+          <Scorecard label="순지출" value={won(expTotal)} sub={`${filtExp.length}건`} tone="text-slate-700" />
+          <Scorecard label="손익" value={won(net)} sub={net >= 0 ? '흑자' : '적자'} tone={net >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
+        </div>
+
+        {/* 필터 바 + 추가 버튼 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={String(selMonth)}
+            onChange={e => setSelMonth(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none focus:border-indigo-500">
+            <option value="all">올해 전체</option>
+            {allMonths.map(m => <option key={m} value={m}>{m}월</option>)}
+          </select>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+            {([['all', '전체'], ['rev', '매출'], ['exp', '지출']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setFilter(k)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${filter === k ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="ml-auto flex gap-2">
+            <button onClick={() => openAdd('rev')} className="text-sm px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">+ 매출</button>
+            <button onClick={() => openAdd('exp')} className="text-sm px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50">+ 지출</button>
+          </div>
+        </div>
+
+        {moneyErr && <p className="text-rose-500 text-sm">⚠️ 매출 오류: {moneyErr}</p>}
+
+        {/* 테이블 */}
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-400 border-b border-slate-100 bg-slate-50">
+                <th className="py-2 px-3 font-medium w-14">날짜</th>
+                <th className="py-2 px-3 font-medium">내용</th>
+                <th className="py-2 px-3 font-medium">분류</th>
+                <th className="py-2 px-3 font-medium text-right">금액</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.length === 0 && (
+                <tr><td colSpan={4} className="py-10 text-center text-slate-400">내역이 없어요.</td></tr>
+              )}
+              {shown.map((r, i) => (
+                <tr key={i} className="group border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                  <td className="py-2 px-3 text-slate-400 text-xs whitespace-nowrap">{r.date || '—'}</td>
+                  <td className="py-2 px-3 text-slate-700">{r.label}</td>
+                  <td className="py-2 px-3">
+                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${r.type === 'rev' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {r.type === 'rev' ? '매출' : '지출'}{r.extra ? ` · ${r.extra}` : ''}
+                    </span>
+                  </td>
+                  <td className="py-2 px-3 text-right whitespace-nowrap">
+                    <span className={`font-medium ${r.type === 'rev' ? 'text-emerald-600' : 'text-slate-700'}`}>
+                      {r.type === 'rev' ? '+' : ''}{won(r.amount)}
+                    </span>
+                    <span className="hidden group-hover:inline-flex gap-1 ml-2 align-middle">
+                      <button onClick={() => openEdit(r)} className="text-xs text-slate-400 hover:text-indigo-600 px-1 py-0.5 rounded hover:bg-indigo-50">편집</button>
+                      <button onClick={() => handleDelete(r)} className="text-xs text-slate-400 hover:text-rose-500 px-1 py-0.5 rounded hover:bg-rose-50">삭제</button>
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <Scorecard label="매출 합계" value={won(revTotal)} sub={`${filtRev.length}건`} tone="text-emerald-600" />
-        <Scorecard label="지출 합계" value={won(expTotal)} sub={`${filtExp.length}건`} tone="text-slate-700" />
-        <Scorecard label="손익" value={won(net)} sub={net >= 0 ? '흑자' : '적자'} tone={net >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
-      </div>
-
-      {moneyErr && <p className="text-rose-500 text-sm">⚠️ 매출 데이터 오류: {moneyErr}</p>}
-
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-slate-400 border-b border-slate-100 bg-slate-50">
-              <th className="py-2 px-3 font-medium">날짜</th>
-              <th className="py-2 px-3 font-medium">내용</th>
-              <th className="py-2 px-3 font-medium">분류</th>
-              <th className="py-2 px-3 font-medium text-right">금액</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.length === 0 && (
-              <tr><td colSpan={4} className="py-10 text-center text-slate-400">이 기간에 내역이 없어요.</td></tr>
-            )}
-            {shown.map((r, i) => (
-              <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
-                <td className="py-2 px-3 text-slate-500 whitespace-nowrap text-xs">{r.date || '날짜 없음'}</td>
-                <td className="py-2 px-3 text-slate-700">{r.label}</td>
-                <td className="py-2 px-3">
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap ${r.type === 'rev' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {r.type === 'rev' ? '매출' : '지출'}{r.extra ? ` · ${r.extra}` : ''}
-                  </span>
-                </td>
-                <td className={`py-2 px-3 text-right font-medium whitespace-nowrap ${r.type === 'rev' ? 'text-emerald-600' : 'text-slate-700'}`}>
-                  {r.type === 'rev' ? '+' : ''}{won(r.amount)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {/* 편집 패널 */}
+      {panel && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/20" onClick={() => setPanel(null)} />
+          <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-semibold text-slate-800 text-sm">
+                {panel.isNew ? '추가' : '수정'} — {panel.formType === 'rev' ? '매출' : '지출'}
+              </h3>
+              <button onClick={() => setPanel(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {panel.formType === 'exp' ? (
+                <>
+                  {panel.isNew && (
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">월</label>
+                      <select value={form.monthStr || ''} onChange={e => setF('monthStr', e.target.value)}
+                        className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm">
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                          <option key={m} value={`${m}월`}>{m}월</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {[['date', '날짜', 'date'], ['cat', '카테고리', 'text'], ['label', '내용', 'text'], ['amount', '금액', 'number'], ['note', '비고', 'text']].map(([k, lbl, t]) => (
+                    <div key={k}>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">{lbl}</label>
+                      <input type={t} value={form[k] || ''} onChange={e => setF(k, e.target.value)}
+                        className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400" />
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {[['contractDate', '계약일', 'date'], ['label', '계약명', 'text'], ['client', '클라이언트', 'text'], ['date', '입금일', 'date'], ['amount', '입금액', 'number'], ['note', '비고', 'text']].map(([k, lbl, t]) => (
+                    <div key={k}>
+                      <label className="text-xs font-medium text-slate-500 block mb-1">{lbl}</label>
+                      <input type={t} value={form[k] || ''} onChange={e => setF(k, e.target.value)}
+                        className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400" />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">입금상태</label>
+                    <select value={form.status || '입금완료'} onChange={e => setF('status', e.target.value)}
+                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm">
+                      {['입금완료', '부분입금', '입금대기', '협의중'].map(s => <option key={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 flex gap-2">
+              <button onClick={handleSave} disabled={saving}
+                className="flex-1 rounded-lg bg-indigo-600 text-white text-sm py-2 font-medium hover:bg-indigo-700 disabled:opacity-50">
+                {saving ? '저장 중…' : '저장'}
+              </button>
+              <button onClick={() => setPanel(null)}
+                className="px-3 rounded-lg border border-slate-200 text-slate-500 text-sm hover:bg-slate-50">취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

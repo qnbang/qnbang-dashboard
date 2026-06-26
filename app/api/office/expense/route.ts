@@ -61,6 +61,25 @@ export async function POST(req: Request) {
   }
 }
 
+// PATCH { month, rowNum, 날짜, 카테고리, 지출내용, 비용, 비고 } → 행 업데이트
+export async function PATCH(req: Request) {
+  try {
+    if (!SHEET_ID || !SA_JSON) return NextResponse.json({ ok: false, error: '설정 누락' }, { status: 500 });
+    const { month, rowNum, 날짜, 카테고리, 지출내용, 비용, 비고 } = await req.json().catch(() => ({}));
+    if (!MONTHS.includes(month) || !rowNum) return NextResponse.json({ ok: false, error: 'month·rowNum 필요' }, { status: 400 });
+    const sheets = api();
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID!, range: `${month}!A${rowNum}:F${rowNum}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[날짜 || '', 카테고리 || '', 지출내용 || '', String(비용 || 0), 비고 || '', '']] },
+    });
+    invalidateSheets();
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}
+
 // DELETE { month, rowNum }  → 행 삭제
 export async function DELETE(req: Request) {
   try {
