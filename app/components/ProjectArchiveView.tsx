@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 
-type Proj = { name: string; client: string; 분류: '자체' | '대행'; 계약: number; 입금: number; 미수: number; 건: number; 월: string; 작업: string; 상태: string };
+type Proj = { name: string; client: string; 분류: '자체' | '대행'; 계약: number; 입금: number; 미수: number; 건: number; 월: string; 작업: string; 상태: string; 링크: string };
 type Month = { 월: string; label: string; 계약: number; 입금: number; 미수: number; projects: Proj[] };
 type Archive = { months: Month[]; 연도흐름: { 월: string; 입금: number; 미수: number }[]; source: string };
 
@@ -116,7 +116,20 @@ export default function ProjectArchiveView() {
                     <div className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-dashed border-slate-200 leading-relaxed">
                       <div><b className="text-slate-600">개요</b> {p.client || '자체'} · 계약 {won(p.계약)} · {p.건}건{p.상태 ? ` · ${p.상태}` : ''}</div>
                       <div className="mt-1"><b className="text-slate-600">작업</b> {p.작업 ? p.작업.replace(/;/g, ' › ').slice(0, 120) : '— (과업 시트에 작업 기록이 없어요)'}</div>
-                      <div className="mt-1 text-slate-400"><b className="text-slate-600">자료</b> 드라이브 폴더 · 작업로그 (2차 연동 예정)</div>
+                      <div className="mt-1">
+                        <b className="text-slate-600">자료</b>{' '}
+                        {p.링크 ? (
+                          p.링크.split(/[\s,]+/).filter(Boolean).map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                              className="inline-block mr-2 text-blue-500 underline hover:text-blue-700"
+                              onClick={(e) => e.stopPropagation()}>
+                              {url.includes('drive.google') ? '📁 드라이브' : url.includes('figma') ? '🎨 피그마' : `🔗 링크${i + 1}`}
+                            </a>
+                          ))
+                        ) : (
+                          <span className="text-slate-400">— 과업 시트 메모 칸에 드라이브/피그마 URL 넣으면 연결됩니다</span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

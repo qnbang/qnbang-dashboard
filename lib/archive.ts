@@ -31,6 +31,7 @@ export interface ArchiveProject {
   월: string;          // YYYY-MM (계약일 기준)
   작업: string;        // 과업 시트 할일/현재상태 (작업 내역)
   상태: string;        // 진행 단계
+  링크: string;        // 과업 시트 메모 칼럼 (드라이브/피그마 등 URL)
 }
 export interface ArchiveMonth { 월: string; label: string; 계약: number; 입금: number; 미수: number; projects: ArchiveProject[]; }
 export interface ArchiveData {
@@ -58,6 +59,7 @@ export async function buildArchive(): Promise<ArchiveData> {
   const 과업목록 = 과업.map((t) => ({
     프로젝트: t['프로젝트'] || t['과업명'] || '', 고객: t['고객'] || '',
     작업: t['할일'] || t['다음할일'] || '', 상태: t['현재상태'] || '',
+    링크: t['메모'] || '',
   })).filter((t) => t.프로젝트);
   const STOP = new Set(['디자인', '제작', '개발', '작업', '대행', '프로젝트', '보고서', '인쇄', '발주', '정기', '콘텐츠', '브랜딩', '리서치', '키비주얼', '제안서']);
   const toks = (s: string) => (String(s).match(/[가-힣]{2,}|[A-Za-z]{3,}/g) || []).filter((w) => !STOP.has(w));
@@ -66,10 +68,10 @@ export async function buildArchive(): Promise<ArchiveData> {
     for (const t of 과업목록) {
       const P = toks(t.프로젝트 + ' ' + t.고객);
       if (P.some((p) => T.some((x) => x === p || (x.length >= 3 && p.includes(x)) || (p.length >= 3 && x.includes(p))))) {
-        return { 작업: t.작업, 상태: t.상태 };
+        return { 작업: t.작업, 상태: t.상태, 링크: t.링크 };
       }
     }
-    return { 작업: '', 상태: '' };
+    return { 작업: '', 상태: '', 링크: '' };
   };
 
   // 매출을 프로젝트(본명)로 묶기
@@ -93,7 +95,7 @@ export async function buildArchive(): Promise<ArchiveData> {
   // 미수·작업 채우기
   const projects = [...map.values()].map((p) => {
     const w = 작업of(p.name, p.client);
-    return { ...p, 미수: Math.max(0, p.계약 - p.입금), 작업: w.작업, 상태: w.상태 };
+    return { ...p, 미수: Math.max(0, p.계약 - p.입금), 작업: w.작업, 상태: w.상태, 링크: w.링크 };
   });
 
   // 월별 그룹핑 (계약월 없으면 '미정')
