@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react';
 
-type Proj = { name: string; client: string; 분류: '자체' | '대행'; 계약: number; 입금: number; 미수: number; 건: number; 월: string; 작업: string; 상태: string; 링크: string };
+type Proj = { name: string; client: string; 분류: '자체' | '대행'; 계약: number; 입금: number; 미수: number; 건: number; 월: string; 작업: string; 상태: string; 링크: string; noRevenue?: boolean };
 type Month = { 월: string; label: string; 계약: number; 입금: number; 미수: number; projects: Proj[] };
 type Archive = { months: Month[]; 연도흐름: { 월: string; 입금: number; 미수: number }[]; source: string };
 
@@ -21,6 +21,9 @@ export default function ProjectArchiveView() {
   const [err, setErr] = useState('');
   const [open, setOpen] = useState<string | null>(null);  // 펼친 카드 key
   const [filter, setFilter] = useState<'all' | '대행' | '자체'>('all');
+  const [revForm, setRevForm] = useState<string | null>(null);  // 매출 입력 폼 열린 카드 key
+  const [revInput, setRevInput] = useState({ 계약금액: '', 분류: '대행', 입금상태: '입금완료', 계약일: '' });
+  const [revBusy, setRevBusy] = useState(false);
 
   useEffect(() => {
     fetch('/api/archive').then((r) => r.json()).then((j) => {
@@ -97,39 +100,100 @@ export default function ProjectArchiveView() {
               const isOpen = open === key;
               return (
                 <div key={key} onClick={() => setOpen(isOpen ? null : key)}
-                  className={`bg-white border rounded-md p-3 cursor-pointer transition hover:shadow-md ${p.미수 > 0 ? 'border-l-[3px] border-l-red-500 border-slate-200' : 'border-slate-200'}`}>
+                  className={`border rounded-md p-3 cursor-pointer transition hover:shadow-md ${p.noRevenue ? 'bg-slate-50 border-dashed border-slate-300' : p.미수 > 0 ? 'bg-white border-l-[3px] border-l-red-500 border-slate-200' : 'bg-white border-slate-200'}`}>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded ${p.분류 === '자체' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-600'}`}>
                       {p.분류 === '자체' ? '🏢 자체' : '🤝 대행'}
                     </span>
-                    {/* 프로젝트는 전체 계약금액 기준 — 미수 있으면 입금/전체(예: 55만/110만) */}
-                    {p.미수 > 0
-                      ? <span className="text-[14px] font-extrabold"><span className="text-emerald-600">{won(p.입금)}</span><span className="text-slate-400 font-bold">/{won(p.계약)}</span></span>
-                      : <span className="text-[14px] font-extrabold text-emerald-600">{won(p.계약)}</span>}
+                    {p.noRevenue
+                      ? <span className="text-[11px] text-slate-400 font-medium">💡 매출 미입력</span>
+                      : p.미수 > 0
+                        ? <span className="text-[14px] font-extrabold"><span className="text-emerald-600">{won(p.입금)}</span><span className="text-slate-400 font-bold">/{won(p.계약)}</span></span>
+                        : <span className="text-[14px] font-extrabold text-emerald-600">{won(p.계약)}</span>}
                   </div>
                   <div className="text-[13.5px] font-bold leading-snug mb-1 text-slate-800">{p.name}</div>
                   <div className="text-[11.5px] text-slate-500">
                     {p.client}{p.client ? ' · ' : ''}
-                    {p.미수 > 0 ? <span className="text-red-600 font-semibold">미수 {won(p.미수)}</span> : <span className="text-emerald-600 font-semibold">완납</span>}
+                    {p.noRevenue
+                      ? <span className="text-slate-400">완수됨 · 매출 미기록</span>
+                      : p.미수 > 0 ? <span className="text-red-600 font-semibold">미수 {won(p.미수)}</span> : <span className="text-emerald-600 font-semibold">완납</span>}
                   </div>
                   {isOpen && (
                     <div className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-dashed border-slate-200 leading-relaxed">
-                      <div><b className="text-slate-600">개요</b> {p.client || '자체'} · 계약 {won(p.계약)} · {p.건}건{p.상태 ? ` · ${p.상태}` : ''}</div>
-                      <div className="mt-1"><b className="text-slate-600">작업</b> {p.작업 ? p.작업.replace(/;/g, ' › ').slice(0, 120) : '— (과업 시트에 작업 기록이 없어요)'}</div>
-                      <div className="mt-1">
-                        <b className="text-slate-600">자료</b>{' '}
-                        {p.링크 ? (
-                          p.링크.split(/[\s,]+/).filter(Boolean).map((url, i) => (
-                            <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                              className="inline-block mr-2 text-blue-500 underline hover:text-blue-700"
-                              onClick={(e) => e.stopPropagation()}>
-                              {url.includes('drive.google') ? '📁 드라이브' : url.includes('figma') ? '🎨 피그마' : `🔗 링크${i + 1}`}
-                            </a>
-                          ))
-                        ) : (
-                          <span className="text-slate-400">— 과업 시트 메모 칸에 드라이브/피그마 URL 넣으면 연결됩니다</span>
-                        )}
-                      </div>
+                      {p.noRevenue ? (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <div className="mb-2 text-slate-500">계약 정보를 입력하면 매출 집계에 포함됩니다.</div>
+                          {revForm === key ? (
+                            <div className="flex flex-col gap-1.5">
+                              <div className="flex gap-1.5">
+                                <input type="number" placeholder="계약금액 (원)" value={revInput.계약금액}
+                                  onChange={(e) => setRevInput((v) => ({ ...v, 계약금액: e.target.value }))}
+                                  className="flex-1 border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700 min-w-0" />
+                                <input type="date" value={revInput.계약일}
+                                  onChange={(e) => setRevInput((v) => ({ ...v, 계약일: e.target.value }))}
+                                  className="border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700" />
+                              </div>
+                              <div className="flex gap-1.5">
+                                <select value={revInput.분류} onChange={(e) => setRevInput((v) => ({ ...v, 분류: e.target.value }))}
+                                  className="flex-1 border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700">
+                                  <option value="대행">대행</option><option value="자체">자체</option>
+                                </select>
+                                <select value={revInput.입금상태} onChange={(e) => setRevInput((v) => ({ ...v, 입금상태: e.target.value }))}
+                                  className="flex-1 border border-slate-300 rounded px-2 py-1 text-[11px] text-slate-700">
+                                  <option value="입금완료">입금완료</option><option value="입금대기">입금대기</option>
+                                </select>
+                              </div>
+                              <div className="flex gap-1.5">
+                                <button disabled={revBusy || !revInput.계약금액}
+                                  onClick={async () => {
+                                    setRevBusy(true);
+                                    const amt = Number(revInput.계약금액) || 0;
+                                    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+                                    const res = await fetch('/api/office/revenue', {
+                                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        계약명: p.name, 클라이언트: p.client, 계약금액: amt, 분류: revInput.분류,
+                                        입금상태: revInput.입금상태, 계약일: revInput.계약일 || today,
+                                        입금일: revInput.입금상태 === '입금완료' ? today : '',
+                                        입금액: revInput.입금상태 === '입금완료' ? amt : 0,
+                                        순매출: revInput.입금상태 === '입금완료' ? amt : 0,
+                                      }),
+                                    }).then((r) => r.json()).catch(() => ({ ok: false }));
+                                    setRevBusy(false);
+                                    if (res.ok) { setRevForm(null); fetch('/api/archive').then((r) => r.json()).then((j) => { if (j.ok) setData(j.archive); }); }
+                                    else alert('저장 실패: ' + (res.error || ''));
+                                  }}
+                                  className="flex-1 bg-slate-700 text-white text-[11px] rounded py-1 disabled:opacity-50">
+                                  {revBusy ? '저장 중…' : '💾 저장'}
+                                </button>
+                                <button onClick={() => setRevForm(null)} className="px-3 text-[11px] text-slate-400 border border-slate-200 rounded py-1">취소</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setRevForm(key); setRevInput({ 계약금액: '', 분류: '대행', 입금상태: '입금완료', 계약일: '' }); }}
+                              className="text-[11px] text-blue-600 underline">💡 계약 정보 입력하기</button>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div><b className="text-slate-600">개요</b> {p.client || '자체'} · 계약 {won(p.계약)} · {p.건}건{p.상태 ? ` · ${p.상태}` : ''}</div>
+                          <div className="mt-1"><b className="text-slate-600">작업</b> {p.작업 ? p.작업.replace(/;/g, ' › ').slice(0, 120) : '— (과업 시트에 작업 기록이 없어요)'}</div>
+                          <div className="mt-1">
+                            <b className="text-slate-600">자료</b>{' '}
+                            {p.링크 ? (
+                              p.링크.split(/[\s,]+/).filter(Boolean).map((url, i) => (
+                                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                  className="inline-block mr-2 text-blue-500 underline hover:text-blue-700"
+                                  onClick={(e) => e.stopPropagation()}>
+                                  {url.includes('drive.google') ? '📁 드라이브' : url.includes('figma') ? '🎨 피그마' : `🔗 링크${i + 1}`}
+                                </a>
+                              ))
+                            ) : (
+                              <span className="text-slate-400">— 과업 시트 메모 칸에 드라이브/피그마 URL 넣으면 연결됩니다</span>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>

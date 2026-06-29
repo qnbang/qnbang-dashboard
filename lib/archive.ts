@@ -32,6 +32,7 @@ export interface ArchiveProject {
   작업: string;        // 과업 시트 할일/현재상태 (작업 내역)
   상태: string;        // 진행 단계
   링크: string;        // 과업 시트 메모 칼럼 (드라이브/피그마 등 URL)
+  noRevenue?: boolean; // 매출 시트 기록 없음 — 사무실 완수 카드만 있는 경우
 }
 export interface ArchiveMonth { 월: string; label: string; 계약: number; 입금: number; 미수: number; projects: ArchiveProject[]; }
 export interface ArchiveData {
@@ -54,6 +55,7 @@ export async function buildArchive(): Promise<ArchiveData> {
 
   const 매출 = objs(sh['매출']);
   const 과업 = objs(sh['과업']);
+  const 아카이브 = objs(sh['아카이브']);
 
   // 과업: 프로젝트명·고객 → 작업 내역. 매출 프로젝트명/클라이언트와 '핵심 단어'로 매칭(흔한 단어 제외)
   const 과업목록 = 과업.map((t) => ({
@@ -90,6 +92,25 @@ export async function buildArchive(): Promise<ArchiveData> {
     const mm = ym(c['계약일']);
     if (mm && (!cur.월 || mm < cur.월)) cur.월 = mm;  // 가장 이른 계약월
     map.set(base, cur);
+  }
+
+  // 아카이브(완수) 카드 중 매출 없는 것 추가
+  for (const a of 아카이브) {
+    const status = a['현재상태'] || '';
+    if (status.includes('폐기')) continue;
+    const base = baseName(a['프로젝트'] || a['과업명'] || '');
+    if (!base) continue;
+    // 기존 매출 프로젝트와 토큰 매칭 — 이미 있으면 스킵
+    const T = toks(base + ' ' + (a['고객'] || ''));
+    const matched = [...map.keys()].some((k) => {
+      const K = toks(k); return K.some((kw) => T.some((t) => t === kw || (t.length >= 3 && kw.includes(t)) || (kw.length >= 3 && t.includes(kw))));
+    });
+    if (matched) continue;
+    map.set('__arc__' + base, {
+      name: base, client: a['고객'] || '', 분류: '대행',
+      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: ym(a['갱신일']) || '',
+      작업: a['다음할일'] || a['할일'] || '', 상태: '완수', 링크: '', noRevenue: true,
+    });
   }
 
   // 미수·작업 채우기
