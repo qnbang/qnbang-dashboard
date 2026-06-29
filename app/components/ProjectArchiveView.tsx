@@ -170,7 +170,7 @@ export default function ProjectArchiveView() {
                               </div>
                             </div>
                           ) : (
-                            <button onClick={() => { setRevForm(key); setRevInput({ 계약금액: '', 분류: '대행', 입금상태: '입금완료', 계약일: '' }); }}
+                            <button onClick={() => { setRevForm(key); setRevInput({ 계약금액: '', 분류: p.분류, 입금상태: '입금완료', 계약일: '' }); }}
                               className="text-[11px] text-blue-600 underline">💡 계약 정보 입력하기</button>
                           )}
                         </div>

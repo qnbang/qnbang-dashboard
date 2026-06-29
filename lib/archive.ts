@@ -107,7 +107,7 @@ export async function buildArchive(): Promise<ArchiveData> {
     });
     if (matched) continue;
     map.set('__arc__' + base, {
-      name: base, client: a['고객'] || '', 분류: '대행',
+      name: base, client: a['고객'] || '', 분류: (a['고객'] ? '대행' : '자체') as '자체' | '대행',
       계약: 0, 입금: 0, 미수: 0, 건: 0, 월: ym(a['갱신일']) || '',
       작업: a['다음할일'] || a['할일'] || '', 상태: '완수', 링크: '', noRevenue: true,
     });
