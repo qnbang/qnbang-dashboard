@@ -90,7 +90,7 @@ export async function buildCRM(): Promise<CRMData> {
   for (const t of 과업) {
     const 공 = t['공위치'];
     if (공 === '완수' || 공 === '보류') continue;
-    if (t['돈종류'] === '투자') continue;
+    if (t['돈종류'] === '투자' || t['분류'] === '자체') continue; // 자체 프로젝트(반보 등)는 고객 아님 → CRM 제외
     const key = t['고객'].trim();
     if (!key) continue; // 고객명 없으면 CRM 제외
     const c = (byClient[key] ||= { 고객: key, 과업수: 0, 공위치: [], 담당: [], 이름들: [], _진행: false });
@@ -125,9 +125,11 @@ export async function buildCRM(): Promise<CRMData> {
 
   // ── 완수: 아카이브·입금완료 고객 중 진행/영업에 없는 곳 ──
   const 완수names = new Set<string>();
-  for (const t of 아카이브) { const k = (t['고객'] || t['프로젝트'] || '').trim(); if (k) 완수names.add(k); }
-  for (const c of 매출) { if (c['입금상태'] === '입금완료') { const k = (c['클라이언트'] || c['계약명']).trim(); if (k) 완수names.add(k); } }
+  // 고객명 있는 것만 = 완수 '고객'. 프로젝트명 폴백 제거(고객 없는 내부 프로젝트가 가짜 고객으로 둔갑하던 버그).
+  for (const t of 아카이브) { const k = (t['고객'] || '').trim(); if (k) 완수names.add(k); }
+  for (const c of 매출) { if (c['입금상태'] === '입금완료' && c['분류'] !== '자체') { const k = (c['클라이언트'] || '').trim(); if (k) 완수names.add(k); } }
   const 완수: CRMClient[] = [...완수names]
+    .filter((k) => !/^_|테스트|삭제예정|검증/.test(k)) // 테스트·삭제예정 등 잡 데이터 제외
     .filter((k) => ![...진행keys, ...영업keys].some((x) => same(x, k)))
     .map((k) => ({ 고객: k, 계약금액: 계약of(k), 미수: 미수of(k), 프로젝트들: 프로젝트들of(k) }))
     .sort((a, b) => (b.계약금액 ?? 0) - (a.계약금액 ?? 0));
