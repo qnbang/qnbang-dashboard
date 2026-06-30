@@ -505,16 +505,10 @@ function CRMView() {
   const [crm, setCrm] = useState<CRMD | null>(null);
   const [openClient, setOpenClient] = useState<string | null>(null); // 고객 클릭→프로젝트 펼침
   const [projDoc, setProjDoc] = useState<string | null>(null); // 프로젝트 클릭→문서 뷰
-  const [jache, setJache] = useState<ProjectRepo[]>([]); // 고객 없는 자체 프로젝트(GitHub)
   const [err, setErr] = useState('');
+  // 자체 프로젝트(깃)는 사무실 탭 "📂 진행 중 프로젝트"로 통합 — 여기선 고객 생애주기만.
   useEffect(() => {
     fetch('/api/crm').then((r) => r.json()).then((j) => { if (j.ok) setCrm(j.crm); else setErr(j.error || '불러오기 실패'); }).catch((e) => setErr(String(e)));
-    fetch('/api/git-projects').then((r) => r.json()).then((j) => {
-      if (!j.ok) return;
-      const raw = (j.projects as ProjectRepo[]).filter((p) => p.category !== '대행').sort((a, b) => (b.pushedAt || '').localeCompare(a.pushedAt || ''));
-      const seen = new Set<string>(); // ponytail: 제목 같으면 같은 프로젝트 repo 둘 → 최근 것만(정렬 후 첫 것)
-      setJache(raw.filter((p) => { const k = p.title.replace(/\s+/g, ''); if (seen.has(k)) return false; seen.add(k); return true; }));
-    }).catch(() => {});
   }, []);
   if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
   if (!crm) return <p className="text-slate-400 text-center py-10">고객 불러오는 중…</p>;
@@ -574,21 +568,6 @@ function CRMView() {
           </div>
         ))}
       </section>
-      {jache.length > 0 && (<>
-        <div className="text-sm font-bold text-slate-700 border-t pt-5 -mb-1">🏢 자체 프로젝트 <span className="font-normal text-slate-400">— 고객 없는 큐앤뱅 자체 ({jache.length}) · 최근순 · 누르면 문서</span></div>
-        <section className="rounded-xl border border-slate-200 divide-y divide-slate-100 overflow-hidden bg-white">
-          {jache.map((p) => (
-            <button key={p.repo} onClick={() => setProjDoc(p.title)} className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-indigo-50">
-              <span className="text-[13px] text-slate-700 truncate">{p.title}</span>
-              <span className="flex items-center gap-2 shrink-0">
-                {p.category && <span className="text-[10px] text-slate-400">{p.category}</span>}
-                {p.pushedAt && <span className="text-[10px] text-slate-300 tabular-nums">{p.pushedAt.slice(0, 10)}</span>}
-                <span className="text-slate-300 text-[10px]">📄</span>
-              </span>
-            </button>
-          ))}
-        </section>
-      </>)}
       {projDoc && <ProjectDocs name={projDoc} onClose={() => setProjDoc(null)} />}
     </div>
   );
@@ -966,10 +945,6 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-type ProjectRepo = {
-  repo: string; title: string; category?: string; manager?: string; startDate?: string; pushedAt: string; htmlUrl: string; driveFolderId?: string;
-  progressStatus?: string; contractStatus?: string; paymentStatus?: string; amount?: number; paidAmount?: number;
-};
 type Commit = { sha: string; message: string; date: string };
 type DocItem = { path: string; title: string; group: string };
 type OrgMember = { login: string; avatarUrl: string; htmlUrl: string };

@@ -12,8 +12,11 @@ type Task = {
   todos?: string[]; staleDays?: number | null; stale?: boolean;
   category?: string;
   memo?: string;
+  repo?: string;
   history?: { when: string; what: string }[];
 };
+// 깃 자동 프로젝트(읽기 전용) — /api/git-projects. 진행 중인 것만 사무실에 자동 표출(시트 안 씀=좀비 없음).
+type GitProj = { repo: string; title: string; manager?: string; progressStatus?: string; htmlUrl: string };
 // 분류별 색·이모지 — 카드 프로젝트명 색, 칩, 포트폴리오 공통.
 const CAT: Record<string, { c: string; e: string }> = {
   대행: { c: '#2563eb', e: '🤝' },     // 파랑 — 고객 일(매출)
@@ -220,6 +223,7 @@ function waitOn(t: { todos?: string[]; status?: string; owner?: string }): strin
 export default function OfficeBoardView() {
   const [office, setOffice] = useState<Office | null>(null);
   const [money, setMoney] = useState<Money | null>(null);
+  const [gitProjs, setGitProjs] = useState<GitProj[]>([]); // 깃 토픽 프로젝트(자동·읽기)
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState<'all' | 'jh' | 'jy' | 'out'>('all');
   const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
@@ -292,6 +296,10 @@ export default function OfficeBoardView() {
     try { const s = localStorage.getItem('qb-office'); if (s) { const d = JSON.parse(s); setOffice(d.office); setMoney(d.money); } } catch {}
     load();
   }, [load]);
+  // 깃 토픽 프로젝트 비동기 로드(사무실 초기 렌더 안 막음). 진행 중인 것만, 시트에 이미 있는 건(저장소 키) 제외하고 합친다.
+  useEffect(() => {
+    fetch('/api/git-projects').then((r) => r.json()).then((j) => { if (j.ok) setGitProjs(j.projects || []); }).catch(() => {});
+  }, []);
   // 패널 열 때 수정 입력칸 초기화(고객=실제 고객만, 프로젝트=프로젝트명, 과업명=자리표시 제외)
   useEffect(() => {
     if (sel) {
@@ -428,6 +436,16 @@ export default function OfficeBoardView() {
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
   const 도구들 = all.filter((t) => (t.category || '') === '도구');
+  // 깃 자동 프로젝트: 진행 중만, 시트에 이미 잡힌 건(저장소 키) 제외, 담당자 필터 적용. (시트에 안 씀 → 좀비 없음)
+  const 시트저장소 = new Set(all.map((t) => t.repo).filter(Boolean));
+  const 깃프로젝트 = gitProjs
+    .filter((p) => p.repo && !시트저장소.has(p.repo))
+    .filter((p) => !['완료', '폐기', '중단', '종료'].some((d) => (p.progressStatus || '').includes(d)))
+    .filter((p) => filter === 'all'
+      ? true
+      : filter === 'jh' ? (p.manager || '신종호') === '신종호'
+      : filter === 'jy' ? p.manager === '김지영'
+      : !!p.manager && p.manager !== '신종호' && p.manager !== '김지영');
   const byDday = (a: Task, b: Task) => (cardDday(a) ?? 9999) - (cardDday(b) ?? 9999); // 카드가 보여주는 D-day(단계날짜 우선) 임박순
   const inbox = board.filter((t) => t.ball === 'inbox').sort(byDday);
   const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
@@ -542,6 +560,16 @@ export default function OfficeBoardView() {
         <section className="room hold" {...dropTo('보류')}><div className="rh">⏸️ 보류 <span className="cnt">{hold.length}</span><span className="hint">멈춤</span></div>
           {hold.length ? hold.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
       </div>
+
+      {깃프로젝트.length > 0 && (<>
+        <div className="divider" style={{ color: '#2563eb' }}>📂 진행 중 프로젝트 (깃 자동) ({깃프로젝트.length}) · 푸시하면 자동 등장 · 누르면 깃</div>
+        <section className="room product"><div className="rowwrap">{깃프로젝트.map((p) => (
+          <a key={p.repo} href={p.htmlUrl} target="_blank" rel="noopener noreferrer" className="prodcard" style={{ cursor: 'pointer', textDecoration: 'none' }}>
+            <div className="pn" style={{ color: '#2563eb' }}>📂 {p.title}</div>
+            <div className="pnext">{[p.manager, p.progressStatus].filter(Boolean).join(' · ') || '진행 중'}</div>
+          </a>
+        ))}</div></section>
+      </>)}
 
       {cat === 'all' && filter !== 'jy' && (<>
         <div className="divider" style={{ color: CAT['도구'].c }}>🧰 도구 백로그 — 판매 제품 ({도구들.length}) · 누르면 설명·사용법</div>

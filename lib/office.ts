@@ -30,6 +30,7 @@ export interface OfficeTask {
   updatedAt: string;       // 갱신일(원본)
   staleDays: number | null; // 마지막 갱신 후 며칠(노화)
   stale: boolean;          // 공위치별 임계 넘겨 "썩는 공"인가
+  repo: string;            // 저장소(깃 repo slug) — 시트 칸. 깃 프로젝트와 연결·중복제거 키.
   history: { when: string; what: string }[]; // 🕘 이력(이력 탭에서, 최신순) — 여정 타임라인
 }
 export interface OfficeRoom { key: string; name: string; hint: string; tasks: OfficeTask[]; }
@@ -90,7 +91,7 @@ function roomOf(t: OfficeTask): string {
 type Seed = {
   id: string; project: string; task: string; owner: string;
   ball: string; due: string; money: string; customer: string; todos: string[];
-  status?: string; nextStep?: string; reason?: string; updatedAt?: string; category?: string; memo?: string;
+  status?: string; nextStep?: string; reason?: string; updatedAt?: string; category?: string; memo?: string; repo?: string;
   history?: { when: string; what: string }[];
 };
 
@@ -108,7 +109,7 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
       id: col('id'), project: col('프로젝트'), task: col('과업명'), owner: col('담당자'),
       pos: col('공위치'), due: col('기한'), money: col('돈종류'),
       customer: col('고객'), todos: col('할일'),
-      status: col('현재상태'), nextStep: col('다음할일'), reason: col('판정근거'), updatedAt: col('갱신일'), category: col('분류'), memo: col('메모'),
+      status: col('현재상태'), nextStep: col('다음할일'), reason: col('판정근거'), updatedAt: col('갱신일'), category: col('분류'), memo: col('메모'), repo: col('저장소'),
     };
 
     // 🕘 이력 탭 → 과업id별 이벤트(최신순). 탭 없으면 빈 history.
@@ -151,6 +152,7 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
         updatedAt: get(ci.updatedAt),
         category: get(ci.category),
         memo: get(ci.memo),
+        repo: get(ci.repo),
       });
     }
     return out.length ? out : null;
@@ -196,6 +198,7 @@ export async function buildOffice(): Promise<OfficeData> {
       reason: s.reason || '',
       updatedAt: s.updatedAt || '',
       staleDays, stale,
+      repo: s.repo || '',
       history: s.history || [],
     };
   });
