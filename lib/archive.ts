@@ -98,7 +98,7 @@ export async function buildArchive(): Promise<ArchiveData> {
   for (const a of 아카이브) {
     const status = a['현재상태'] || '';
     if (status.includes('폐기')) continue;
-    const base = baseName(a['프로젝트'] || a['과업명'] || '');
+    const base = baseName(a['프로젝트'] || '');  // 과업명 폴백 제거 — 명시된 프로젝트만
     if (!base) continue;
     // 기존 매출 프로젝트와 토큰 매칭 — 이미 있으면 스킵
     const T = toks(base + ' ' + (a['고객'] || ''));
@@ -118,7 +118,8 @@ export async function buildArchive(): Promise<ArchiveData> {
   for (const t of 과업) {
     const 공위치 = t['공위치'] || '';
     if (공위치 === '완수' || 공위치 === '보류') continue;
-    const base = baseName(t['프로젝트'] || t['과업명'] || '');
+    if (!t['계약여부'] || t['계약여부'] === '영업') continue;  // 계약 없는 운영성 과업 제외
+    const base = baseName(t['프로젝트'] || '');  // 과업명 폴백 제거
     if (!base || 과업프로젝트.has(base)) continue;
     과업프로젝트.set(base, t);
   }
