@@ -7,7 +7,36 @@ import HubView, { type Cfg, type Section } from './HubView';
 export const dynamic = 'force-dynamic';
 
 // 허브별 콘텐츠 — 현황판(체크리스트)은 SSOT에서, 바로가기·코멘트표는 여기서.
-const HUB: Record<string, Cfg & { statusRepo: string; statusPath: string }> = {
+//
+// ── 새 프로젝트 추가 표준(하드코딩 금지, 아래 키만 채우면 됨) ──────────────
+//   title/sub/deadline : 제목·한줄설명·기준일(D-day)
+//   role/footerText    : 상단 협업 표기·하단 푸터 (안 쓰면 씨투아/M650 기본)
+//   ddayLabel/ddayNote : 기준일 성격. 입찰=생략(기본 '제출 마감'), 행사='피크데이' 등
+//   coLabel            : 담당 범례의 협력사 이름 (기본 '씨투아', 사례별 '상인회' 등)
+//   statusRepo/Path    : 체크리스트 소스(깃 repo의 현황판.md). 없으면 작업순서 블록 자동 숨김
+//                        현황판 항목 담당 = 줄 앞 [큐앤뱅]/[상인회]/[협의] 태그
+//   nav                : 바로가기 카드. src = public/share/*.html 파일명 OR 공유슬러그(/share/<slug>)
+//                        → 회의록 등은 마크다운 공유문서로 두면 '공유된 문서' 탭에서 바로 수정 가능
+//   comments           : 코멘트→수정방법 표 (없으면 [])
+// ──────────────────────────────────────────────────────────────────────
+const HUB: Record<string, Cfg & { statusRepo?: string; statusPath?: string }> = {
+  mangwon: {
+    title: '망원 야간 보물찾기 — 기획',
+    sub: '마포구 야간·음식문화 활성화 지원사업. 골목 QR 보물찾기 + 영수증 빙고. 캠페인 기간 9/14(월)~9/20(일), 피크데이 9/19(토) 야간. 예산 2,000만원.',
+    deadline: '2026-09-19',
+    role: '큐앤뱅(QN!) × 망리단길골목형상점가 상인회',
+    footerText: '큐앤뱅(QN!) × 망리단길골목형상점가 상인회 · 망원 야간 보물찾기',
+    ddayLabel: '피크데이',
+    ddayNote: '(캠페인 기간 9/14~9/20 · 피크데이 9/19 야간)',
+    coLabel: '상인회',
+    statusRepo: 'qnbang-proj-mangwon',
+    statusPath: '현황판.md',
+    nav: [
+      // 회의록은 마크다운 공유문서(슬러그) — 대시보드 '공유된 문서' 탭에서 바로 수정 가능
+      { src: 'mangwon', title: '1차 기획 회의록 (6/29)', ic: '📝', t: '회의록', d: '6/29 1차 기획 미팅 정리', primary: true },
+    ],
+    comments: [],
+  },
   m650: {
     title: 'M650 탄광문화축제 — 제안서 디벨롭',
     sub: '11페이지 스토리라인(석탄이 6단계)을 축으로 제안서 전체를 정리하는 작업입니다. 진행 상황을 함께 관리합니다.',
@@ -51,7 +80,8 @@ function parseStatus(md: string): { sections: Section[]; done: number; total: nu
       const mark = m[1].toLowerCase();
       const state: Section['items'][number]['state'] = mark === 'x' ? 'done' : (mark === '~' || mark === '-') ? 'wait' : 'todo';
       let text = m[2].trim(); let who = '';
-      const w = text.match(/^\[(큐앤뱅|씨투아|협의)\]\s*/);
+      // 담당 태그 = 줄 앞 [한글/영문 2~6자] — 특정 회사명 하드코딩 없이 사례별 담당(큐앤뱅·상인회·협의 등) 인식
+      const w = text.match(/^\[([가-힣A-Za-z]{2,6})\]\s*/);
       if (w) { who = w[1]; text = text.slice(w[0].length); }
       cur.items.push({ state, who, text });
       total++; if (state === 'done') done++;
@@ -65,7 +95,7 @@ export default async function HubPage({ params }: { params: Promise<{ key: strin
   const { key } = await params;
   const cfg = HUB[key];
   if (!cfg) notFound();
-  const md = await getDoc(cfg.statusRepo, cfg.statusPath);
+  const md = cfg.statusRepo ? await getDoc(cfg.statusRepo, cfg.statusPath || '현황판.md') : '';
   const { sections, done, total } = parseStatus(md || '');
   return <HubView cfg={cfg} sections={sections} done={done} total={total} />;
 }

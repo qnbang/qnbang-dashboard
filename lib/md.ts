@@ -67,7 +67,20 @@ export function mdToHtml(src: string): string {
     }
 
     const li = line.match(/^\s*[-*]\s+(.+)$/);
-    if (li) { closeQuote(); if (!inList) { html += '<ul>\n'; inList = true; } html += `<li>${inline(li[1])}</li>\n`; i++; continue; }
+    if (li) {
+      closeQuote(); if (!inList) { html += '<ul>\n'; inList = true; }
+      // 체크리스트(- [ ]/[x]/[~]) → 이모지 체크박스. 줄 앞 [담당] 태그는 굵게.
+      const task = li[1].match(/^\[([ xX~-])\]\s*(.*)$/);
+      if (task) {
+        const m = task[1].toLowerCase();
+        const box = m === 'x' ? '✅' : (m === '~' || m === '-') ? '⏳' : '⬜';
+        const rest = inline(task[2]).replace(/^\[([^\]]{1,8})\]\s*/, '<strong>[$1]</strong> ');
+        html += `<li style="list-style:none;margin-left:-1.1em">${box} ${rest}</li>\n`;
+      } else {
+        html += `<li>${inline(li[1])}</li>\n`;
+      }
+      i++; continue;
+    }
 
     closeList(); closeQuote();
     html += `<p>${inline(line)}</p>\n`; i++;

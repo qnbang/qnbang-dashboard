@@ -7,7 +7,14 @@ import { useState, useEffect } from 'react';
 export type Item = { state: 'done' | 'wait' | 'todo'; who: string; text: string };
 export type Section = { name: string; items: Item[] };
 export type Nav = { src: string; title: string; ic: string; t: string; d: string; primary?: boolean };
-export type Cfg = { title: string; sub: string; deadline: string; nav: Nav[]; comments: string[][] };
+export type Cfg = {
+  title: string; sub: string; deadline: string; nav: Nav[]; comments: string[][];
+  role?: string;        // 상단 브랜드바 협업 표기 (기본: 씨투아)
+  footerText?: string;  // 하단 푸터 문구
+  ddayLabel?: string;   // D-day 박스 라벨 (기본: '제출 마감' / 행사면 '행사 시작' 등)
+  ddayNote?: string;    // D-day 박스 보조 설명 (기본: 나라장터 입찰 연동)
+  coLabel?: string;     // 담당 범례의 협력사 이름 (기본: 씨투아 / 사례별 '상인회' 등)
+};
 
 export default function HubView({ cfg, sections, done, total }: { cfg: Cfg; sections: Section[]; done: number; total: number }) {
   const [modal, setModal] = useState<{ src: string; title: string } | null>(null);
@@ -26,19 +33,20 @@ export default function HubView({ cfg, sections, done, total }: { cfg: Cfg; sect
   }, []);
 
   const pct = total ? Math.round((done / total) * 100) : 0;
-  const whoCls = (w: string) => (w === '큐앤뱅' ? 'qn' : w === '씨투아' ? 'co' : w === '협의' ? 'both' : '');
+  // 담당 색상: 큐앤뱅=qn, 협의=both, 그 외(협력사 이름 무엇이든)=co — 특정 회사명 하드코딩 제거
+  const whoCls = (w: string) => (w === '큐앤뱅' ? 'qn' : w === '협의' ? 'both' : w ? 'co' : '');
 
   return (
     <div className="wrap">
       <style>{HUB_CSS}</style>
-      <div className="brandbar"><img src="/share/qn-logo.png" alt="큐앤뱅" /><span className="role">큐앤뱅(QN!) × 씨투아테크놀러지 협업</span></div>
+      <div className="brandbar"><img src="/share/qn-logo.png" alt="큐앤뱅" /><span className="role">{cfg.role ?? '큐앤뱅(QN!) × 씨투아테크놀러지 협업'}</span></div>
 
       <h1>{cfg.title}</h1>
       <p className="sub">{cfg.sub}</p>
 
       <div className="dday">
         <div className="big">{dday}</div>
-        <div className="txt"><b>제출 마감 {cfg.deadline.replace(/-/g, '. ')}</b> (나라장터 입찰 제출과 연동)</div>
+        <div className="txt"><b>{cfg.ddayLabel ?? '제출 마감'} {cfg.deadline.replace(/-/g, '. ')}</b> {cfg.ddayNote ?? '(나라장터 입찰 제출과 연동)'}</div>
       </div>
 
       <h2>바로가기</h2>
@@ -50,24 +58,28 @@ export default function HubView({ cfg, sections, done, total }: { cfg: Cfg; sect
         ))}
       </div>
 
-      <h2>작업 순서 <small style={{ color: '#999', fontWeight: 400, fontSize: 14 }}>— 현황판과 자동 동기화</small></h2>
-      <div className="prog"><i style={{ width: `${pct}%` }} /></div>
-      <p className="progtxt">진행률 {pct}% ({done}/{total} 완료)</p>
-      <p className="legend">담당: <span className="who qn">큐앤뱅</span> · <span className="who co">씨투아</span> · <span className="who both">협의</span></p>
+      {total > 0 && (
+        <>
+          <h2>작업 순서 <small style={{ color: '#999', fontWeight: 400, fontSize: 14 }}>— 현황판과 자동 동기화</small></h2>
+          <div className="prog"><i style={{ width: `${pct}%` }} /></div>
+          <p className="progtxt">진행률 {pct}% ({done}/{total} 완료)</p>
+          <p className="legend">담당: <span className="who qn">큐앤뱅</span> · <span className="who co">{cfg.coLabel ?? '씨투아'}</span> · <span className="who both">협의</span></p>
 
-      {sections.map((s) => (
-        <div className="step" key={s.name}>
-          <h3>{s.name}</h3>
-          <ul className="todo">
-            {s.items.map((it, i) => (
-              <li key={i} className={it.state === 'done' ? 'checked' : ''}>
-                <span className="mark">{it.state === 'done' ? '✅' : it.state === 'wait' ? '⏳' : '⬜'}</span>
-                <span>{it.who && <span className={`who ${whoCls(it.who)}`}>{it.who}</span>}{it.text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+          {sections.map((s) => (
+            <div className="step" key={s.name}>
+              <h3>{s.name}</h3>
+              <ul className="todo">
+                {s.items.map((it, i) => (
+                  <li key={i} className={it.state === 'done' ? 'checked' : ''}>
+                    <span className="mark">{it.state === 'done' ? '✅' : it.state === 'wait' ? '⏳' : '⬜'}</span>
+                    <span>{it.who && <span className={`who ${whoCls(it.who)}`}>{it.who}</span>}{it.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </>
+      )}
 
       {cfg.comments.length > 0 && (
         <>
@@ -79,7 +91,7 @@ export default function HubView({ cfg, sections, done, total }: { cfg: Cfg; sect
         </>
       )}
 
-      <div className="footer"><img src="/share/qn-logo.png" alt="큐앤뱅" /><p className="meta">큐앤뱅(QN!) × 씨투아테크놀러지 · M650 탄광문화축제 프로젝트 관리</p></div>
+      <div className="footer"><img src="/share/qn-logo.png" alt="큐앤뱅" /><p className="meta">{cfg.footerText ?? '큐앤뱅(QN!) × 씨투아테크놀러지 · M650 탄광문화축제 프로젝트 관리'}</p></div>
 
       {modal && (
         <div className="modal open" onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}>
