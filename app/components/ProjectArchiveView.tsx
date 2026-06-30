@@ -115,7 +115,7 @@ export default function ProjectArchiveView() {
                   <div className="text-[11.5px] text-slate-500">
                     {p.client}{p.client ? ' · ' : ''}
                     {p.noRevenue
-                      ? <span className="text-slate-400">완수됨 · 매출 미기록</span>
+                      ? <span className="text-slate-400">{p.상태 === '완수' ? '완수됨 · 매출 미기록' : `${p.상태} · 매출 미기록`}</span>
                       : p.미수 > 0 ? <span className="text-red-600 font-semibold">미수 {won(p.미수)}</span> : <span className="text-emerald-600 font-semibold">완납</span>}
                   </div>
                   {isOpen && (

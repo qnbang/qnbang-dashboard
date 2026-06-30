@@ -113,6 +113,29 @@ export async function buildArchive(): Promise<ArchiveData> {
     });
   }
 
+  // 과업(진행 중) 중 매출 없는 것 추가 — 완수·보류 제외, 프로젝트명으로 묶어 대표 1행
+  const 과업프로젝트 = new Map<string, Record<string, string>>();
+  for (const t of 과업) {
+    const 공위치 = t['공위치'] || '';
+    if (공위치 === '완수' || 공위치 === '보류') continue;
+    const base = baseName(t['프로젝트'] || t['과업명'] || '');
+    if (!base || 과업프로젝트.has(base)) continue;
+    과업프로젝트.set(base, t);
+  }
+  for (const [base, t] of 과업프로젝트) {
+    const T = toks(base + ' ' + (t['고객'] || ''));
+    const matched = [...map.keys()].some((k) => {
+      const K = toks(k.replace(/^__(?:arc|wip)__/, ''));
+      return K.some((kw) => T.some((x) => x === kw || (x.length >= 3 && kw.includes(x)) || (kw.length >= 3 && x.includes(kw))));
+    });
+    if (matched) continue;
+    map.set('__wip__' + base, {
+      name: base, client: t['고객'] || '', 분류: (t['고객'] ? '대행' : '자체') as '자체' | '대행',
+      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: ym(t['갱신일']) || '',
+      작업: t['다음할일'] || t['할일'] || '', 상태: t['공위치'] || '진행 중', 링크: t['메모'] || '', noRevenue: true,
+    });
+  }
+
   // 미수·작업 채우기
   const projects = [...map.values()].map((p) => {
     const w = 작업of(p.name, p.client);
