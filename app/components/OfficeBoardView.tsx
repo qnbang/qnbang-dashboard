@@ -436,10 +436,11 @@ export default function OfficeBoardView() {
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
   const 도구들 = all.filter((t) => (t.category || '') === '도구');
-  // 깃 자동 프로젝트: 진행 중만, 시트에 이미 잡힌 건(저장소 키) 제외, 담당자 필터 적용. (시트에 안 씀 → 좀비 없음)
+  // 깃 자동 프로젝트: 진행 중만, 시트에 이미 잡힌 건(저장소 키 OR 프로젝트명) 제외, 담당자 필터 적용. (시트에 안 씀 → 좀비 없음)
   const 시트저장소 = new Set(all.map((t) => t.repo).filter(Boolean));
+  const 시트프로젝트명 = new Set(all.map((t) => (t.project || '').replace(/\s+/g, '')).filter(Boolean)); // 저장소 미입력 과업도 이름으로 중복 제거(소리쉼 등)
   const 깃프로젝트 = gitProjs
-    .filter((p) => p.repo && !시트저장소.has(p.repo))
+    .filter((p) => p.repo && !시트저장소.has(p.repo) && !시트프로젝트명.has((p.title || '').replace(/\s+/g, '')))
     .filter((p) => !['완료', '폐기', '중단', '종료'].some((d) => (p.progressStatus || '').includes(d)))
     .filter((p) => filter === 'all'
       ? true

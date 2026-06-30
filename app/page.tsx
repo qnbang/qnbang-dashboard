@@ -310,6 +310,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
     if (!panel) return;
     setSaving(true);
     try {
+      let res: Response;
       if (panel.formType === 'exp') {
         const body: Record<string, string | number> = {
           month: form.monthStr || panel.monthStr || '1월',
@@ -317,7 +318,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
           지출내용: form.label || '', 비용: Number(form.amount) || 0, 비고: form.note || '',
         };
         if (!panel.isNew) body.rowNum = panel.rowNum!;
-        await fetch('/api/office/expense', { method: panel.isNew ? 'POST' : 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+        res = await fetch('/api/office/expense', { method: panel.isNew ? 'POST' : 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
       } else {
         const body: Record<string, string | number> = {
           계약일: form.contractDate || '', 계약명: form.label || '',
@@ -325,10 +326,15 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
           입금일: form.date || '', 입금액: Number(form.amount) || 0, 비고: form.note || '',
         };
         if (!panel.isNew) body.rowNum = panel.rowNum!;
-        await fetch('/api/office/revenue', { method: panel.isNew ? 'POST' : 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+        res = await fetch('/api/office/revenue', { method: panel.isNew ? 'POST' : 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
       }
+      // 저장 성공 확인 후에만 폼 닫기 — 실패면 폼 유지 + 알림(입력값 날아가지 않게)
+      const j = await res.json().catch(() => ({ ok: res.ok }));
+      if (!res.ok || j.ok === false) { alert('저장 실패: ' + (j.error || res.status)); return; }
       setPanel(null);
       await Promise.all([reloadMoney(), reloadExp()]);
+    } catch (e) {
+      alert('저장 실패: ' + String(e));
     } finally {
       setSaving(false);
     }
