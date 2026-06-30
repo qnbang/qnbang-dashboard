@@ -3,6 +3,7 @@
 // 데이터: /api/archive (매출+과업). 카드 클릭 → 개요·작업·자료 바로가기 펼침.
 
 import { useEffect, useState } from 'react';
+import ProjectDocs from './ProjectDocs';
 
 type Proj = { name: string; client: string; 분류: '자체' | '대행'; 계약: number; 입금: number; 미수: number; 건: number; 월: string; 작업: string; 상태: string; 링크: string; noRevenue?: boolean };
 type Month = { 월: string; label: string; 계약: number; 입금: number; 미수: number; projects: Proj[] };
@@ -19,7 +20,8 @@ export default function ProjectArchiveView() {
   const [data, setData] = useState<Archive | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
-  const [open, setOpen] = useState<string | null>(null);  // 펼친 카드 key
+  const [open, setOpen] = useState<string | null>(null);  // 펼친 카드 key(매출 미입력 카드의 계약 입력용)
+  const [docName, setDocName] = useState<string | null>(null);  // 문서 모달 — 누른 프로젝트의 GitHub 작업로그·문서
   const [filter, setFilter] = useState<'all' | '대행' | '자체'>('all');
   const [revForm, setRevForm] = useState<string | null>(null);  // 매출 입력 폼 열린 카드 key
   const [revInput, setRevInput] = useState({ 계약금액: '', 분류: '대행', 입금상태: '입금완료', 계약일: '' });
@@ -99,7 +101,7 @@ export default function ProjectArchiveView() {
               const key = m.월 + p.name;
               const isOpen = open === key;
               return (
-                <div key={key} onClick={() => setOpen(isOpen ? null : key)}
+                <div key={key} onClick={() => p.noRevenue ? setOpen(isOpen ? null : key) : setDocName(p.name)}
                   className={`border rounded-md p-3 cursor-pointer transition hover:shadow-md ${p.noRevenue ? 'bg-slate-50 border-dashed border-slate-300' : p.미수 > 0 ? 'bg-white border-l-[3px] border-l-red-500 border-slate-200' : 'bg-white border-slate-200'}`}>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className={`text-[10.5px] font-bold px-1.5 py-0.5 rounded ${p.분류 === '자체' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-600'}`}>
@@ -118,11 +120,9 @@ export default function ProjectArchiveView() {
                       ? <span className="text-slate-400">{p.상태 === '완수' ? '완수됨 · 매출 미기록' : `${p.상태} · 매출 미기록`}</span>
                       : p.미수 > 0 ? <span className="text-red-600 font-semibold">미수 {won(p.미수)}</span> : <span className="text-emerald-600 font-semibold">완납</span>}
                   </div>
-                  {isOpen && (
-                    <div className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-dashed border-slate-200 leading-relaxed">
-                      {p.noRevenue ? (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <div className="mb-2 text-slate-500">계약 정보를 입력하면 매출 집계에 포함됩니다.</div>
+                  {isOpen && p.noRevenue && (
+                    <div className="text-[11px] text-slate-500 mt-2 pt-2 border-t border-dashed border-slate-200 leading-relaxed" onClick={(e) => e.stopPropagation()}>
+                      <div className="mb-2 text-slate-500">계약 정보를 입력하면 매출 집계에 포함됩니다.</div>
                           {revForm === key ? (
                             <div className="flex flex-col gap-1.5">
                               <div className="flex gap-1.5">
@@ -173,27 +173,6 @@ export default function ProjectArchiveView() {
                             <button onClick={() => { setRevForm(key); setRevInput({ 계약금액: '', 분류: p.분류, 입금상태: '입금완료', 계약일: '' }); }}
                               className="text-[11px] text-blue-600 underline">💡 계약 정보 입력하기</button>
                           )}
-                        </div>
-                      ) : (
-                        <>
-                          <div><b className="text-slate-600">개요</b> {p.client || '자체'} · 계약 {won(p.계약)} · {p.건}건{p.상태 ? ` · ${p.상태}` : ''}</div>
-                          <div className="mt-1"><b className="text-slate-600">작업</b> {p.작업 ? p.작업.replace(/;/g, ' › ').slice(0, 120) : '— (과업 시트에 작업 기록이 없어요)'}</div>
-                          <div className="mt-1">
-                            <b className="text-slate-600">자료</b>{' '}
-                            {p.링크 ? (
-                              p.링크.split(/[\s,]+/).filter(Boolean).map((url, i) => (
-                                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                                  className="inline-block mr-2 text-blue-500 underline hover:text-blue-700"
-                                  onClick={(e) => e.stopPropagation()}>
-                                  {url.includes('drive.google') ? '📁 드라이브' : url.includes('figma') ? '🎨 피그마' : `🔗 링크${i + 1}`}
-                                </a>
-                              ))
-                            ) : (
-                              <span className="text-slate-400">— 과업 시트 메모 칸에 드라이브/피그마 URL 넣으면 연결됩니다</span>
-                            )}
-                          </div>
-                        </>
-                      )}
                     </div>
                   )}
                 </div>
@@ -203,6 +182,7 @@ export default function ProjectArchiveView() {
         </section>
       ))}
       {fmonths.length === 0 && <p className="text-slate-400 text-center py-10">표시할 프로젝트가 없어요.</p>}
+      {docName && <ProjectDocs name={docName} onClose={() => setDocName(null)} />}
     </div>
   );
 }
