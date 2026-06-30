@@ -18,12 +18,14 @@ function objs(sheet: unknown[][] | undefined): Record<string, string>[] {
     .map((r) => Object.fromEntries(head.map((h, i) => [h, String((r as unknown[])[i] ?? '').trim()])));
 }
 
-// 고객명 매칭 — 공백/접미 차이 흡수(소리쉼↔소리쉼티). 빈 값은 매칭 안 함.
+// 고객명 매칭 — 공백 무시 + 접미 차이 흡수(소리쉼↔소리쉼티, 김창수 위스키↔김창수위스키증류소, 사단법인점프↔사단법인 점프).
+// 짧은 쪽(3글자 이상)이 긴 쪽에 포함되면 같은 고객. 2글자 과병합 방지 가드.
 function same(a: string, b: string): boolean {
-  a = (a || '').trim(); b = (b || '').trim();
+  a = (a || '').replace(/\s+/g, ''); b = (b || '').replace(/\s+/g, '');
   if (!a || !b) return false;
-  if (a === b || a.includes(b) || b.includes(a)) return true;
-  return a.split(/\s+/)[0] === b.split(/\s+/)[0];
+  if (a === b) return true;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  return s.length >= 3 && l.includes(s);
 }
 
 export interface CRMClient {
@@ -128,9 +130,13 @@ export async function buildCRM(): Promise<CRMData> {
   // 고객명 있는 것만 = 완수 '고객'. 프로젝트명 폴백 제거(고객 없는 내부 프로젝트가 가짜 고객으로 둔갑하던 버그).
   for (const t of 아카이브) { const k = (t['고객'] || '').trim(); if (k) 완수names.add(k); }
   for (const c of 매출) { if (c['입금상태'] === '입금완료' && c['분류'] !== '자체') { const k = (c['클라이언트'] || '').trim(); if (k) 완수names.add(k); } }
-  const 완수: CRMClient[] = [...완수names]
+  const 완수후보 = [...완수names]
     .filter((k) => !/^_|테스트|삭제예정|검증/.test(k)) // 테스트·삭제예정 등 잡 데이터 제외
-    .filter((k) => ![...진행keys, ...영업keys].some((x) => same(x, k)))
+    .filter((k) => ![...진행keys, ...영업keys].some((x) => same(x, k)));
+  // 완수 안에서도 같은 고객 다른 표기(사단법인점프↔사단법인 점프) 합치기 — 먼저 들어온 표기 유지
+  const 완수keys: string[] = [];
+  for (const k of 완수후보) if (!완수keys.some((x) => same(x, k))) 완수keys.push(k);
+  const 완수: CRMClient[] = 완수keys
     .map((k) => ({ 고객: k, 계약금액: 계약of(k), 미수: 미수of(k), 프로젝트들: 프로젝트들of(k) }))
     .sort((a, b) => (b.계약금액 ?? 0) - (a.계약금액 ?? 0));
 
