@@ -128,7 +128,25 @@ const AUTOMATED_COMMIT_PATTERNS = [
 
 // 프로젝트 repo 목록 — repo 전체를 받아 'qnbang-project' 토픽으로 거른다.
 // (검색 API는 색인 지연이 있어, 새 repo가 즉시 안 잡힘 → 목록 API로 즉시 반영)
+// repo당 프로젝트.json·작업로그·커밋을 긁어 ~1.5초 → SWR 캐시(2분)로 웜에선 즉시 응답. (sheetCache와 같은 방식)
+const PROJ_TTL = 120_000;
+let _projCache: { at: number; data: ProjectRepo[] } | null = null;
+let _projInflight: Promise<ProjectRepo[]> | null = null;
+function _refreshProjects(): Promise<ProjectRepo[]> {
+  if (_projInflight) return _projInflight;
+  _projInflight = _fetchProjectRepos()
+    .then((d) => { _projCache = { at: Date.now(), data: d }; return d; })
+    .finally(() => { _projInflight = null; });
+  return _projInflight;
+}
 export async function listProjectRepos(): Promise<ProjectRepo[]> {
+  if (_projCache) {
+    if (Date.now() - _projCache.at >= PROJ_TTL) void _refreshProjects(); // 낡으면 백그라운드 갱신(안 기다림)
+    return _projCache.data;
+  }
+  return _refreshProjects();
+}
+async function _fetchProjectRepos(): Promise<ProjectRepo[]> {
   const res = await fetch(
     `https://api.github.com/orgs/${OWNER}/repos?per_page=100&sort=updated`,
     { headers: headers(), cache: 'no-store' }
