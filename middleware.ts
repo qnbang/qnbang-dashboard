@@ -13,6 +13,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // login, api/login, api/cache(시트 캐시 비우기 — 무해, 외부 쓰기 후 호출용), share(외부 공유 정적페이지), hub(협업 허브 외부공개), 정적 자원, 파비콘은 검사에서 제외
-  matcher: ['/((?!login|api/login|api/cache|share|hub|_next/static|_next/image|icon.png|apple-icon.png).*)'],
+  // login, api/login, api/cache, api/cron(크론 — 자체 key로 보호), share, hub, 정적 자원, 파비콘은 검사에서 제외
+  matcher: ['/((?!login|api/login|api/cache|api/cron|share|hub|_next/static|_next/image|icon.png|apple-icon.png).*)'],
 };
