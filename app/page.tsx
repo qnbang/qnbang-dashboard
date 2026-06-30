@@ -8,6 +8,7 @@ import OfficeBoardView from './components/OfficeBoardView';
 import ProjectArchiveView from './components/ProjectArchiveView';
 import ProjectDocs from './components/ProjectDocs';
 import { renderMarkdown } from '@/lib/markdown';
+import { Loading, ErrorBox } from './components/ui';
 
 type Expense = {
   _row: number;
@@ -241,8 +242,8 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
 
   useEffect(() => { reloadMoney(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading || !data || moneyLoading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
-  if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
+  if (loading || !data || moneyLoading) return <Loading text="정산 불러오는 중" pad="py-20" />;
+  if (error) return <ErrorBox msg={error} pad="py-20" />;
 
   const expenses = localExp ?? (data.expenses || []);
 
@@ -516,8 +517,8 @@ function CRMView() {
   useEffect(() => {
     fetch('/api/crm').then((r) => r.json()).then((j) => { if (j.ok) setCrm(j.crm); else setErr(j.error || '불러오기 실패'); }).catch((e) => setErr(String(e)));
   }, []);
-  if (err) return <p className="text-red-500 text-center py-10">⚠️ {err}</p>;
-  if (!crm) return <p className="text-slate-400 text-center py-10">고객 불러오는 중…</p>;
+  if (err) return <ErrorBox msg={err} />;
+  if (!crm) return <Loading text="고객 불러오는 중" />;
   const cols = [
     { key: 'lead', label: '📣 영업 중', hint: '계약 전', cls: 'border-sky-200 bg-sky-50', items: crm.영업중 },
     { key: 'active', label: '🔨 계약 진행중', hint: '납품 중', cls: 'border-emerald-200 bg-emerald-50', items: crm.진행중 },
@@ -806,8 +807,8 @@ function SharesView() {
     try { await navigator.clipboard.writeText(open.url); setModalCopied(true); setTimeout(() => setModalCopied(false), 1500); } catch { /* 무시 */ }
   };
 
-  if (loading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
-  if (error) return <p className="text-red-500 text-center py-20">⚠️ {error}</p>;
+  if (loading) return <Loading text="공유 문서 불러오는 중" pad="py-20" />;
+  if (error) return <ErrorBox msg={error} pad="py-20" />;
 
   return (
     <div className="space-y-4">

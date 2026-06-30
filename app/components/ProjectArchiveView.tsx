@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import ProjectDocs from './ProjectDocs';
+import { Loading, ErrorBox } from './ui';
 
 type Proj = { name: string; client: string; 분류: '자체' | '대행'; 계약: number; 입금: number; 미수: number; 건: number; 월: string; 작업: string; 상태: string; 링크: string; noRevenue?: boolean };
 type Month = { 월: string; label: string; 계약: number; 입금: number; 미수: number; projects: Proj[] };
@@ -33,8 +34,8 @@ export default function ProjectArchiveView() {
     }).catch((e) => setErr(String(e))).finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-slate-400 text-center py-20">불러오는 중…</p>;
-  if (err) return <p className="text-red-500 text-center py-20">⚠️ {err}</p>;
+  if (loading) return <Loading text="프로젝트 불러오는 중" pad="py-20" />;
+  if (err) return <ErrorBox msg={err} pad="py-20" />;
   if (!data) return null;
 
   const flow = data.연도흐름.filter((y) => y.입금 + y.미수 > 0);

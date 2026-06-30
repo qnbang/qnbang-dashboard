@@ -4,6 +4,7 @@
 
 import { useEffect, useState } from 'react';
 import { renderMarkdown } from '@/lib/markdown';
+import { Loading } from './ui';
 
 type ProjectRepo = { repo: string; title: string; manager?: string };
 type DocItem = { path: string; title: string; group: string };
@@ -118,7 +119,7 @@ export default function ProjectDocs({ name, onClose }: { name: string; onClose: 
           <button onClick={onClose} className="text-xs text-slate-400 hover:text-slate-600">닫기 ✕</button>
         </div>
         <div className="p-5 space-y-4">
-          {state === 'loading' && <p className="text-slate-400 text-sm text-center py-8">불러오는 중…</p>}
+          {state === 'loading' && <Loading text="문서 불러오는 중" pad="py-8" />}
           {state === 'notfound' && <p className="text-slate-400 text-sm text-center py-8">연결된 GitHub 저장소를 못 찾았어요.<br /><span className="text-xs">(프로젝트.json·qnbang-project 토픽 확인)</span></p>}
           {state === 'ok' && (<>
             {intro && (

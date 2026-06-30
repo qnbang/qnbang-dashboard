@@ -4,6 +4,7 @@
 // 시트의 flat 공위치(ball)를 시안 I 칸으로 매핑해 실데이터로 그린다. 카드 클릭=슬라이드 패널.
 import { useEffect, useState, useCallback } from 'react';
 import { renderMarkdown } from '@/lib/markdown';
+import { Loading, ErrorBox } from './ui';
 
 type Task = {
   id: string; project: string; task: string; owner: string;
@@ -404,8 +405,8 @@ export default function OfficeBoardView() {
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
 
-  if (err) return <p className="text-rose-500 text-center py-10">⚠️ {err}</p>;
-  if (!office) return <p className="text-slate-400 text-center py-10">관제탑 불러오는 중…</p>;
+  if (err && !office) return <ErrorBox msg={err} />; // 캐시(office) 있으면 에러여도 화면 유지
+  if (!office) return <Loading text="관제탑 불러오는 중" />;
 
   const all: Task[] = [
     ...(office.rooms || []).flatMap((r) => r.tasks),
