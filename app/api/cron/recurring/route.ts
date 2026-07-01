@@ -74,7 +74,9 @@ export async function GET(req: Request) {
     const 지출생성: string[] = [];
     for (const f of 고정비) {
       if ((f['활성'] || 'Y').toUpperCase() === 'N') continue;      // 비활성 고정비 건너뜀
-      const day = Number(String(f['납부일'] ?? '').replace(/[^0-9]/g, ''));
+      const raw = String(f['납부일'] ?? '').trim();
+      const lastDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0)).getUTCDate();
+      const day = /말/.test(raw) ? lastDay : Number(raw.replace(/[^0-9]/g, '')); // '말일' → 그 달 마지막 날
       if (!day) continue;                                          // 납부일 없으면 건너뜀(대표가 채워야 함)
       if (curDay < day) continue;                                  // 아직 납부일 전 → 그날 되면 기록
       const 항목 = f['항목'] || '';
