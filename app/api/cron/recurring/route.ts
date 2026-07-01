@@ -61,9 +61,39 @@ export async function GET(req: Request) {
         valueInputOption: 'USER_ENTERED', insertDataOption: 'INSERT_ROWS',
         requestBody: { values: toAppend },
       });
-      invalidateSheets();
     }
-    return NextResponse.json({ ok: true, 월: curYM, 생성: created, 건너뜀: skipped.length });
+
+    // ── 고정비 자동 지출 기록 ── 납부일 오면 그 달 지출탭에 자동 append(멱등). 지금 매달 손으로 넣던 걸 자동화.
+    const 고정비 = objs(sheets['고정비']);
+    const curMonthTab = `${now.getUTCMonth() + 1}월`;              // 예: '7월'
+    const curDay = now.getUTCDate();
+    const 월지출 = objs(sheets[curMonthTab]);
+    // 이번 달 지출탭에 자동(고정비)로 이미 넣은 항목 집합 — 재실행/중복 방지
+    const 이미기록 = new Set(월지출.filter((x) => (x['비고'] || '').includes('자동(고정비)')).map((x) => x['지출 내용']));
+    const 지출append: string[][] = [];
+    const 지출생성: string[] = [];
+    for (const f of 고정비) {
+      if ((f['활성'] || 'Y').toUpperCase() === 'N') continue;      // 비활성 고정비 건너뜀
+      const day = Number(String(f['납부일'] ?? '').replace(/[^0-9]/g, ''));
+      if (!day) continue;                                          // 납부일 없으면 건너뜀(대표가 채워야 함)
+      if (curDay < day) continue;                                  // 아직 납부일 전 → 그날 되면 기록
+      const 항목 = f['항목'] || '';
+      if (!항목 || 이미기록.has(항목)) continue;                    // 이미 이번 달 자동기록됨
+      const 금액 = Number(String(f['금액'] ?? '').replace(/[^0-9.-]/g, '')) || 0;
+      // 지출 헤더: 날짜, 카테고리, 지출 내용, 비용, 비고, 과업 관리
+      지출append.push([`${curYM}-${String(day).padStart(2, '0')}`, f['종류'] || '고정비', 항목, String(금액), '자동(고정비)', '']);
+      지출생성.push(항목);
+    }
+    if (지출append.length) {
+      await api().spreadsheets.values.append({
+        spreadsheetId: SHEET_ID!, range: `${curMonthTab}!A1`,
+        valueInputOption: 'USER_ENTERED', insertDataOption: 'INSERT_ROWS',
+        requestBody: { values: 지출append },
+      });
+    }
+
+    if (toAppend.length || 지출append.length) invalidateSheets();
+    return NextResponse.json({ ok: true, 월: curYM, 매출생성: created, 매출건너뜀: skipped.length, 고정비생성: 지출생성 });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
