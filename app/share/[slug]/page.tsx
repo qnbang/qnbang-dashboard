@@ -69,36 +69,41 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
   );
 }
 
-// 변환기(.tools/md-읽기페이지/변환.mjs)와 동일한 톤의 스타일 — 정적 공유물과 같은 모양.
+// 큐앤뱅 문서 표준(블랙앤화이트·곡선 없음·Pretendard) — 공유문서 공통 톤.
+// 강조=검정, 인용박스=회색+검정 좌선, h2=검정 바, 각진(라운드 0).
 const CSS = `
-  .share-wrap { --ink:#1f2328; --muted:#8a8a8a; --accent:#b8430f; --line:#ececec;
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+  .share-wrap { --ink:#111111; --sub:#6b6b6b; --line:#e3e3e3; --soft:#f6f6f6;
     max-width:760px; margin:0 auto; padding:0 24px 88px; color:var(--ink);
-    font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif;
-    line-height:1.62; font-size:16px; -webkit-text-size-adjust:100%; }
+    font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    line-height:1.8; font-size:15px; -webkit-text-size-adjust:100%; word-break:keep-all; }
   .share-wrap .brandbar { display:flex; align-items:center; justify-content:space-between;
-    padding:26px 0 22px; margin-bottom:30px; border-bottom:1px solid var(--line); }
-  .share-wrap .brandbar .logo { height:30px; width:auto; display:block; }
-  .share-wrap .role { font-size:12.5px; color:var(--muted); letter-spacing:0.2px; }
-  .share-wrap h1 { font-size:30px; font-weight:800; line-height:1.3; letter-spacing:-0.5px; margin:0 0 6px; padding-bottom:18px; border-bottom:2.5px solid var(--ink); }
-  .share-wrap h2 { font-size:21px; font-weight:800; letter-spacing:-0.3px; margin:42px 0 12px; padding-top:6px; }
-  .share-wrap h3 { font-size:17px; font-weight:700; letter-spacing:-0.2px; margin:30px 0 8px; color:#111; }
-  .share-wrap p { margin:7px 0; }
-  .share-wrap strong { color:var(--accent); font-weight:700; }
-  .share-wrap a { color:#0a66c2; text-decoration:none; }
-  .share-wrap a:hover { text-decoration:underline; }
-  .share-wrap code { background:#f3f3f3; padding:1px 6px; border-radius:5px; font-size:0.88em;
+    padding:28px 0 22px; margin-bottom:32px; border-bottom:1px solid var(--line); }
+  .share-wrap .brandbar .logo { height:24px; width:auto; display:block; }
+  .share-wrap .role { font-size:11.5px; color:var(--sub); letter-spacing:.02em; }
+  .share-wrap h1 { font-size:26px; font-weight:800; line-height:1.3; letter-spacing:-.03em;
+    margin:0 0 12px; padding-bottom:18px; border-bottom:3px solid var(--ink); }
+  .share-wrap h2 { font-size:17px; font-weight:700; letter-spacing:-.01em;
+    margin:40px 0 12px; padding:10px 14px; background:var(--ink); color:#fff; }
+  .share-wrap h3 { font-size:14px; font-weight:700; margin:24px 0 8px; color:var(--ink);
+    border-left:3px solid var(--ink); padding-left:10px; }
+  .share-wrap p { margin:8px 0; font-size:14.5px; }
+  .share-wrap strong { color:var(--ink); font-weight:700; }
+  .share-wrap a { color:var(--ink); text-decoration:underline; text-underline-offset:2px; }
+  .share-wrap code { background:var(--soft); padding:1px 6px; border-radius:0; font-size:0.88em;
     font-family:"SFMono-Regular",ui-monospace,monospace; }
-  .share-wrap hr { border:none; border-top:1px solid var(--line); margin:34px 0; }
-  .share-wrap ul { margin:8px 0; padding-left:22px; } .share-wrap li { margin:2px 0; }
-  .share-wrap blockquote { margin:18px 0; padding:14px 18px; background:#faf9f7; border-left:3px solid #c9742a;
-    border-radius:0 8px 8px 0; color:#555; font-size:0.95em; }
+  .share-wrap hr { border:none; border-top:1px solid var(--line); margin:36px 0; }
+  .share-wrap ul { margin:8px 0; padding-left:20px; }
+  .share-wrap li { margin:5px 0; font-size:14px; line-height:1.7; } .share-wrap li::marker { color:var(--sub); }
+  .share-wrap blockquote { margin:12px 0; padding:12px 16px; background:var(--soft); border-left:3px solid var(--ink);
+    border-radius:0; color:#333; font-size:0.95em; }
   .share-wrap blockquote p { margin:4px 0; }
-  .share-wrap table { border-collapse:collapse; width:100%; margin:18px 0; font-size:0.92em; }
+  .share-wrap table { border-collapse:collapse; width:100%; margin:14px 0; font-size:0.9em; }
   .share-wrap th,.share-wrap td { border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top; }
-  .share-wrap th { background:#f7f7f7; font-weight:700; }
+  .share-wrap th { background:var(--soft); font-weight:700; }
   .share-wrap .footer { margin-top:56px; padding-top:24px; border-top:1px solid var(--line);
     display:flex; align-items:center; gap:12px; }
-  .share-wrap .footer .footer-logo { height:20px; width:auto; opacity:0.85; }
-  .share-wrap .footer .meta { color:var(--muted); font-size:12.5px; margin:0; }
-  @media (max-width:520px){ .share-wrap{padding:0 16px 64px;} .share-wrap h1{font-size:24px;} .share-wrap{font-size:15px;} }
+  .share-wrap .footer .footer-logo { height:18px; width:auto; opacity:0.55; }
+  .share-wrap .footer .meta { color:var(--sub); font-size:11.5px; margin:0; }
+  @media (max-width:520px){ .share-wrap{padding:0 16px 64px;} .share-wrap h1{font-size:22px;} }
 `;
