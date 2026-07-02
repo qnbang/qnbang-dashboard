@@ -98,6 +98,7 @@ export async function buildArchive(): Promise<ArchiveData> {
   for (const a of 아카이브) {
     const status = a['현재상태'] || '';
     if (status.includes('폐기')) continue;
+    if (a['출처'] === '단건할일') continue; // 잡일(월세 입금 등) — 프로젝트 아니므로 매출 집계 후보에서 제외
     const base = baseName(a['프로젝트'] || '');  // 과업명 폴백 제거 — 명시된 프로젝트만
     if (!base) continue;
     // 기존 매출 프로젝트와 토큰 매칭 — 이미 있으면 스킵

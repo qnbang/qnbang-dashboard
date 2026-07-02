@@ -264,7 +264,7 @@ export default function OfficeBoardView() {
     if (!txt || qaBusy) return;
     setQaBusy(true);
     try {
-      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: txt, ball }) });
+      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: txt, ball, 출처: '단건할일' }) }); // 출처 태그로 매출 프로젝트 아카이브 집계에서 제외(archive.ts)
       const j = await r.json();
       if (j.ok) { setQa(''); load(); } else alert(j.error || '추가 실패');
     } catch (e) { alert(String(e)); } finally { setQaBusy(false); }
