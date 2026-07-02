@@ -12,7 +12,7 @@ const KEY = process.env.SHEET_KEY || 'qnbang2026';
 // 과업POST.py HEADER 와 동일 순서(단일 진실원)
 const HEADER = ['id', '프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일',
   '기한', '고객', '돈종류', '할일', '판정근거', '갱신일', '출처', '계약여부'];
-const 공위치_LIST = ['시작전', '내작업', '내회신', '고객대기', '보류', '완수'];
+const 공위치_LIST = ['받은일', '시작전', '내작업', '내회신', '고객대기', '보류', '완수']; // 받은일 포함 — 드래그로 받은일 이동한 셀이 드롭다운 경고 안 뜨게(office.ts POS2BALL과 동일 어휘)
 const 돈종류_LIST = ['매출', '투자'];
 
 // 한 줄에서 공위치 단어(한글/영문/약어) → 표준 라벨
@@ -77,10 +77,12 @@ export async function POST(req: Request) {
       갱신일: today,
       출처: String(b.출처 || '대시보드'),
     };
+    // '처리됨으로(완수)'는 과업 탭이 아니라 아카이브 탭에 직행 — 과업 탭의 완수 행은 화면 어디에도 안 그려져 증발함(complete 라우트와 같은 목적지)
+    const 탭 = p.공위치 === '완수' ? '아카이브' : '과업';
     const res = await fetch(WRITE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: KEY, 종류: '과업', 헤더: HEADER, 행,
+      body: JSON.stringify({ key: KEY, 종류: 탭, 헤더: HEADER, 행,
         드롭다운: { 공위치: 공위치_LIST, 돈종류: 돈종류_LIST } }),
     });
     const out = await res.json().catch(() => ({}));

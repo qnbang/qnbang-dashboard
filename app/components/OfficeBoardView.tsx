@@ -429,7 +429,7 @@ export default function OfficeBoardView() {
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
   const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
-  const ACTIVE_BALLS = new Set(['inbox', 'mywork', 'myreply', 'client']);
+  const ACTIVE_BALLS = new Set(['inbox', 'unset', 'mywork', 'myreply', 'client']); // unset(미분류)도 활성 — 자체사업 미분류 카드가 받은일 바구니에서 안 빠지게
   // 보드 = 대행+내부 + 자체사업의 '활성 과업'(반보 호스트모집 등). 도구·리서치는 작업 아니라 포트폴리오만.
   const board = cat === 'all'
     ? vis.filter((t) => { const c = t.category || ''; if (c === '도구' || c === '리서치') return false; if (c === '자체사업') return ACTIVE_BALLS.has(t.ball); return true; })
@@ -439,7 +439,7 @@ export default function OfficeBoardView() {
   const 도구들 = all.filter((t) => (t.category || '') === '도구');
   // 깃 자동 프로젝트: 진행 중만, 시트에 이미 잡힌 건(저장소 키 OR 프로젝트명) 제외, 담당자 필터 적용. (시트에 안 씀 → 좀비 없음)
   const 시트저장소 = new Set(all.map((t) => t.repo).filter(Boolean));
-  const 시트프로젝트명 = new Set(all.map((t) => (t.project || '').replace(/\s+/g, '')).filter(Boolean)); // 저장소 미입력 과업도 이름으로 중복 제거(소리쉼 등)
+  const 시트프로젝트명 = new Set(all.flatMap((t) => [t.project, t.client]).map((s) => (s || '').replace(/\s+/g, '')).filter(Boolean)); // 저장소 미입력 과업도 이름으로 중복 제거 — 프로젝트명뿐 아니라 고객명(client)도 비교(소리쉼은 고객='소리쉼', 프로젝트='홈페이지개발'이라 프로젝트명만 보면 안 걸림)
   const 깃프로젝트 = gitProjs
     .filter((p) => p.repo && !시트저장소.has(p.repo) && !시트프로젝트명.has((p.title || '').replace(/\s+/g, '')))
     .filter((p) => !['완료', '폐기', '중단', '종료'].some((d) => (p.progressStatus || '').includes(d)))
@@ -449,7 +449,7 @@ export default function OfficeBoardView() {
       : filter === 'jy' ? p.manager === '김지영'
       : !!p.manager && p.manager !== '신종호' && p.manager !== '김지영');
   const byDday = (a: Task, b: Task) => (cardDday(a) ?? 9999) - (cardDday(b) ?? 9999); // 카드가 보여주는 D-day(단계날짜 우선) 임박순
-  const inbox = board.filter((t) => t.ball === 'inbox').sort(byDday);
+  const inbox = board.filter((t) => t.ball === 'inbox' || t.ball === 'unset').sort(byDday); // 빈 공위치(미정)도 받은일 바구니로(office.ts 규칙) — 빠른추가가 공위치 빈칸으로 저장하므로
   const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
   const work = board.filter((t) => t.ball === 'mywork').sort(byDday);
   const wait = board.filter((t) => t.ball === 'client').sort(byDday);
