@@ -17,7 +17,6 @@ type Task = {
   history?: { when: string; what: string }[];
 };
 // 깃 자동 프로젝트(읽기 전용) — /api/git-projects. 진행 중인 것만 사무실에 자동 표출(시트 안 씀=좀비 없음).
-type GitProj = { repo: string; title: string; manager?: string; progressStatus?: string; htmlUrl: string };
 // 분류별 색·이모지 — 카드 프로젝트명 색, 칩, 포트폴리오 공통.
 const CAT: Record<string, { c: string; e: string }> = {
   대행: { c: '#2563eb', e: '🤝' },     // 파랑 — 고객 일(매출)
@@ -106,7 +105,9 @@ const CSS = `
 .qb .tkt.urgent{border-left:3px solid #ef4458}
 .qb .ic{font-size:17px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:#f1f3fa;border-radius:10px;flex-shrink:0}
 .qb .tbody{flex:1;min-width:0}.qb .tag-cli{font-size:10px;font-weight:700;color:#9298ac}
-.qb .cli-proj{font-size:10.5px;color:#9aa0b0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .cli-proj .proj{color:#5a6078;font-weight:700}
+.qb .cli-proj{font-size:10.5px;color:#9aa0b0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px}.qb .cli-proj .proj{color:#2563eb;font-weight:700}
+.qb .clibadge{display:inline-block;padding:1px 6px;border-radius:5px;background:#eef0f6;color:#4b5563;font-size:10px;font-weight:700;flex-shrink:0}
+.qb .clibadge.own{background:#f6f6f6;color:#8a8f9c}
 .qb .task-big{font-size:15px;font-weight:700;color:#1a1e30;line-height:1.32;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .qb .room.wait .tkt{flex:1 1 280px}
 .qb .task{font-size:13.5px;font-weight:700;margin-top:1px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -224,7 +225,6 @@ function waitOn(t: { todos?: string[]; status?: string; owner?: string }): strin
 export default function OfficeBoardView() {
   const [office, setOffice] = useState<Office | null>(null);
   const [money, setMoney] = useState<Money | null>(null);
-  const [gitProjs, setGitProjs] = useState<GitProj[]>([]); // 깃 토픽 프로젝트(자동·읽기)
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState<'all' | 'jh' | 'jy' | 'out'>('all');
   const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
@@ -299,7 +299,6 @@ export default function OfficeBoardView() {
   }, [load]);
   // 깃 토픽 프로젝트 비동기 로드(사무실 초기 렌더 안 막음). 진행 중인 것만, 시트에 이미 있는 건(저장소 키) 제외하고 합친다.
   useEffect(() => {
-    fetch('/api/git-projects').then((r) => r.json()).then((j) => { if (j.ok) setGitProjs(j.projects || []); }).catch(() => {});
   }, []);
   // 패널 열 때 수정 입력칸 초기화(고객=실제 고객만, 프로젝트=프로젝트명, 과업명=자리표시 제외)
   useEffect(() => {
@@ -437,17 +436,7 @@ export default function OfficeBoardView() {
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
   const 도구들 = all.filter((t) => (t.category || '') === '도구');
-  // 깃 자동 프로젝트: 진행 중만, 시트에 이미 잡힌 건(저장소 키 OR 프로젝트명) 제외, 담당자 필터 적용. (시트에 안 씀 → 좀비 없음)
-  const 시트저장소 = new Set(all.map((t) => t.repo).filter(Boolean));
-  const 시트프로젝트명 = new Set(all.flatMap((t) => [t.project, t.client]).map((s) => (s || '').replace(/\s+/g, '')).filter(Boolean)); // 저장소 미입력 과업도 이름으로 중복 제거 — 프로젝트명뿐 아니라 고객명(client)도 비교(소리쉼은 고객='소리쉼', 프로젝트='홈페이지개발'이라 프로젝트명만 보면 안 걸림)
-  const 깃프로젝트 = gitProjs
-    .filter((p) => p.repo && !시트저장소.has(p.repo) && !시트프로젝트명.has((p.title || '').replace(/\s+/g, '')))
-    .filter((p) => !['완료', '폐기', '중단', '종료'].some((d) => (p.progressStatus || '').includes(d)))
-    .filter((p) => filter === 'all'
-      ? true
-      : filter === 'jh' ? (p.manager || '신종호') === '신종호'
-      : filter === 'jy' ? p.manager === '김지영'
-      : !!p.manager && p.manager !== '신종호' && p.manager !== '김지영');
+  // (깃 자동 섹션 폐기 — 깃 프로젝트는 크론 git-sync가 시트에 직접 등록해 위 보드로 통일됨)
   const byDday = (a: Task, b: Task) => (cardDday(a) ?? 9999) - (cardDday(b) ?? 9999); // 카드가 보여주는 D-day(단계날짜 우선) 임박순
   const inbox = board.filter((t) => t.ball === 'inbox' || t.ball === 'unset').sort(byDday); // 빈 공위치(미정)도 받은일 바구니로(office.ts 규칙) — 빠른추가가 공위치 빈칸으로 저장하므로
   const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
@@ -479,7 +468,7 @@ export default function OfficeBoardView() {
       return t.ball === 'client' ? `${lastDone.text} → 대기중` : lastDone.text;
     }
     const task = t.task && t.task !== '(프로젝트 등록)' ? t.task : '';
-    return task || t.project;
+    return task || '(다음 과업 정하기)'; // 프로젝트명을 큰글씨로 쓰면 윗줄(고객·프로젝트)이 사라져 3층 구조가 무너짐 — 과업 없으면 채우라고 표시
   };
   const Card = (t: Task) => {
     const cli = t.client && t.client !== t.project ? t.client : '';
@@ -490,7 +479,8 @@ export default function OfficeBoardView() {
     <div key={t.id} draggable onDragStart={dragStart(t.id)} className={`tkt${(cardDday(t) ?? 99) <= 3 ? ' urgent' : ''}${sel?.id === t.id ? ' sel' : ''}`} onClick={() => setSel(t)}>
       <div className="ic">{t.ball === 'client' ? '🚪' : t.ball === 'myreply' ? '🧾' : '🖥️'}</div>
       <div className="tbody">
-        {(cli || showProj) && <div className="cli-proj">{cli && <span>{cli}{showProj ? ' · ' : ''}</span>}{showProj && <span className="proj" style={cat ? { color: cat.c } : undefined}>{cat ? cat.e + ' ' : ''}{t.project}</span>}</div>}
+        {/* 윗줄 고정 양식: [고객사 뱃지(없으면 자체)] + 파란 프로젝트명 — 고객사·프로젝트가 항상 구분돼 보이게 */}
+        <div className="cli-proj"><span className={`clibadge${cli ? '' : ' own'}`}>{cli || '자체'}</span>{showProj && <span className="proj">{cat ? cat.e + ' ' : ''}{t.project}</span>}</div>
         <div className="task-big">{big}</div>
       </div>
       {t.owner && t.owner !== '신종호' && (WHO[t.owner]
@@ -540,12 +530,18 @@ export default function OfficeBoardView() {
       )}
 
       <div className="board">
-        <section className="room inbox-room" {...dropTo('받은일')}><div className="rh">📥 받은 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">미분류</span></div>
+        {/* 단건 할 일 — 프로젝트로 만들 것 없는 잔일을 적어두고 ✓로 끝내는 칸(입력+완수만, 심플) */}
+        <section className="room inbox-room" {...dropTo('받은일')}><div className="rh">✍️ 단건 할 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">적어두고 끝나면 ✓</span></div>
           <div className="qa">
-            <input value={qa} onChange={(e) => setQa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) quickAdd('받은일'); }} placeholder="+ 받은/처리한 일 한 줄… (Enter=받은일)" disabled={qaBusy} />
-            {qa.trim() && <div className="qa-btns"><button onClick={() => quickAdd('받은일')} disabled={qaBusy}>📥 받은일로</button><button onClick={() => quickAdd('완수')} disabled={qaBusy}>✅ 처리됨으로</button></div>}
+            <input value={qa} onChange={(e) => setQa(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) quickAdd('받은일'); }} placeholder="+ 할 일 한 줄… (Enter=추가)" disabled={qaBusy} />
           </div>
-          <div className="tkts">{inbox.length ? inbox.map(Card) : <div className="empty">📭 비움</div>}</div></section>
+          <div className="tkts">{inbox.length ? inbox.map((t) => (
+            <div key={t.id} className="smalltk" onClick={() => setSel(t)} style={{ cursor: 'pointer' }}>
+              <button onClick={(e) => { e.stopPropagation(); complete(t.id); }} title="완수 처리"
+                style={{ width: 24, height: 24, borderRadius: 6, border: '1.5px solid #d5d9e3', background: '#fff', cursor: 'pointer', fontSize: 13, color: '#16a34a', flexShrink: 0, lineHeight: 1 }}>✓</button>
+              <div><div className="task">{t.task || t.project}</div>{t.due ? <div className="c">{t.due}</div> : null}</div>
+            </div>
+          )) : <div className="empty">비움</div>}</div></section>
         <section className="room proc" {...dropTo('내회신')}><div className="rh">🧾 처리 <span className="cnt">{proc.length}</span><span className="hint">영업·연락·결재</span></div>
           <div className="tkts">{proc.length ? proc.map(Card) : <Empty />}</div></section>
       </div>
@@ -562,16 +558,6 @@ export default function OfficeBoardView() {
         <section className="room hold" {...dropTo('보류')}><div className="rh">⏸️ 보류 <span className="cnt">{hold.length}</span><span className="hint">멈춤</span></div>
           {hold.length ? hold.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
       </div>
-
-      {깃프로젝트.length > 0 && (<>
-        <div className="divider" style={{ color: '#2563eb' }}>📂 진행 중 프로젝트 (깃 자동) ({깃프로젝트.length}) · 푸시하면 자동 등장 · 누르면 깃</div>
-        <section className="room product"><div className="rowwrap">{깃프로젝트.map((p) => (
-          <a key={p.repo} href={p.htmlUrl} target="_blank" rel="noopener noreferrer" className="prodcard" style={{ cursor: 'pointer', textDecoration: 'none' }}>
-            <div className="pn" style={{ color: '#2563eb' }}>📂 {p.title}</div>
-            <div className="pnext">{[p.manager, p.progressStatus].filter(Boolean).join(' · ') || '진행 중'}</div>
-          </a>
-        ))}</div></section>
-      </>)}
 
       {cat === 'all' && filter !== 'jy' && (<>
         <div className="divider" style={{ color: CAT['도구'].c }}>🧰 도구 백로그 — 판매 제품 ({도구들.length}) · 누르면 설명·사용법</div>

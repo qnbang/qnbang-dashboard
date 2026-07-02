@@ -10,7 +10,7 @@ const SA_JSON = process.env.GOOGLE_SA_JSON;
 const WRITE_URL = process.env.SHEET_WRITE_URL
   || 'https://script.google.com/macros/s/AKfycbxPt24eFUbUP1cPwsv5Gspc3pak_hvqIdGf7T4cbvqJSxKkKimCdEhxdSll0yMPJ5dPAw/exec';
 const KEY = process.env.SHEET_KEY || 'qnbang2026';
-const PATCHABLE = new Set(['프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일', '기한', '고객', '돈종류', '할일', '메모', '갱신일']);
+const PATCHABLE = new Set(['프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일', '기한', '고객', '돈종류', '할일', '메모', '갱신일', '분류', '저장소']);
 
 function saApi() {
   const sa = JSON.parse(SA_JSON!);
