@@ -22,18 +22,20 @@ export const dynamic = 'force-dynamic';
 const HUB: Record<string, Cfg & { statusRepo?: string; statusPath?: string }> = {
   mangwon: {
     title: '망원 야간 보물찾기 — 기획',
-    sub: '마포구 야간·음식문화 활성화 지원사업. 골목 QR 보물찾기 + 영수증 빙고. 캠페인 기간 9/14(월)~9/20(일), 피크데이 9/19(토) 야간. 예산 2,000만원.',
+    sub: '마포구 야간·음식문화 활성화 지원사업. 골목에서 보물을 찾고, 매장 영수증으로 얻은 열쇠로 경품 보물상자에 도전. 행사 9/17(목)~9/20(일), 피크데이 9/19(토) 야간. 예산 2,000만원.',
     deadline: '2026-09-19',
     role: '큐앤뱅(QN!) × 망리단길골목형상점가 상인회',
     footerText: '큐앤뱅(QN!) × 망리단길골목형상점가 상인회 · 망원 야간 보물찾기',
     ddayLabel: '피크데이',
-    ddayNote: '(캠페인 기간 9/14~9/20 · 피크데이 9/19 야간)',
+    ddayNote: '(행사 9/17~9/20 · 피크데이 9/19 야간)',
     coLabel: '상인회',
     statusRepo: 'qnbang-proj-mangwon',
     statusPath: '현황판.md',
     nav: [
-      // 회의록은 마크다운 공유문서(슬러그) — 대시보드 '공유된 문서' 탭에서 바로 수정 가능
-      { src: 'mangwon', title: '1차 기획 회의록 (6/29)', ic: '📝', t: '회의록', d: '6/29 1차 기획 미팅 정리', primary: true },
+      // 계획안·회의록은 마크다운 공유문서(슬러그) — 대시보드 '공유된 문서' 탭에서 바로 수정 가능
+      { src: 'mangwon-plan', title: '1차 계획안', ic: '📋', t: '1차 계획안', d: '운영·경품·페이백·일정 (최신)', primary: true },
+      // 회의록은 게시판(여러 회의 목록) — 새 회의는 mangwon-meeting-board.html에 줄 추가
+      { src: 'mangwon-meeting-board.html', title: '회의록', ic: '📝', t: '회의록', d: '회의 기록 모음' },
     ],
     comments: [],
   },

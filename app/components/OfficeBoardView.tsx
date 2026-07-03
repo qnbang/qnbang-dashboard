@@ -966,7 +966,7 @@ export default function OfficeBoardView() {
                   {st.date ? (
                     <span className={`jdate${i === firstUndone ? ' now' : ''}`} onClick={() => openDateBox(i, st)} title="클릭=날짜 선택">📅 {st.start ? `${st.start}~${st.date}` : st.date}{i === firstUndone && stepDday(st.date) != null ? ` · ${ddText(stepDday(st.date))}` : ''}</span>
                   ) : (
-                    <span className="jdate empty" onClick={() => openDateBox(i, st)} title="클릭=날짜 선택">📅 날짜</span>
+                    <span className="jdate empty" onClick={() => openDateBox(i, st)} title="날짜 선택">📅</span>
                   )}
                   {(() => { const out = st.owner && st.owner !== '신종호' && st.owner !== '김지영'; return (
                     <select className={`jwho${st.owner ? (out ? ' set out' : ' set') : ''}`} title="이 단계 담당" value={st.owner || ''} onClick={(e) => e.stopPropagation()} onChange={(e) => setStepOwner(cur, i, e.target.value)}>
