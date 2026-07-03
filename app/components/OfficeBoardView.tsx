@@ -161,7 +161,7 @@ const CSS = `
 .qb .jstep:hover{border-color:#c4c8da}.qb .jstep.cur{border-color:#3a3d44;box-shadow:0 0 0 1px #3a3d4422;font-weight:700}
 .qb .jstep.done{color:#a0a5b8;background:#f7f8fc}.qb .jstep.done .jtext{text-decoration:line-through}
 .qb .jmark{width:18px;text-align:center;flex-shrink:0;color:#9298ac}.qb .jstep.cur .jmark{color:#3a3d44}.qb .jstep.done .jmark{color:#10b981}
-.qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0;cursor:pointer}.qb .jdate:hover{outline:1px solid #9aa0b8}.qb .jdate.now{background:#fde8eb;color:#e0364a;font-weight:700}
+.qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1;min-width:0;word-break:keep-all}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0;white-space:nowrap;cursor:pointer}.qb .jdate:hover{outline:1px solid #9aa0b8}.qb .jdate.now{background:#fde8eb;color:#e0364a;font-weight:700}
 .qb .jdate.empty{background:none;border:1px dashed #c4c8da;color:#9aa0b8}
 .qb .datebox{border:1px solid #3a3d44;border-radius:10px;background:#fff;padding:10px 12px;margin:-2px 0 8px 27px;box-shadow:0 8px 24px -10px #1e225544}
 .qb .datebox .drow{display:flex;align-items:center;gap:8px;margin-bottom:6px}.qb .datebox .drow span{font-size:11.5px;color:#6a7088;width:44px;flex-shrink:0}.qb .datebox .drow input{flex:1}
@@ -187,7 +187,7 @@ const CSS = `
 .qb .due{height:20px;border-radius:5px;font-size:11.5px;font-weight:700;padding:2px 6px;margin:0 3px;background:#ffffffd8;border:1px dashed #9aa0b8;color:#3a415c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .due::before{content:"◆ ";color:#d6455f;font-size:9px}
 .qb .jeditbtn{background:none;border:none;cursor:pointer;font-size:11px;opacity:0;transition:opacity .1s;flex-shrink:0;padding:0 2px}
 .qb .jstep:hover .jeditbtn{opacity:.55}.qb .jeditbtn:hover{opacity:1}
-.qb .jwho{font-size:10px;font-weight:700;border:none;border-radius:6px;padding:2px 4px;flex-shrink:0;cursor:pointer;background:#f1f3fa;color:#9298ac;opacity:.5;transition:opacity .1s;-webkit-appearance:none;appearance:none}
+.qb .jwho{font-size:10px;font-weight:700;border:none;border-radius:6px;padding:2px 4px;flex-shrink:0;max-width:76px;white-space:nowrap;cursor:pointer;background:#f1f3fa;color:#9298ac;opacity:.5;transition:opacity .1s;-webkit-appearance:none;appearance:none}
 .qb .jstep:hover .jwho{opacity:1}.qb .jwho:hover{opacity:1}
 .qb .jwho.set{opacity:1;color:#5a6078}.qb .jwho.set.out{color:#0d9488;background:#ccfbf1}
 .qb .arcwrap{margin-top:18px}
