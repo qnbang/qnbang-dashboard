@@ -29,8 +29,8 @@ export const HUB: Record<string, HubCfg> = {
     nav: [
       // 계획안·회의록은 마크다운 공유문서(슬러그) — 대시보드 '공유된 문서' 탭에서 바로 수정 가능
       { src: 'mangwon-plan', title: '1차 계획안', ic: '📋', t: '1차 계획안', d: '운영·경품·페이백·일정 (최신)', primary: true },
-      // 회의록은 게시판(여러 회의 목록) — 새 회의는 mangwon-meeting-board.html에 줄 추가
-      { src: 'mangwon-meeting-board.html', title: '회의록', ic: '📝', t: '회의록', d: '회의 기록 모음' },
+      // 회의록 = 데이터화된 게시판(/board/mangwon). 새 회의는 화면에서 추가(배포 불필요).
+      { src: 'board:mangwon', title: '회의록', ic: '📝', t: '회의록', d: '회의 기록 모음' },
     ],
     comments: [],
   },
@@ -41,7 +41,7 @@ export const HUB: Record<string, HubCfg> = {
     statusRepo: 'qnbang-proj-m650',
     statusPath: '현황판.md',
     nav: [
-      { src: 'm650-meeting-board.html', title: '회의록', ic: '📝', t: '회의록', d: '회의 기록 모음' },
+      { src: 'board:m650', title: '회의록', ic: '📝', t: '회의록', d: '회의 기록 모음' },
       { src: 'm650-actionplan.html', title: '액션플랜 — 6/30 마감', ic: '📅', t: '액션플랜', d: '6/30까지 일정·마일스톤', primary: true },
       { src: 'm650-questions.html', title: '확인사항 — 씨투아 협의', ic: '❓', t: '확인사항', d: '함께 정할 질문' },
       { src: 'm650-festival-ideas.html', title: '디벨롭 아이디어 ①~⑩', ic: '💡', t: '디벨롭 아이디어', d: '①~⑩ 추천안' },

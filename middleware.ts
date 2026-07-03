@@ -13,6 +13,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // login, api/login, api/cache, api/cron(크론 — 자체 key로 보호), api/hub-toggle(공개 허브 체크박스 토글 — HUB 설정 repo·체크박스로만 제한), share, hub, 정적 자원, 파비콘은 검사에서 제외
-  matcher: ['/((?!login|api/login|api/cache|api/cron|api/hub-toggle|share|hub|_next/static|_next/image|icon.png|apple-icon.png).*)'],
+  // login, api/login, api/cache, api/cron(크론 — 자체 key로 보호), api/hub-toggle(공개 허브 체크박스 토글 — HUB 설정 repo·체크박스로만 제한),
+  // board(공개 회의 게시판 — 읽기전용, 편집 폼은 로그인 시에만·api/board가 자체 쿠키검사), share, hub, 정적 자원, 파비콘은 검사에서 제외
+  matcher: ['/((?!login|api/login|api/cache|api/cron|api/hub-toggle|api/board|board|share|hub|_next/static|_next/image|icon.png|apple-icon.png).*)'],
 };

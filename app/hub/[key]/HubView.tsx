@@ -85,7 +85,7 @@ export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg
       <h2>바로가기</h2>
       <div className="nav">
         {cfg.nav.map((n) => (
-          <button key={n.src} className={n.primary ? 'primary' : ''} onClick={() => setModal({ src: `/share/${n.src}`, title: n.title })}>
+          <button key={n.src} className={n.primary ? 'primary' : ''} onClick={() => setModal({ src: n.src.startsWith('board:') ? `/board/${n.src.slice(6)}` : `/share/${n.src}`, title: n.title })}>
             <div className="ic">{n.ic}</div><div className="t">{n.t}</div><div className="d">{n.d}</div>
           </button>
         ))}
