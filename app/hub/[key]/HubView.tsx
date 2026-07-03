@@ -16,9 +16,40 @@ export type Cfg = {
   coLabel?: string;     // 담당 범례의 협력사 이름 (기본: 씨투아 / 사례별 '상인회' 등)
 };
 
-export default function HubView({ cfg, sections, done, total }: { cfg: Cfg; sections: Section[]; done: number; total: number }) {
+export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg: Cfg; sections: Section[]; done?: number; total?: number }) {
   const [modal, setModal] = useState<{ src: string; title: string } | null>(null);
   const [dday, setDday] = useState('D-—');
+  const [secs, setSecs] = useState<Section[]>(sections);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  // 체크박스 토글 — 낙관적 반영 후 서버 저장(현황판.md). 실패 시 롤백, 충돌이면 새로고침.
+  async function toggle(si: number, ii: number) {
+    if (busy) return;
+    const it = secs[si].items[ii];
+    const sectionName = secs[si].name;
+    const nextState: Item['state'] = it.state === 'done' ? 'todo' : 'done';
+    const prev = secs;
+    const id = `${si}:${ii}`;
+    setBusy(id);
+    setSecs((s) => s.map((sec, x) => (x !== si ? sec : { ...sec, items: sec.items.map((item, y) => (y !== ii ? item : { ...item, state: nextState })) })));
+    try {
+      const r = await fetch('/api/hub-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: hubKey, sectionName, text: it.text }),
+      });
+      if (!r.ok) {
+        setSecs(prev);
+        if (r.status === 409) { alert('다른 곳에서 먼저 바뀌었어요. 최신 상태로 새로고침합니다.'); location.reload(); }
+        else alert('저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      }
+    } catch {
+      setSecs(prev);
+      alert('네트워크 오류로 저장하지 못했어요.');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   useEffect(() => {
     const dl = new Date(cfg.deadline + 'T00:00:00'); const t = new Date(); t.setHours(0, 0, 0, 0);
@@ -32,6 +63,8 @@ export default function HubView({ cfg, sections, done, total }: { cfg: Cfg; sect
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
+  const total = secs.reduce((a, s) => a + s.items.length, 0);
+  const done = secs.reduce((a, s) => a + s.items.filter((i) => i.state === 'done').length, 0);
   const pct = total ? Math.round((done / total) * 100) : 0;
   // 담당 색상: 큐앤뱅=qn, 협의=both, 그 외(협력사 이름 무엇이든)=co — 특정 회사명 하드코딩 제거
   const whoCls = (w: string) => (w === '큐앤뱅' ? 'qn' : w === '협의' ? 'both' : w ? 'co' : '');
@@ -63,14 +96,17 @@ export default function HubView({ cfg, sections, done, total }: { cfg: Cfg; sect
           <h2>작업 순서 <small style={{ color: '#999', fontWeight: 400, fontSize: 14 }}>— 현황판과 자동 동기화</small></h2>
           <div className="prog"><i style={{ width: `${pct}%` }} /></div>
           <p className="progtxt">진행률 {pct}% ({done}/{total} 완료)</p>
-          <p className="legend">담당: <span className="who qn">큐앤뱅</span> · <span className="who co">{cfg.coLabel ?? '씨투아'}</span> · <span className="who both">협의</span></p>
+          <p className="legend">담당: <span className="who qn">큐앤뱅</span> · <span className="who co">{cfg.coLabel ?? '씨투아'}</span> · <span className="who both">협의</span> <span style={{ color: '#aaa' }}>· 항목을 누르면 체크/해제</span></p>
 
-          {sections.map((s) => (
+          {secs.map((s, si) => (
             <div className="step" key={s.name}>
               <h3>{s.name}</h3>
               <ul className="todo">
                 {s.items.map((it, i) => (
-                  <li key={i} className={it.state === 'done' ? 'checked' : ''}>
+                  <li key={i} className={`${it.state === 'done' ? 'checked' : ''}${busy === `${si}:${i}` ? ' busy' : ''}`}
+                    role="button" tabIndex={0}
+                    onClick={() => toggle(si, i)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(si, i); } }}>
                     <span className="mark">{it.state === 'done' ? '✅' : it.state === 'wait' ? '⏳' : '⬜'}</span>
                     <span>{it.who && <span className={`who ${whoCls(it.who)}`}>{it.who}</span>}{it.text}</span>
                   </li>
@@ -126,7 +162,9 @@ const HUB_CSS = `
   .wrap .step { border:1px solid var(--line); border-radius:13px; padding:16px 18px; margin:12px 0; background:#fff; }
   .wrap .step h3 { margin:0 0 8px; font-size:16.5px; }
   .wrap ul.todo { list-style:none; padding:0; margin:6px 0 0; }
-  .wrap ul.todo li { display:flex; align-items:flex-start; gap:9px; padding:6px 0; border-top:1px dashed #eee; font-size:14.5px; }
+  .wrap ul.todo li { display:flex; align-items:flex-start; gap:9px; padding:6px 6px; border-top:1px dashed #eee; font-size:14.5px; cursor:pointer; border-radius:7px; transition:background .12s; }
+  .wrap ul.todo li:hover { background:#faf9f7; }
+  .wrap ul.todo li.busy { opacity:.5; pointer-events:none; }
   .wrap ul.todo li:first-child { border-top:none; }
   .wrap ul.todo .mark { flex:none; }
   .wrap ul.todo li.checked span:last-child { color:#aaa; text-decoration:line-through; }
