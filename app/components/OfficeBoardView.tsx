@@ -426,12 +426,9 @@ export default function OfficeBoardView() {
     return owners.some((o) => o !== '신종호' && o !== '김지영'); // 외주
   });
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
-  // 작업 보드 = 대행+내부(지금 할 일). 도구·리서치·자체사업은 포트폴리오 섹션으로(칩 누르면 그 분류만 보드에).
-  const PORTFOLIO_CATS = new Set(['도구', '리서치', '자체사업']);
-  const ACTIVE_BALLS = new Set(['inbox', 'unset', 'mywork', 'myreply', 'client']); // unset(미분류)도 활성 — 자체사업 미분류 카드가 받은일 바구니에서 안 빠지게
-  // 보드 = 대행+내부 + 자체사업의 '활성 과업'(반보 호스트모집 등). 도구·리서치는 작업 아니라 포트폴리오만.
+  // 보드 = 대행+내부+자체사업 전 공위치(보류·예정 포함 — 활성만 올리면 보류로 옮긴 카드가 '실종'됨). 도구·리서치만 포트폴리오 섹션 전용.
   const board = cat === 'all'
-    ? vis.filter((t) => { const c = t.category || ''; if (c === '도구' || c === '리서치') return false; if (c === '자체사업') return ACTIVE_BALLS.has(t.ball); return true; })
+    ? vis.filter((t) => { const c = t.category || ''; return c !== '도구' && c !== '리서치'; })
     : vis.filter((t) => (t.category || '') === cat);
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
@@ -444,7 +441,7 @@ export default function OfficeBoardView() {
   const wait = board.filter((t) => t.ball === 'client').sort(byDday);
   const todo = board.filter((t) => t.ball === 'start').sort(byDday); // 예정 = 시작전 전부(날짜 있는 것 먼저, 없는 건 뒤) — 언젠가 통합
   const hold = board.filter((t) => t.ball === 'hold').sort(byDday);
-  const ACTIVE_SET = new Set(['inbox', 'mywork', 'myreply', 'client', 'hold']);
+  const ACTIVE_SET = new Set(['inbox', 'mywork', 'myreply', 'client']); // 가동률=지금 움직이는 공만. 보류(hold)=멈춤이라 '진행 중' 계수에서 제외
   const SHOW_CATS = ['대행', '자체사업', '내부', '리서치'] as const;
   // 활성 과업 중 카테고리별 고유 프로젝트 수
   const catProjects = Object.fromEntries(SHOW_CATS.map((k) => [
