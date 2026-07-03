@@ -117,6 +117,13 @@ export default function Home() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState('office');
 
+  // 새로고침해도 보던 섹션 유지 — 현재 탭을 URL 해시(#office 등)에 담아 두고, 열 때 그 해시로 복원.
+  useEffect(() => {
+    const h = window.location.hash.slice(1);
+    if (h && TABS.some((t) => t.key === h)) setTab(h);
+  }, []);
+  const goTab = (key: string) => { setTab(key); window.location.hash = key; };
+
   useEffect(() => {
     fetch('/api/data')
       .then((r) => r.json())
@@ -155,7 +162,7 @@ export default function Home() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => goTab(t.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
                 tab === t.key
                   ? 'border-indigo-600 text-indigo-600'

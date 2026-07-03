@@ -1,5 +1,5 @@
 // 프로젝트 아카이브 — 매출(계약 원장)을 '프로젝트(계약명)' 기준으로 묶어 월별 게시판으로 만든다.
-// 월 배치 = 계약일(프로젝트 시작 월). 자체/대행 = 매출 시트 '분류' 칸. 작업 내역 = 과업 시트.
+// 월 배치 = 계약일(프로젝트 시작 월). 계약일 없는 카드는 id에 박힌 생성일(첫 기록일)로, 그것도 없으면 갱신일로 폴백. 자체/대행 = 매출 시트 '분류' 칸. 작업 내역 = 과업 시트.
 // 흐름 체크(년·월별 매출) + 프로젝트별 매출·미수·작업 아카이빙이 목적.
 
 import { getSheets } from './sheetCache';
@@ -18,6 +18,13 @@ function baseName(name: string): string {
 function ym(d: unknown): string {
   const m = String(d ?? '').replace(/[./]/g, '-').match(/(\d{4})-(\d{1,2})/);
   return m ? `${m[1]}-${m[2].padStart(2, '0')}` : '';
+}
+
+// id에 박힌 생성일(dYYMMDD / gitYYMMDD…) → YYYY-MM. 계약일 없는 카드의 '첫 기록일(시작월)'로 씀.
+// ponytail: q13 같은 옛 id는 날짜가 없어 빈값 → 호출부에서 갱신일로 폴백.
+function idYm(id: unknown): string {
+  const m = String(id ?? '').match(/^[a-z]*(\d{2})(\d{2})(\d{2})/);
+  return m ? `20${m[1]}-${m[2]}` : '';
 }
 
 export interface ArchiveProject {
@@ -109,7 +116,7 @@ export async function buildArchive(): Promise<ArchiveData> {
     if (matched) continue;
     map.set('__arc__' + base, {
       name: base, client: a['고객'] || '', 분류: (a['고객'] ? '대행' : '자체') as '자체' | '대행',
-      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: ym(a['갱신일']) || '',
+      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: idYm(a['id']) || ym(a['갱신일']),
       작업: a['다음할일'] || a['할일'] || '', 상태: '완수', 링크: '', noRevenue: true,
     });
   }
@@ -133,7 +140,7 @@ export async function buildArchive(): Promise<ArchiveData> {
     if (matched) continue;
     map.set('__wip__' + base, {
       name: base, client: t['고객'] || '', 분류: (t['고객'] ? '대행' : '자체') as '자체' | '대행',
-      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: ym(t['갱신일']) || '',
+      계약: 0, 입금: 0, 미수: 0, 건: 0, 월: idYm(t['id']) || ym(t['갱신일']),
       작업: t['다음할일'] || t['할일'] || '', 상태: t['공위치'] || '진행 중', 링크: t['메모'] || '', noRevenue: true,
     });
   }
