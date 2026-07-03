@@ -31,7 +31,7 @@ const DOC_LABEL: Record<string, { t: string; h: string; p: string }> = {
   자체사업: { t: '📄 사업 개요', h: '어떤 사업·현황', p: '어떤 사업인지, 현재 진행 현황, 다음 방향을…' },
   도구: { t: '📄 도구 설명', h: '어떤 건지·진행상태·사용법', p: '어떤 도구인지, 어디까지 됐는지, 어떻게 쓰는지를…' },
 };
-// 할일 단계 파싱: "✓텍스트 @6/25" → {done, text, date}
+// 할일 단계 파싱: "✓텍스트 @6/25" 또는 "텍스트 @7/1~7/10" → {done, text, date(=마감), start(=시작, 있을 때만)}
 function parseStep(raw: string) {
   const done = raw.startsWith('✓');
   let s = (done ? raw.slice(1) : raw).trim();
@@ -39,10 +39,17 @@ function parseStep(raw: string) {
   const om = s.match(/^@(\S+)\s+/);
   const owner = om ? om[1] : '';
   if (om) s = s.slice(om[0].length).trim();
-  const dm = s.match(/@\s*(\d{1,2}\/\d{1,2})\s*$/); // 끝의 @월/일 = 날짜
-  const date = dm ? dm[1] : '';
+  // 끝의 @월/일 = 마감일. @시작~마감이면 앞=시작·뒤=마감(하위호환: 단일 @6/25는 start='' date='6/25').
+  const dm = s.match(/@\s*(\d{1,2}\/\d{1,2})(?:~(\d{1,2}\/\d{1,2}))?\s*$/);
+  const start = dm && dm[2] ? dm[1] : '';       // 물결(~) 뒤가 있을 때만 앞쪽이 시작일
+  const date = dm ? (dm[2] || dm[1]) : '';       // 마감일 = 항상 뒤쪽(또는 단일)
   if (dm) s = s.slice(0, dm.index).trim();
-  return { done, text: s, date, owner, raw };
+  return { done, text: s, date, start, owner, raw };
+}
+// 단계 날짜 토큰 직렬화 — 시작이 있으면 @시작~마감, 아니면 @마감(없으면 빈 문자열). 저장 재조립 전용.
+function dateToken(st: { date: string; start?: string }): string {
+  if (!st.date) return '';
+  return st.start ? ` @${st.start}~${st.date}` : ` @${st.date}`;
 }
 // 할일 단계가 비었으면 현재상태를 '지금 단계'로 흐름에 흡수. 손대는 순간(체크·추가) 진짜 단계로 굳어 이력에 쌓임.
 function effTodos(t: { todos?: string[]; status?: string }): string[] {
@@ -76,6 +83,8 @@ function toOver(p: Record<string, string>): Partial<Task> { // 한글 patch → 
   return o as Partial<Task>;
 }
 const WHO: Record<string, string> = { 신종호: '🧑‍💼 종호', 김지영: '🎨 김지영' };
+// 캘린더 담당자 색(시안 기준) — 신종호 파랑·김지영 분홍·그 외(외주) 회색.
+const OWNER_COLOR = (owner: string) => owner === '신종호' ? '#4a6fd6' : owner === '김지영' ? '#c95f8a' : '#7a8296';
 
 // 🧪 실험실 — 과업 시트가 아닌 고정 참조. (도구 백로그는 분류=도구 행으로 이관됨)
 const EXPERIMENTS = [
@@ -152,7 +161,30 @@ const CSS = `
 .qb .jstep:hover{border-color:#c4c8da}.qb .jstep.cur{border-color:#3a3d44;box-shadow:0 0 0 1px #3a3d4422;font-weight:700}
 .qb .jstep.done{color:#a0a5b8;background:#f7f8fc}.qb .jstep.done .jtext{text-decoration:line-through}
 .qb .jmark{width:18px;text-align:center;flex-shrink:0;color:#9298ac}.qb .jstep.cur .jmark{color:#3a3d44}.qb .jstep.done .jmark{color:#10b981}
-.qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0}.qb .jdate.now{background:#fde8eb;color:#e0364a;font-weight:700}
+.qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0;cursor:pointer}.qb .jdate:hover{outline:1px solid #9aa0b8}.qb .jdate.now{background:#fde8eb;color:#e0364a;font-weight:700}
+.qb .jdate.empty{background:none;border:1px dashed #c4c8da;color:#9aa0b8}
+.qb .datebox{border:1px solid #3a3d44;border-radius:10px;background:#fff;padding:10px 12px;margin:-2px 0 8px 27px;box-shadow:0 8px 24px -10px #1e225544}
+.qb .datebox .drow{display:flex;align-items:center;gap:8px;margin-bottom:6px}.qb .datebox .drow span{font-size:11.5px;color:#6a7088;width:44px;flex-shrink:0}.qb .datebox .drow input{flex:1}
+.qb .datebox .dbtns{display:flex;gap:6px;margin-top:2px}.qb .datebox .ok{font-size:12px;font-weight:700;background:#3a3d44;color:#fff;border:none;border-radius:8px;padding:5px 14px;cursor:pointer}.qb .datebox .clear{font-size:12px;background:#f1f3fa;color:#6a7088;border:none;border-radius:8px;padding:5px 10px;cursor:pointer}
+/* ── 뷰 토글 + 캘린더뷰(시안 이식) ── */
+.qb .viewtoggle{margin-left:auto;display:flex;border-radius:8px;overflow:hidden;border:1px solid #e0e3ee}
+.qb .viewtoggle span{padding:6px 16px;font-size:13px;background:#ffffffcc;color:#5a6078;cursor:pointer;font-weight:700}.qb .viewtoggle span.on{background:#3a3d44;color:#fff}
+.qb .calwrap{padding:2px 4px 8px}
+.qb .monthnav{display:flex;align-items:center;gap:12px;padding:14px 18px 4px}.qb .monthnav b{font-size:17px}
+.qb .mbtn{width:26px;height:26px;border-radius:6px;background:#ffffff90;border:1px solid #ffffffaa;text-align:center;line-height:24px;font-size:13px;color:#4a5069;cursor:pointer}
+.qb .todaybtn{font-size:12px;padding:4px 10px;border-radius:6px;background:#ffffff90;border:1px solid #ffffffaa;color:#4a5069;cursor:pointer}
+.qb .legend{margin-left:auto;display:flex;gap:12px;font-size:12px;color:#4a5069;align-items:center;flex-wrap:wrap}
+.qb .legend .dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.qb .cal{padding:12px 14px 16px}
+.qb .dow{display:grid;grid-template-columns:repeat(7,1fr);font-size:12px;color:#6a7089;padding:6px 0;text-align:center;font-weight:700}.qb .dow .sun{color:#d6455f}.qb .dow .sat{color:#4a6fd6}
+.qb .week{position:relative;border-top:1px solid #ffffff88}
+.qb .days{display:grid;grid-template-columns:repeat(7,1fr)}
+.qb .day{min-height:96px;padding:6px 6px 4px;border-right:1px solid #ffffff55;font-size:12px;color:#5a6079}.qb .day:last-child{border-right:none}.qb .day .n{font-weight:700}.qb .day.out{opacity:.35}.qb .day.sun .n{color:#d6455f}.qb .day.sat .n{color:#4a6fd6}
+.qb .day.today{background:#ffffff70}.qb .day.today .n{background:#1e2233;color:#fff;border-radius:5px;padding:1px 6px}
+.qb .bars{position:absolute;top:30px;left:0;right:0;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:22px;row-gap:3px;pointer-events:none}
+.qb .bar{height:20px;border-radius:5px;font-size:11.5px;font-weight:700;color:#fff;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 3px;box-shadow:0 2px 6px -2px #2a335560}
+.qb .bar.contL{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0}.qb .bar.contR{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0}
+.qb .due{height:20px;border-radius:5px;font-size:11.5px;font-weight:700;padding:2px 6px;margin:0 3px;background:#ffffffd8;border:1px dashed #9aa0b8;color:#3a415c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .due::before{content:"◆ ";color:#d6455f;font-size:9px}
 .qb .jeditbtn{background:none;border:none;cursor:pointer;font-size:11px;opacity:0;transition:opacity .1s;flex-shrink:0;padding:0 2px}
 .qb .jstep:hover .jeditbtn{opacity:.55}.qb .jeditbtn:hover{opacity:1}
 .qb .jwho{font-size:10px;font-weight:700;border:none;border-radius:6px;padding:2px 4px;flex-shrink:0;cursor:pointer;background:#f1f3fa;color:#9298ac;opacity:.5;transition:opacity .1s;-webkit-appearance:none;appearance:none}
@@ -204,6 +236,22 @@ function stepDday(md: string): number | null {
   if (diff < -180) { target = new Date(now.getFullYear() + 1, +m[1] - 1, +m[2]); diff = Math.round((target.getTime() - t0.getTime()) / 86400000); }
   return diff;
 }
+// "M/D" → "YYYY-MM-DD"(date input value). 연도는 stepDday와 같은 추론(6개월 넘게 지났으면 내년).
+function mdToYmd(md: string): string {
+  const m = md.match(/^(\d{1,2})\/(\d{1,2})$/);
+  if (!m) return '';
+  const now = new Date();
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let y = now.getFullYear();
+  const diff = Math.round((new Date(y, +m[1] - 1, +m[2]).getTime() - t0.getTime()) / 86400000);
+  if (diff < -180) y += 1;
+  return `${y}-${String(+m[1]).padStart(2, '0')}-${String(+m[2]).padStart(2, '0')}`;
+}
+// "YYYY-MM-DD"(date input) → "M/D"(저장 토큰). 연도는 버림.
+function ymdToMd(ymd: string): string {
+  const m = ymd.match(/^\d{4}-(\d{2})-(\d{2})$/);
+  return m ? `${+m[1]}/${+m[2]}` : '';
+}
 // 카드가 실제로 보여주는 D-day = 지금 단계의 @날짜(있으면) 아니면 과업 기한. 정렬·뱃지·urgent 모두 이걸로.
 function cardDday(t: { todos?: string[]; status?: string; due?: string; dday?: number | null }): number | null {
   const c = currentStep(t);
@@ -228,8 +276,12 @@ export default function OfficeBoardView() {
   const [err, setErr] = useState('');
   const [filter, setFilter] = useState<'all' | 'jh' | 'jy' | 'out'>('all');
   const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
+  const [view, setView] = useState<'board' | 'cal'>('board'); // 칸반 ↔ 캘린더 뷰
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; }); // 캘린더 보이는 달
   useEffect(() => { try { const c = localStorage.getItem('qb-cat'); if (c) setCat(c as typeof cat); } catch { /**/ } }, []); // 새로고침 유지
   useEffect(() => { try { localStorage.setItem('qb-cat', cat); } catch { /**/ } }, [cat]);
+  useEffect(() => { try { const v = localStorage.getItem('qb-view'); if (v === 'cal' || v === 'board') setView(v); } catch { /**/ } }, []); // 뷰 유지
+  useEffect(() => { try { localStorage.setItem('qb-view', view); } catch { /**/ } }, [view]);
   useEffect(() => { // PC: ESC로 모달 닫기
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSel(null); setMoneyList(null); } };
     window.addEventListener('keydown', onKey);
@@ -256,6 +308,9 @@ export default function OfficeBoardView() {
   const [showDone, setShowDone] = useState(false); // 문서형: 완료 단계 접기
   const [editStepIdx, setEditStepIdx] = useState<number | null>(null);
   const [editStepVal, setEditStepVal] = useState('');
+  const [dateStepIdx, setDateStepIdx] = useState<number | null>(null); // 📅 클릭=인라인 날짜박스 열린 단계
+  const [dateStart, setDateStart] = useState(''); // 날짜박스 시작일(YYYY-MM-DD)
+  const [dateEnd, setDateEnd] = useState('');     // 날짜박스 마감일(YYYY-MM-DD)
 
   const [qa, setQa] = useState(''); // 받은일/처리 빠른추가 입력(단건)
   const [qaBusy, setQaBusy] = useState(false);
@@ -308,7 +363,7 @@ export default function OfficeBoardView() {
         프로젝트: sel.project || '',
         과업명: (sel.task && sel.task !== '(프로젝트 등록)') ? sel.task : '',
       });
-      setShowEdit(false); setShowMoney(false); setEditStepIdx(null);
+      setShowEdit(false); setShowMoney(false); setEditStepIdx(null); setDateStepIdx(null);
       setMemoVal(sel.memo || ''); setShowHist(false); setDocEdit(false); setOpenSec(null); setShowDone(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -377,12 +432,38 @@ export default function OfficeBoardView() {
     const 내용 = `+ "${txt.replace(/@.*$/, '').trim()}" 추가`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
-  const startEditStep = (i: number, st: { text: string; date: string; owner: string }) => { setEditStepIdx(i); setEditStepVal((st.owner ? `@${st.owner} ` : '') + st.text + (st.date ? ` @${st.date}` : '')); };
+  const startEditStep = (i: number, st: { text: string; date: string; start?: string; owner: string }) => { setEditStepIdx(i); setEditStepVal((st.owner ? `@${st.owner} ` : '') + st.text + dateToken(st)); };
   const saveStepEdit = (t: Task, i: number) => {
     const v = editStepVal.trim(); if (!v) return;
     const todos = [...effTodos(t)]; const wasDone = parseStep(todos[i]).done;
     todos[i] = (wasDone ? '✓' : '') + v; setEditStepIdx(null);
     const 내용 = `✎ 단계 수정: "${v.replace(/@.*$/, '').trim()}"`;
+    optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
+  };
+  // 📅 칩 클릭 → 그 단계의 인라인 날짜박스 토글. 현재 시작/마감을 date input 값(YYYY-MM-DD)으로 채운다.
+  const openDateBox = (i: number, st: { date: string; start?: string }) => {
+    if (dateStepIdx === i) { setDateStepIdx(null); return; }
+    setDateStepIdx(i);
+    setDateStart(st.start ? mdToYmd(st.start) : '');
+    setDateEnd(st.date ? mdToYmd(st.date) : '');
+  };
+  // 날짜박스 저장 — 단계 날짜 토큰을 재조립(시작~마감/마감만/없음)해 기존 단계저장 경로로 보냄.
+  const saveDate = (t: Task, i: number) => {
+    const todos = [...effTodos(t)]; const st = parseStep(todos[i]);
+    const start = ymdToMd(dateStart), end = ymdToMd(dateEnd);
+    // 마감 없으면 날짜 토큰 제거(=지우기). 시작만 있고 마감 없으면 시작을 마감으로 승격.
+    const nextDate = end || start; const nextStart = end ? (start && start !== end ? start : '') : '';
+    const body = (st.owner ? `@${st.owner} ` : '') + st.text + dateToken({ date: nextDate, start: nextStart });
+    todos[i] = (st.done ? '✓' : '') + body; setDateStepIdx(null);
+    const 내용 = nextDate ? `📅 "${st.text}" 날짜 ${nextStart ? nextStart + '~' : ''}${nextDate}` : `📅 "${st.text}" 날짜 지움`;
+    optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
+  };
+  // 날짜 지우기 — 그 단계 날짜 토큰 제거.
+  const clearDate = (t: Task, i: number) => {
+    const todos = [...effTodos(t)]; const st = parseStep(todos[i]);
+    const body = (st.owner ? `@${st.owner} ` : '') + st.text; // 날짜 토큰 없이 재조립
+    todos[i] = (st.done ? '✓' : '') + body; setDateStepIdx(null);
+    const 내용 = `📅 "${st.text}" 날짜 지움`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
   const delStep = (t: Task, i: number) => {
@@ -397,7 +478,7 @@ export default function OfficeBoardView() {
     let next = val;
     if (val === '__외주__') next = (prompt('외주사 이름 (공백 없이)') || '').trim().replace(/\s+/g, ''); // 취소·빈값이면 상속
     if (next === st.owner) return; // 변화 없음
-    const body = (next ? `@${next} ` : '') + st.text + (st.date ? ` @${st.date}` : '');
+    const body = (next ? `@${next} ` : '') + st.text + dateToken(st);
     todos[i] = (st.done ? '✓' : '') + body;
     const lbl = next ? (WHO[next] || `🤝 ${next}`) : '담당 해제(카드 담당 상속)';
     const 내용 = `👤 "${st.text}" → ${lbl}`;
@@ -430,6 +511,16 @@ export default function OfficeBoardView() {
   const board = cat === 'all'
     ? vis.filter((t) => { const c = t.category || ''; return c !== '도구' && c !== '리서치'; })
     : vis.filter((t) => (t.category || '') === cat);
+  // 캘린더 항목 = 보이는 과업(board)의 미완료·날짜 있는 단계 전부를 펼침. start&end=기간막대, end만=◆칩.
+  type CalItem = { task: Task; proj: string; text: string; owner: string; start: string; end: string };
+  const calItems: CalItem[] = board.flatMap((t) => effTodos(t).map(parseStep)
+    .filter((s) => !s.done && s.date)
+    .map((s) => ({
+      task: t, proj: t.project || t.task || '', text: s.text,
+      owner: (s.owner || t.owner || '신종호'),
+      start: s.start ? mdToYmd(s.start) : '', end: mdToYmd(s.date), // YYYY-MM-DD로 통일
+    }))
+    .filter((c) => c.end)); // 마감 파싱 실패는 제외
   const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
   const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
   const 도구들 = all.filter((t) => (t.category || '') === '도구');
@@ -493,6 +584,66 @@ export default function OfficeBoardView() {
   };
   const Empty = () => <div className="empty">— 없음 —</div>;
 
+  // 사무실 캘린더뷰 — 시안의 주별 grid 로직 그대로. 막대(기간)·◆칩(마감만). 클릭=그 프로젝트 패널.
+  const CalView = () => {
+    const { y: Y, m: M } = calMonth;
+    const today = new Date(); const TODAY = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const first = new Date(Y, M, 1), startDow = first.getDay(), dim = new Date(Y, M + 1, 0).getDate();
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < startDow; i++) cells.push(null);
+    for (let d = 1; d <= dim; d++) cells.push(d);
+    while (cells.length % 7) cells.push(null);
+    const ymd = (d: number) => `${Y}-${String(M + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const weeks: (number | null)[][] = [];
+    for (let w = 0; w < cells.length / 7; w++) weeks.push(cells.slice(w * 7, w * 7 + 7));
+    const step = (dir: number) => { let m = M + dir, yy = Y; if (m < 0) { m = 11; yy--; } if (m > 11) { m = 0; yy++; } setCalMonth({ y: yy, m }); };
+    return (
+      <div className="calwrap">
+        <div className="monthnav">
+          <span className="mbtn" onClick={() => step(-1)}>◀</span><b>{Y}년 {M + 1}월</b><span className="mbtn" onClick={() => step(1)}>▶</span>
+          <span className="todaybtn" onClick={() => setCalMonth({ y: today.getFullYear(), m: today.getMonth() })}>오늘</span>
+          <div className="legend">
+            <span><span className="dot" style={{ background: '#4a6fd6' }} />신종호</span>
+            <span><span className="dot" style={{ background: '#c95f8a' }} />지영</span>
+            <span><span className="dot" style={{ background: '#7a8296' }} />외주</span>
+            <span><span className="dot" style={{ background: '#fff', border: '1px dashed #9aa0b8' }} />◆ 마감일만</span>
+          </div>
+        </div>
+        <div className="cal">
+          <div className="dow"><span className="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span className="sat">토</span></div>
+          {weeks.map((week, w) => {
+            const wDates = week.map((d) => d ? ymd(d) : null);
+            const wFirst = wDates.find(Boolean) as string, wLast = [...wDates].reverse().find(Boolean) as string;
+            const bars: React.ReactNode[] = [];
+            calItems.forEach((c, ci) => {
+              if (!c.start) { // 마감만 → ◆ 칩
+                const idx = wDates.indexOf(c.end);
+                if (idx >= 0) bars.push(<div key={ci} className="due" style={{ gridColumn: `${idx + 1}/span 1`, pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => setSel(c.task)}>{c.proj} — {c.text}</div>);
+                return;
+              }
+              if (c.end < wFirst || c.start > wLast) return; // 이 주와 안 겹침
+              const s = Math.max(0, wDates.findIndex((x) => x && x >= c.start));
+              let e = 6; for (let i = 6; i >= 0; i--) { const x = wDates[i]; if (x && x <= c.end) { e = i; break; } }
+              const contL = c.start < wFirst, contR = c.end > wLast;
+              bars.push(<div key={ci} className={`bar${contL ? ' contL' : ''}${contR ? ' contR' : ''}`} style={{ gridColumn: `${s + 1}/span ${e - s + 1}`, background: OWNER_COLOR(c.owner), pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => setSel(c.task)}>{c.proj} — {c.text}</div>);
+            });
+            return (
+              <div key={w} className="week">
+                <div className="days">
+                  {week.map((d, i) => {
+                    const cls = ['day', i === 0 && 'sun', i === 6 && 'sat', !d && 'out', d && ymd(d) === TODAY && 'today'].filter(Boolean).join(' ');
+                    return <div key={i} className={cls}>{d ? <span className="n">{d}</span> : ''}</div>;
+                  })}
+                </div>
+                <div className="bars">{bars}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`qb${dragId ? ' dragging' : ''}`} onDragEnd={() => setDragId(null)}>
       <style>{CSS}</style>
@@ -515,6 +666,7 @@ export default function OfficeBoardView() {
           <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
         <button className="npbtn" onClick={() => setShowNP((v) => !v)}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
+        <div className="viewtoggle"><span className={view === 'board' ? 'on' : ''} onClick={() => setView('board')}>칸반</span><span className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>캘린더</span></div>
       </div>
       {showNP && (
         <div className="npform">
@@ -526,6 +678,9 @@ export default function OfficeBoardView() {
         </div>
       )}
 
+      {view === 'cal' && <div className="room" style={{ padding: 0, overflow: 'hidden' }}><CalView /></div>}
+
+      {view === 'board' && (<>
       <div className="board">
         {/* 단건 할 일 — 프로젝트로 만들 것 없는 잔일을 적어두고 ✓로 끝내는 칸(입력+완수만, 심플) */}
         <section className="room inbox-room" {...dropTo('받은일')}><div className="rh">✍️ 단건 할 일 <span className={`cnt${inbox.length ? ' red' : ''}`}>{inbox.length}</span><span className="hint">적어두고 끝나면 ✓</span></div>
@@ -576,6 +731,7 @@ export default function OfficeBoardView() {
         <section className="room product"><div className="rowwrap">{EXPERIMENTS.map((x) => (
           <div key={x.n} className="labcard"><div className="ln">🧪 {x.n}</div><div className="lg">{x.g}</div></div>
         ))}</div></section>
+      </>)}
       </>)}
 
       {/* 아카이브 — 완수·폐기 프로젝트(접이식, 열 때 온디맨드 로드) */}
@@ -789,10 +945,15 @@ export default function OfficeBoardView() {
                   <button className="jbtn del" disabled={busy} onClick={() => delStep(cur, i)}>🗑</button>
                 </div>
               ) : (
-                <div key={i} className={`jstep${st.done ? ' done' : i === firstUndone ? ' cur' : ''}`}>
+                <div key={i}>
+                <div className={`jstep${st.done ? ' done' : i === firstUndone ? ' cur' : ''}`}>
                   <span className="jmark" onClick={() => toggleStep(cur, i)}>{st.done ? '✓' : i === firstUndone ? '▶' : '○'}</span>
                   <span className="jtext" onClick={() => toggleStep(cur, i)}>{st.text}</span>
-                  {st.date && <span className={`jdate${i === firstUndone ? ' now' : ''}`}>📅 {st.date}{i === firstUndone && stepDday(st.date) != null ? ` · ${ddText(stepDday(st.date))}` : ''}</span>}
+                  {st.date ? (
+                    <span className={`jdate${i === firstUndone ? ' now' : ''}`} onClick={() => openDateBox(i, st)} title="클릭=날짜 선택">📅 {st.start ? `${st.start}~${st.date}` : st.date}{i === firstUndone && stepDday(st.date) != null ? ` · ${ddText(stepDday(st.date))}` : ''}</span>
+                  ) : (
+                    <span className="jdate empty" onClick={() => openDateBox(i, st)} title="클릭=날짜 선택">📅 날짜</span>
+                  )}
                   {(() => { const out = st.owner && st.owner !== '신종호' && st.owner !== '김지영'; return (
                     <select className={`jwho${st.owner ? (out ? ' set out' : ' set') : ''}`} title="이 단계 담당" value={st.owner || ''} onClick={(e) => e.stopPropagation()} onChange={(e) => setStepOwner(cur, i, e.target.value)}>
                       <option value="">담당</option>
@@ -803,6 +964,14 @@ export default function OfficeBoardView() {
                     </select>
                   ); })()}
                   <button className="jeditbtn" onClick={() => startEditStep(i, st)}>✏️</button>
+                </div>
+                {dateStepIdx === i && (
+                  <div className="datebox">
+                    <div className="drow"><span>시작일</span><input type="date" className="ein" value={dateStart} onChange={(e) => setDateStart(e.target.value)} /></div>
+                    <div className="drow"><span>마감일</span><input type="date" className="ein" value={dateEnd} onChange={(e) => setDateEnd(e.target.value)} /></div>
+                    <div className="dbtns"><button className="ok" disabled={busy} onClick={() => saveDate(cur, i)}>저장</button><button className="clear" disabled={busy} onClick={() => clearDate(cur, i)}>날짜 지우기</button></div>
+                  </div>
+                )}
                 </div>
               ));
             })()}
