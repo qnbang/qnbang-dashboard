@@ -321,7 +321,7 @@ export default function OfficeBoardView() {
     try {
       const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: txt, ball, 출처: '단건할일' }) }); // 출처 태그로 매출 프로젝트 아카이브 집계에서 제외(archive.ts)
       const j = await r.json();
-      if (j.ok) { setQa(''); load(); } else alert(j.error || '추가 실패');
+      if (j.ok) { setQa(''); load(true); } else alert(j.error || '추가 실패'); // fresh=1 로 즉시 반영(캐시 인스턴스 지연 방지) — 새 프로젝트와 동일
     } catch (e) { alert(String(e)); } finally { setQaBusy(false); }
   };
   // 웹 새 프로젝트 등록 — 프로젝트명+마감+담당 → 예정(시작전) 칸에 카드 1개
