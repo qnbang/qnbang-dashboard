@@ -181,7 +181,7 @@ const CSS = `
 .qb .days{display:grid;grid-template-columns:repeat(7,1fr)}
 .qb .day{min-height:96px;padding:6px 6px 4px;border-right:1px solid #ffffff55;font-size:12px;color:#5a6079}.qb .day:last-child{border-right:none}.qb .day .n{font-weight:700}.qb .day.out{opacity:.35}.qb .day.sun .n{color:#d6455f}.qb .day.sat .n{color:#4a6fd6}
 .qb .day.today{background:#ffffff70}.qb .day.today .n{background:#1e2233;color:#fff;border-radius:5px;padding:1px 6px}
-.qb .bars{position:absolute;top:30px;left:0;right:0;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:22px;row-gap:3px;pointer-events:none}
+.qb .bars{position:absolute;top:36px;left:0;right:0;display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:22px;row-gap:3px;pointer-events:none}
 .qb .bar{height:20px;border-radius:5px;font-size:11.5px;font-weight:700;color:#fff;padding:2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 3px;box-shadow:0 2px 6px -2px #2a335560}
 .qb .bar.contL{border-top-left-radius:0;border-bottom-left-radius:0;margin-left:0}.qb .bar.contR{border-top-right-radius:0;border-bottom-right-radius:0;margin-right:0}
 .qb .due{height:20px;border-radius:5px;font-size:11.5px;font-weight:700;padding:2px 6px;margin:0 3px;background:#ffffffd8;border:1px dashed #9aa0b8;color:#3a415c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qb .due::before{content:"◆ ";color:#d6455f;font-size:9px}
@@ -614,28 +614,42 @@ export default function OfficeBoardView() {
           {weeks.map((week, w) => {
             const wDates = week.map((d) => d ? ymd(d) : null);
             const wFirst = wDates.find(Boolean) as string, wLast = [...wDates].reverse().find(Boolean) as string;
-            const bars: React.ReactNode[] = [];
+            // 이 주에 걸치는 항목을 칸 구간(s~e)으로 변환
+            type Slot = { ci: number; c: CalItem; s: number; e: number; due: boolean; contL: boolean; contR: boolean; row: number };
+            const items: Slot[] = [];
             calItems.forEach((c, ci) => {
               if (!c.start) { // 마감만 → ◆ 칩
                 const idx = wDates.indexOf(c.end);
-                if (idx >= 0) bars.push(<div key={ci} className="due" style={{ gridColumn: `${idx + 1}/span 1`, pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => setSel(c.task)}>{c.proj} — {c.text}</div>);
+                if (idx >= 0) items.push({ ci, c, s: idx, e: idx, due: true, contL: false, contR: false, row: 0 });
                 return;
               }
               if (c.end < wFirst || c.start > wLast) return; // 이 주와 안 겹침
               const s = Math.max(0, wDates.findIndex((x) => x && x >= c.start));
               let e = 6; for (let i = 6; i >= 0; i--) { const x = wDates[i]; if (x && x <= c.end) { e = i; break; } }
-              const contL = c.start < wFirst, contR = c.end > wLast;
-              bars.push(<div key={ci} className={`bar${contL ? ' contL' : ''}${contR ? ' contR' : ''}`} style={{ gridColumn: `${s + 1}/span ${e - s + 1}`, background: OWNER_COLOR(c.owner), pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => setSel(c.task)}>{c.proj} — {c.text}</div>);
+              items.push({ ci, c, s, e, due: false, contL: c.start < wFirst, contR: c.end > wLast, row: 0 });
             });
+            // 겹치지 않게 행 배정(구간 그래프) — 같은 칸을 쓰는 항목은 다음 행으로. 주 높이는 필요한 행 수만큼 늘려 다음 주 침범·클릭막힘 방지.
+            const rowOcc: [number, number][][] = [];
+            items.forEach((it) => {
+              let r = 0;
+              while ((rowOcc[r] || (rowOcc[r] = [])).some(([os, oe]) => !(it.e < os || it.s > oe))) r++;
+              rowOcc[r].push([it.s, it.e]); it.row = r;
+            });
+            const minH = Math.max(124, 36 + rowOcc.length * 26 + 8); // 빈 주도 넉넉히(위아래 크게)
             return (
               <div key={w} className="week">
-                <div className="days">
+                <div className="days" style={{ minHeight: minH }}>
                   {week.map((d, i) => {
                     const cls = ['day', i === 0 && 'sun', i === 6 && 'sat', !d && 'out', d && ymd(d) === TODAY && 'today'].filter(Boolean).join(' ');
                     return <div key={i} className={cls}>{d ? <span className="n">{d}</span> : ''}</div>;
                   })}
                 </div>
-                <div className="bars">{bars}</div>
+                <div className="bars">
+                  {items.map((it) => it.due
+                    ? <div key={it.ci} className="due" title={`${it.c.proj} — ${it.c.text}`} style={{ gridColumn: `${it.s + 1}/span 1`, gridRow: it.row + 1, pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => setSel(it.c.task)}>{it.c.proj} — {it.c.text}</div>
+                    : <div key={it.ci} className={`bar${it.contL ? ' contL' : ''}${it.contR ? ' contR' : ''}`} title={`${it.c.proj} — ${it.c.text}`} style={{ gridColumn: `${it.s + 1}/span ${it.e - it.s + 1}`, gridRow: it.row + 1, background: OWNER_COLOR(it.c.owner), pointerEvents: 'auto', cursor: 'pointer' }} onClick={() => setSel(it.c.task)}>{it.c.proj} — {it.c.text}</div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -659,6 +673,7 @@ export default function OfficeBoardView() {
         {([['all', '전체'], ['jh', '🧑‍💼 신종호'], ['jy', '🎨 김지영'], ['out', '🤝 외주']] as const).map(([k, lb]) => (
           <div key={k} className={`chip${filter === k ? ' on' : ''}`} onClick={() => setFilter(k)}>{lb}</div>
         ))}
+        <div className="viewtoggle"><span className={view === 'board' ? 'on' : ''} onClick={() => setView('board')}>칸반</span><span className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>캘린더</span></div>
       </div>
       <div className="filters" style={{ marginTop: -6 }}>
         <div className={`chip${cat === 'all' ? ' on' : ''}`} onClick={() => setCat('all')}>전체 분류</div>
@@ -666,7 +681,6 @@ export default function OfficeBoardView() {
           <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
         <button className="npbtn" onClick={() => setShowNP((v) => !v)}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
-        <div className="viewtoggle"><span className={view === 'board' ? 'on' : ''} onClick={() => setView('board')}>칸반</span><span className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>캘린더</span></div>
       </div>
       {showNP && (
         <div className="npform">
