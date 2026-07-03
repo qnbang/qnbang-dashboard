@@ -101,6 +101,13 @@ const WORK_TOOLS: WorkTool[] = [
       { label: '어드민', href: 'https://banbo-preview.vercel.app/admin.html' },
     ],
   },
+  {
+    name: '스레드 링크 자동수집기',
+    desc: '스레드·인스타 링크를 던지면 도구·기법을 자동 식별·요약해 위키로 쌓고, 적용 지시서까지 뽑아주는 도구',
+    href: 'https://collector.qnbang.com',
+    icon: '🧲',
+    color: 'bg-sky-50 text-sky-600 border-sky-200',
+  },
 ];
 
 export default function Home() {
