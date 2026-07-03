@@ -943,10 +943,9 @@ export default function OfficeBoardView() {
               {DOC_LABEL[cur.category || ''] && (() => { const dn = effTodos(cur).map(parseStep).filter((s) => s.done).length; return dn > 0 ? <button className="docbtn" onClick={() => setShowDone((v) => !v)}>✓ 완료 {dn}개 {showDone ? '숨기기' : '보기'}</button> : null; })()}</div>
             {(() => {
               const raw = effTodos(cur).map(parseStep);
-              // 날짜순으로 보여주되 토글·편집은 원본 인덱스(i)로 — 완료는 위(원래순서), 미완료는 날짜 오름차순(무날짜 뒤).
+              // 날짜순으로 보여주되 토글·편집은 원본 인덱스(i)로 — 완료(위)·미완료(아래) 그룹 안에서 모두 날짜 오름차순(무날짜 뒤).
               const order = raw.map((st, i) => ({ st, i })).sort((a, b) => {
                 if (a.st.done !== b.st.done) return a.st.done ? -1 : 1;
-                if (a.st.done) return a.i - b.i;
                 const da = a.st.date ? (stepDday(a.st.date) ?? 99999) : 99999;
                 const db = b.st.date ? (stepDday(b.st.date) ?? 99999) : 99999;
                 return da !== db ? da - db : a.i - b.i;
