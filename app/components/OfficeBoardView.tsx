@@ -162,7 +162,7 @@ const CSS = `
 .qb .jstep.done{color:#a0a5b8;background:#f7f8fc}.qb .jstep.done .jtext{text-decoration:line-through}
 .qb .jmark{width:18px;text-align:center;flex-shrink:0;color:#9298ac}.qb .jstep.cur .jmark{color:#3a3d44}.qb .jstep.done .jmark{color:#10b981}
 .qb .jmark,.qb .jtext{cursor:pointer}.qb .jtext{flex:1;min-width:0;word-break:keep-all}.qb .jdate{font-size:10.5px;color:#6b7088;background:#f1f3fa;border-radius:6px;padding:2px 7px;flex-shrink:0;white-space:nowrap;cursor:pointer}.qb .jdate:hover{outline:1px solid #9aa0b8}.qb .jdate.now{background:#fde8eb;color:#e0364a;font-weight:700}
-.qb .jdate.empty{background:none;border:1px dashed #c4c8da;color:#9aa0b8}
+.qb .jdate.empty{background:none;border:1px dashed #c4c8da;color:#9aa0b8;flex:0 0 30px;width:30px;box-sizing:border-box;text-align:center;padding-left:0;padding-right:0;overflow:hidden}
 .qb .datebox{border:1px solid #3a3d44;border-radius:10px;background:#fff;padding:10px 12px;margin:-2px 0 8px 27px;box-shadow:0 8px 24px -10px #1e225544}
 .qb .datebox .drow{display:flex;align-items:center;gap:8px;margin-bottom:6px}.qb .datebox .drow span{font-size:11.5px;color:#6a7088;width:44px;flex-shrink:0}.qb .datebox .drow input{flex:1}
 .qb .datebox .dbtns{display:flex;gap:6px;margin-top:2px}.qb .datebox .ok{font-size:12px;font-weight:700;background:#3a3d44;color:#fff;border:none;border-radius:8px;padding:5px 14px;cursor:pointer}.qb .datebox .clear{font-size:12px;background:#f1f3fa;color:#6a7088;border:none;border-radius:8px;padding:5px 10px;cursor:pointer}
