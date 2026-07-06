@@ -133,6 +133,8 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
       const r = rows[i];
       if (!Array.isArray(r) || r.every((c) => String(c ?? '').trim() === '')) continue;
       const get = (j: number) => (j >= 0 ? String(r[j] ?? '').trim() : '');
+      // 유령행 스킵: 소프트삭제(칸 비우기)가 id·담당자·출처만 남긴 행 — 안 거르면 받은일 바구니에 빈 카드로 떠서 "할 일이 이상하다"가 됨(2026-07-06)
+      if (!get(ci.project) && !get(ci.task)) continue;
       const todosRaw = get(ci.todos);
       const tid = get(ci.id) || `r${i}`;
       out.push({
