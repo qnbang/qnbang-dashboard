@@ -205,6 +205,9 @@ const CSS = `
 .qb .npcli{width:160px}
 .qb .nplbl{font-size:11.5px;color:#9298ac;display:flex;align-items:center;gap:5px}
 .qb .npok{background:#10b981;color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:pointer}.qb .npok:disabled{opacity:.5;cursor:default}.qb .npok:not(:disabled):hover{background:#0ea372}
+.qb .npmsg{flex-basis:100%;width:100%;font-size:12.5px;font-weight:700;border-radius:8px;padding:7px 11px;margin-top:2px}
+.qb .npmsg.ok{background:#ecfdf5;color:#0a7d55;border:1px solid #b7ecd6}
+.qb .npmsg.err{background:#fef2f2;color:#c0392b;border:1px solid #f6c9c4}
 .qb .jstep.editing{padding:6px 8px;gap:6px}
 .qb .jein2{flex:1;font-size:13px;border:1px solid #3a3d44;border-radius:7px;padding:6px 9px;outline:none}
 .qb .jbtn{font-size:11px;font-weight:700;border:none;border-radius:7px;padding:5px 10px;cursor:pointer;flex-shrink:0}
@@ -324,20 +327,30 @@ export default function OfficeBoardView() {
       if (j.ok) { setQa(''); load(true); } else alert(j.error || '추가 실패'); // fresh=1 로 즉시 반영(캐시 인스턴스 지연 방지) — 새 프로젝트와 동일
     } catch (e) { alert(String(e)); } finally { setQaBusy(false); }
   };
-  // 웹 새 프로젝트 등록 — 프로젝트명+마감+담당 → 예정(시작전) 칸에 카드 1개
+  // 웹 새 프로젝트 등록 — 프로젝트명+과업(첫 할일)+마감+담당 → 작업(내작업) 칸에 카드 1개
   const [showNP, setShowNP] = useState(false);
-  const [np, setNP] = useState({ name: '', due: '', owner: '신종호', client: '' });
+  const [np, setNP] = useState({ name: '', task: '', due: '', owner: '신종호', client: '' });
   const [npBusy, setNPBusy] = useState(false);
+  const [npMsg, setNPMsg] = useState<{ ok: boolean; text: string } | null>(null); // 등록 성공/실패를 눈에 보이게(조용히 사라짐 방지)
   const addProject = async () => {
     const name = np.name.trim();
     if (!name || npBusy) return;
-    setNPBusy(true);
+    setNPBusy(true); setNPMsg(null);
     try {
       const client = np.client.trim();
-      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: name, task: name, owner: np.owner, ball: '시작전', due: np.due, customer: client, money: client ? '매출' : '투자', 출처: '웹새프로젝트' }) });
-      const j = await r.json();
-      if (j.ok) { setNP({ name: '', due: '', owner: np.owner, client: '' }); setShowNP(false); load(true); } else alert(j.error || '등록 실패');
-    } catch (e) { alert(String(e)); } finally { setNPBusy(false); }
+      const 과업 = np.task.trim(); // 첫 과업 = 할일 로그 맨 앞(카드 헤드라인). 비우면 프로젝트명이 과업명 대신.
+      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: name, task: 과업 || name, 할일: 과업, owner: np.owner, ball: '내작업', due: np.due, customer: client, money: client ? '매출' : '투자', 출처: '웹새프로젝트' }) });
+      const j = await r.json().catch(() => ({ ok: false, error: '서버 응답을 못 읽었어요' }));
+      if (j.ok) {
+        setNP({ name: '', task: '', due: '', owner: np.owner, client: '' }); // 폼은 열어둠 — 성공 표시 보이고 연속 등록 가능
+        setNPMsg({ ok: true, text: `✅ '${name}' 작업 칸에 등록됐어요` });
+        load(true); setTimeout(() => load(true), 1500); // 반영 지연 백스톱 — 캐시로 카드가 늦게 뜨는 것 방지
+      } else {
+        setNPMsg({ ok: false, text: `⚠️ 등록 실패 — ${j.error || '시트 저장이 안 됐어요'}. 입력값 그대로 두었으니 다시 눌러주세요.` });
+      }
+    } catch (e) {
+      setNPMsg({ ok: false, text: `⚠️ 등록 실패 — ${String(e)}. 입력값 그대로 두었으니 다시 시도하세요.` });
+    } finally { setNPBusy(false); }
   };
   const load = useCallback((fresh = false) => {
     fetch(fresh ? '/api/office?fresh=1' : '/api/office').then((r) => r.json()).then((j) => {
@@ -680,15 +693,17 @@ export default function OfficeBoardView() {
         {(['대행', '도구', '리서치', '자체사업', '내부'] as const).map((k) => (
           <div key={k} className="chip" style={cat === k ? { background: CAT[k].c, borderColor: CAT[k].c, color: '#fff' } : { color: CAT[k].c }} onClick={() => setCat(cat === k ? 'all' : k)}>{CAT[k].e} {k}</div>
         ))}
-        <button className="npbtn" onClick={() => setShowNP((v) => !v)}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
+        <button className="npbtn" onClick={() => { setShowNP((v) => !v); setNPMsg(null); }}>{showNP ? '✕ 닫기' : '+ 새 프로젝트'}</button>
       </div>
       {showNP && (
         <div className="npform">
             <input autoFocus value={np.name} onChange={(e) => setNP({ ...np, name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addProject(); }} placeholder="프로젝트명" />
+            <input value={np.task} onChange={(e) => setNP({ ...np, task: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addProject(); }} placeholder="과업 (첫 할일 · 선택)" />
             <input className="npcli" value={np.client} onChange={(e) => setNP({ ...np, client: e.target.value })} placeholder="고객사 (자체면 비움)" />
             <label className="nplbl">마감<input type="date" value={np.due} onChange={(e) => setNP({ ...np, due: e.target.value })} /></label>
             <select value={np.owner} onChange={(e) => setNP({ ...np, owner: e.target.value })}><option value="신종호">담당 신종호</option><option value="김지영">담당 김지영</option></select>
-            <button className="npok" disabled={npBusy || !np.name.trim()} onClick={addProject}>예정에 등록</button>
+            <button className="npok" disabled={npBusy || !np.name.trim()} onClick={addProject}>{npBusy ? '등록 중…' : '작업에 등록'}</button>
+            {npMsg && <div className={`npmsg ${npMsg.ok ? 'ok' : 'err'}`}>{npMsg.text}</div>}
         </div>
       )}
 
