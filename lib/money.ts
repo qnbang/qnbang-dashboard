@@ -21,6 +21,15 @@ export interface Contract {
   미수금: number;
   미수종류: '받을예정' | '단순미수' | '';
 }
+export interface Labor {
+  _row: number;
+  월: string;          // 귀속월 YYYY-MM
+  구분: string;        // 직원 | 프리랜서 | 기타
+  이름: string;
+  세전: number; 공제: number; 실지급: number;
+  지급상태: string;    // 대기 | 지급완료
+  지급일: string; 비고: string;
+}
 export interface MoneyData {
   순매출누계: number;
   미수금합: number;
@@ -31,6 +40,7 @@ export interface MoneyData {
   월별: { 월: string; 계약액: number; 순매출: number; 실현: number }[];
   계약목록: Contract[];
   고정비목록: { 항목: string; 금액: number; 납부일: string; 종류: string }[];
+  인건비목록: Labor[];
   잔고: { 통장잔고: number; 세이프박스: number; 보유현금: number; 업데이트: string };
 }
 
@@ -86,6 +96,18 @@ export async function fetchMoneyData(): Promise<MoneyData> {
     }))
     .filter((f) => f.항목);
 
+  // 인건비 (귀속월 원장 — 지급확인 전까지는 지출에 안 잡히고 미지급으로 집계)
+  const 인건비목록: Labor[] = rows(sheets['인건비']).map((r) => ({
+    _row: Number(r['_row']) || 0,
+    월: ym(r['월']),
+    구분: String(r['구분'] ?? ''),
+    이름: String(r['이름'] ?? ''),
+    세전: num(r['세전']), 공제: num(r['공제']), 실지급: num(r['실지급']),
+    지급상태: String(r['지급상태'] ?? ''),
+    지급일: String(r['지급일'] ?? ''),
+    비고: String(r['비고'] ?? ''),
+  })).filter((l) => l.이름);
+
   // 월별 집계 (계약일=계약기준 매출, 입금일=실현매출)
   const map: Record<string, { 계약액: number; 순매출: number; 실현: number }> = {};
   for (const c of 계약목록) {
@@ -124,6 +146,7 @@ export async function fetchMoneyData(): Promise<MoneyData> {
     월별,
     계약목록,
     고정비목록,
+    인건비목록,
     잔고: { 통장잔고, 세이프박스, 보유현금: 통장잔고 + 세이프박스, 업데이트: 잔고업데이트 },
   };
 }

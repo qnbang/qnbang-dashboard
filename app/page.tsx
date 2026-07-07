@@ -196,13 +196,33 @@ type RevContract = {
   계약금액: number; 부가세: number; 공급가: number; 입금액: number; 미수금: number;
   입금상태: string; 입금일: string; 입금예정일: string; 미수종류: '받을예정' | '단순미수' | ''; 순매출: number;
 };
+type LaborRow = {
+  _row: number;
+  월: string; 구분: string; 이름: string;
+  세전: number; 공제: number; 실지급: number;
+  지급상태: string; 지급일: string; 비고: string;
+};
 type RevMoney = {
   순매출누계: number; 미수금합: number; 받을예정합: number; 단순미수합: number;
   고정비월합: number; 계약건수: number;
   월별: { 월: string; 순매출: number; 계약액: number; 실현: number }[];
   계약목록: RevContract[];
+  고정비목록?: { 항목: string; 금액: number; 납부일: string; 종류: string }[];
+  인건비목록?: LaborRow[];
   잔고?: { 통장잔고: number; 세이프박스: number; 보유현금: number; 업데이트: string };
 };
+
+const 지출카테고리 = ['실비', '업무비', '식비', '프로그램 사용료', '월세&공과금', '재료비', '세금', '급여'];
+// 프리랜서 3.3% 공제 (10원 미만 절사: 소득세 3% + 지방소득세 0.3%)
+function 프리랜서공제(세전: number) {
+  const 소득세 = Math.floor(세전 * 0.03 / 10) * 10;
+  const 지방세 = Math.floor(소득세 * 0.1 / 10) * 10;
+  return 소득세 + 지방세;
+}
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function parseM(d: string) {
   const m = d.replace(/[./]/g, '-').replace(/\s/g, '').match(/\d{4}-(\d{1,2})/);
@@ -236,9 +256,10 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   const [localExp, setLocalExp] = useState<Expense[] | null>(null);
   const [filter, setFilter] = useState<'all' | 'rev' | 'exp'>('all');
   const [selMonth, setSelMonth] = useState<'all' | number>('all');
-  const [panel, setPanel] = useState<{ isNew: boolean; formType: 'rev' | 'exp'; rowNum?: number; monthStr?: string } | null>(null);
+  const [panel, setPanel] = useState<{ isNew: boolean; formType: 'rev' | 'exp' | 'labor'; rowNum?: number; monthStr?: string } | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [openList, setOpenList] = useState<'recv' | 'pay' | null>(null); // 미수금·미지급금 카드 클릭 → 목록 펼침
 
   const setF = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -303,6 +324,96 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   const combined = [...filtRev, ...filtExp].sort((a, b) => b.dateFull.localeCompare(a.dateFull));
   const shown = filter === 'all' ? combined : combined.filter(r => r.type === filter);
 
+  // ── 10일 정산 파생값 ──────────────────────────────────────────────
+  const labor = money?.인건비목록 || [];
+  const now = new Date();
+  const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevYM = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+
+  const thisLabor = labor.filter(l => l.월 === curYM);
+  const 직원분 = thisLabor.filter(l => l.구분 === '직원');
+  const 프리분 = thisLabor.filter(l => l.구분 === '프리랜서');
+  const 기타분 = thisLabor.filter(l => l.구분 !== '직원' && l.구분 !== '프리랜서');
+  const 대기합 = (ls: LaborRow[]) => ls.filter(l => l.지급상태 !== '지급완료').reduce((s, l) => s + l.실지급, 0);
+
+  // 원천세: 귀속월 프리랜서 공제분을 다음달 10일 납부. 납부 여부 = 지출 비고의 멱등키.
+  // ponytail: 2~5월(엑셀 이관분)은 과거 처리 완료로 간주 — 2026-06분부터 추적
+  const 원천세시작 = '2026-06';
+  const whtMonths = Array.from(new Set(labor.filter(l => l.구분 === '프리랜서' && l.공제 > 0 && l.월 >= 원천세시작 && l.월 < curYM).map(l => l.월))).sort();
+  const whtList = whtMonths.map(m => ({
+    월: m,
+    금액: labor.filter(l => l.구분 === '프리랜서' && l.월 === m).reduce((s, l) => s + l.공제, 0),
+    납부됨: expenses.some(e => (e.note || '').includes(`자동(원천세 ${m})`)),
+  }));
+  const whtDue = whtList.filter(w => !w.납부됨);
+
+  // 미지급금(역미수) = 지급 안 된 인건비 전체 누적 + 미납 원천세
+  const 미지급인건비 = labor.filter(l => l.지급상태 !== '지급완료');
+  const 미지급금합 = 미지급인건비.reduce((s, l) => s + l.실지급, 0) + whtDue.reduce((s, w) => s + w.금액, 0);
+  const 예상손익 = net + (money?.미수금합 ?? 0) - 미지급금합;
+
+  // 부가세 적립 권장 = 전월 입금분 부가세 합 (세이프박스 이체용 참고치 — 지출 아님)
+  const 부가세권장 = (money?.계약목록 || []).filter(c => c.입금일 === prevYM && c.입금액 > 0).reduce((s, c) => s + c.부가세, 0);
+
+  // 고정비 — 이번달 기록 여부(크론이 납부일에 자동 기록, 비고=자동(고정비))
+  const 고정비기록됨 = new Set(expenses.filter(e => e.month === now.getMonth() + 1 && (e.note || '').includes('자동(고정비)')).map(e => e.content));
+  const 고정비목록 = (money?.고정비목록 || []).slice().sort((a, b) => {
+    const d = (s: string) => /말/.test(s) ? 31 : Number(String(s).replace(/[^0-9]/g, '')) || 99;
+    return d(a.납부일) - d(b.납부일);
+  });
+
+  const day = now.getDate();
+  const dday = day < 10 ? `D-${10 - day}` : day === 10 ? 'D-DAY' : '10일 지남';
+  const 십일합계 = 대기합(thisLabor) + whtDue.reduce((s, w) => s + w.금액, 0);
+
+  const reloadAll = () => Promise.all([reloadMoney(), reloadExp()]);
+
+  const payLabor = async (l: LaborRow) => {
+    let 카테고리: string | undefined;
+    if (l.구분 !== '직원' && l.구분 !== '프리랜서') {
+      // ponytail: 기타 항목 카테고리는 prompt로 — 전용 UI는 기타가 잦아지면 그때
+      카테고리 = window.prompt(`지출 카테고리 입력:\n${지출카테고리.join(' / ')}`, '업무비') || '';
+      if (!카테고리) return;
+    }
+    if (!confirm(`${l.이름} ${won(l.실지급)} 지급확인할까요?\n(통장에서 실제 이체된 뒤에 눌러주세요 — 오늘 날짜로 지출 기록됩니다)`)) return;
+    const res = await fetch('/api/office/labor', { method: 'PATCH', body: JSON.stringify({ action: 'pay', rowNum: l._row, 지급일: todayISO(), 카테고리 }), headers: { 'Content-Type': 'application/json' } });
+    const j = await res.json().catch(() => ({ ok: res.ok }));
+    if (!res.ok || j.ok === false) { alert('지급확인 실패: ' + (j.error || res.status)); return; }
+    await reloadAll();
+  };
+
+  const recordWht = async (w: { 월: string; 금액: number }) => {
+    if (!confirm(`원천세 ${w.월}분 ${won(w.금액)}을 오늘 날짜 지출(세금)로 기록할까요?\n(홈택스 납부 후 눌러주세요)`)) return;
+    const res = await fetch('/api/office/expense', { method: 'POST', body: JSON.stringify({ month: `${now.getMonth() + 1}월`, 날짜: todayISO(), 카테고리: '세금', 지출내용: `원천세(프리랜서 3.3%) ${w.월}분`, 비용: w.금액, 비고: `자동(원천세 ${w.월})` }), headers: { 'Content-Type': 'application/json' } });
+    const j = await res.json().catch(() => ({ ok: res.ok }));
+    if (!res.ok || j.ok === false) { alert('기록 실패: ' + (j.error || res.status)); return; }
+    await reloadAll();
+  };
+
+  const copyRoster = async () => {
+    if (!confirm(`지난달 인건비 명단을 ${curYM}로 복사할까요? (전부 '대기' 상태로 들어옵니다)`)) return;
+    const res = await fetch('/api/office/labor', { method: 'POST', body: JSON.stringify({ action: 'copy', to: curYM }), headers: { 'Content-Type': 'application/json' } });
+    const j = await res.json().catch(() => ({ ok: res.ok }));
+    if (!res.ok || j.ok === false) { alert(j.error || '복사 실패'); return; }
+    await reloadAll();
+  };
+
+  const openAddLabor = () => {
+    setForm({ lMonth: curYM, lType: '프리랜서', lName: '', lGross: '', lDeduct: '', lNote: '' });
+    setPanel({ isNew: true, formType: 'labor' });
+  };
+  const openEditLabor = (l: LaborRow) => {
+    setForm({ lMonth: l.월, lType: l.구분, lName: l.이름, lGross: String(l.세전), lDeduct: String(l.공제), lNote: l.비고 });
+    setPanel({ isNew: false, formType: 'labor', rowNum: l._row });
+  };
+  const deleteLabor = async (l: LaborRow) => {
+    if (!confirm(`"${l.이름} (${l.월})" 인건비 행을 삭제할까요?`)) return;
+    await fetch('/api/office/labor', { method: 'DELETE', body: JSON.stringify({ rowNum: l._row }), headers: { 'Content-Type': 'application/json' } });
+    await reloadAll();
+  };
+  // ────────────────────────────────────────────────────────────────
+
   const openAdd = (formType: 'rev' | 'exp') => {
     const curM = selMonth === 'all' ? new Date().getMonth() + 1 : selMonth;
     setForm({ monthStr: `${curM}월`, status: '입금완료' });
@@ -326,7 +437,16 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
     setSaving(true);
     try {
       let res: Response;
-      if (panel.formType === 'exp') {
+      if (panel.formType === 'labor') {
+        const 세전 = Number(form.lGross) || 0;
+        const 공제 = Number(form.lDeduct) || 0;
+        const body: Record<string, string | number> = {
+          월: form.lMonth || '', 구분: form.lType || '', 이름: form.lName || '',
+          세전, 공제, 실지급: 세전 - 공제, 비고: form.lNote || '',
+        };
+        if (!panel.isNew) body.rowNum = panel.rowNum!;
+        res = await fetch('/api/office/labor', { method: panel.isNew ? 'POST' : 'PATCH', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
+      } else if (panel.formType === 'exp') {
         const body: Record<string, string | number> = {
           month: form.monthStr || panel.monthStr || '1월',
           날짜: form.date || '', 카테고리: form.cat || '',
@@ -369,11 +489,169 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
     <>
       <div className="space-y-4">
         {/* 상단 스코어카드 */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Scorecard label="순매출" value={won(revTotal)} sub={`${filtRev.length}건`} tone="text-emerald-600" />
           <Scorecard label="순지출" value={won(expTotal)} sub={`${filtExp.length}건`} tone="text-slate-700" />
-          <Scorecard label="손익" value={won(net)} sub={net >= 0 ? '흑자' : '적자'} tone={net >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
+          <Scorecard label="손익" value={won(net)} sub={`예상 ${won(예상손익)} (받을 돈−줄 돈 반영)`} tone={net >= 0 ? 'text-emerald-600' : 'text-rose-600'} />
           <Scorecard label="보유현금" value={won(money?.잔고?.보유현금 ?? 0)} sub={money?.잔고?.업데이트 ? `${money.잔고.업데이트} 기준` : '잔고 탭에서 업데이트'} tone="text-indigo-600" />
+          <Scorecard label="미수금 · 받을 돈" value={won(money?.미수금합 ?? 0)} sub="눌러서 목록 보기" tone="text-sky-600"
+            onClick={() => setOpenList(openList === 'recv' ? null : 'recv')} active={openList === 'recv'} />
+          <Scorecard label="미지급금 · 줄 돈" value={won(미지급금합)} sub={`${미지급인건비.length + whtDue.length}건 · 눌러서 목록 보기`} tone="text-rose-600"
+            onClick={() => setOpenList(openList === 'pay' ? null : 'pay')} active={openList === 'pay'} />
+        </div>
+
+        {/* 미수금 목록 (카드 클릭 시) */}
+        {openList === 'recv' && (
+          <div className="rounded-2xl border border-sky-200 bg-white overflow-hidden">
+            <div className="px-4 py-2.5 bg-sky-50 text-sm font-semibold text-sky-700">미수금 — 받을 돈 목록</div>
+            <table className="w-full text-sm">
+              <tbody>
+                {(money?.계약목록 || []).filter(c => c.미수금 > 0).map((c, i) => (
+                  <tr key={i} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2 px-3 text-slate-400 text-xs whitespace-nowrap">{c.계약일 || '—'}</td>
+                    <td className="py-2 px-3 text-slate-700">{c.계약명}{c.클라이언트 ? ` · ${c.클라이언트}` : ''}</td>
+                    <td className="py-2 px-3"><span className={`text-xs px-1.5 py-0.5 rounded ${c.미수종류 === '받을예정' ? 'bg-sky-50 text-sky-700' : 'bg-amber-50 text-amber-700'}`}>{c.미수종류 || '미수'}</span></td>
+                    <td className="py-2 px-3 text-right font-medium text-sky-600 whitespace-nowrap">{won(c.미수금)}</td>
+                  </tr>
+                ))}
+                {(money?.계약목록 || []).filter(c => c.미수금 > 0).length === 0 && (
+                  <tr><td className="py-6 text-center text-slate-400" colSpan={4}>미수금이 없어요. 👍</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 미지급금 목록 (카드 클릭 시) */}
+        {openList === 'pay' && (
+          <div className="rounded-2xl border border-rose-200 bg-white overflow-hidden">
+            <div className="px-4 py-2.5 bg-rose-50 text-sm font-semibold text-rose-700 flex justify-between">
+              <span>미지급금 — 줘야 하는데 아직 안 준 돈</span><span>{won(미지급금합)}</span>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {미지급인건비.map((l) => (
+                  <tr key={`l${l._row}`} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2 px-3 text-slate-400 text-xs whitespace-nowrap">{l.월}</td>
+                    <td className="py-2 px-3 text-slate-700">{l.이름}</td>
+                    <td className="py-2 px-3"><span className={`text-xs px-1.5 py-0.5 rounded ${l.구분 === '직원' ? 'bg-indigo-50 text-indigo-700' : l.구분 === '프리랜서' ? 'bg-violet-50 text-violet-700' : 'bg-amber-50 text-amber-700'}`}>{l.구분}</span></td>
+                    <td className="py-2 px-3 text-right font-medium text-rose-600 whitespace-nowrap">{won(l.실지급)}</td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                      <button onClick={() => payLabor(l)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">지급확인</button>
+                      <button onClick={() => openEditLabor(l)} className="text-xs text-slate-400 hover:text-indigo-600 ml-1">편집</button>
+                    </td>
+                  </tr>
+                ))}
+                {whtDue.map((w) => (
+                  <tr key={`w${w.월}`} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2 px-3 text-slate-400 text-xs whitespace-nowrap">{w.월}</td>
+                    <td className="py-2 px-3 text-slate-700">원천세(프리랜서 3.3%) {w.월}분</td>
+                    <td className="py-2 px-3"><span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">세금</span></td>
+                    <td className="py-2 px-3 text-right font-medium text-rose-600 whitespace-nowrap">{won(w.금액)}</td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                      <button onClick={() => recordWht(w)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">지출기록</button>
+                    </td>
+                  </tr>
+                ))}
+                {미지급인건비.length === 0 && whtDue.length === 0 && (
+                  <tr><td className="py-6 text-center text-slate-400" colSpan={5}>미지급금이 없어요. 👍</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 이번달 10일 정산 — 나갈 돈 */}
+        <div className="rounded-2xl border border-indigo-200 bg-white overflow-hidden">
+          <div className="px-4 py-3 bg-indigo-50 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span className="font-semibold text-indigo-800 text-sm">💸 이번달 10일 정산 — 나갈 돈</span>
+              <span className="ml-2 text-xs text-indigo-400">{curYM} · {dday}</span>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={copyRoster} className="text-xs px-2.5 py-1.5 rounded-lg border border-indigo-300 text-indigo-600 bg-white hover:bg-indigo-50">지난달 명단 복사</button>
+              <button onClick={openAddLabor} className="text-xs px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">+ 인건비</button>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {thisLabor.length === 0 && (
+              <div className="px-4 py-4 text-sm text-slate-400">이번달 인건비 명단이 아직 없어요 — [지난달 명단 복사]로 시작하세요.</div>
+            )}
+            {[['직원', '👤 직원 급여', 직원분], ['프리랜서', '🧑‍💻 프리랜서(외주) · 3.3% 공제 후', 프리분], ['기타', '📎 기타 지급', 기타분]].map(([key, title, list]) => {
+              const ls = list as LaborRow[];
+              if (ls.length === 0) return null;
+              return (
+                <div key={key as string} className="px-4 py-2.5">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium text-slate-700">{title as string} <span className="text-slate-400 font-normal">{ls.length}명</span></span>
+                    <span className="font-semibold text-slate-800">{won(ls.reduce((s, l) => s + l.실지급, 0))}</span>
+                  </div>
+                  <div className="space-y-0.5 pl-4">
+                    {ls.map((l) => (
+                      <div key={l._row} className={`flex items-center justify-between text-sm py-1 px-1 -mx-1 rounded ${l.지급상태 === '지급완료' ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}`}>
+                        <span className="text-slate-600">{l.이름} <span className="text-xs text-slate-400">{l.비고 || (l.공제 > 0 ? `세전 ${l.세전.toLocaleString()} − 공제 ${l.공제.toLocaleString()}` : '')}</span></span>
+                        <span className="flex items-center gap-2 whitespace-nowrap">
+                          {l.지급상태 === '지급완료' ? (
+                            <>
+                              <span className="text-slate-400 line-through">{won(l.실지급)}</span>
+                              <span className="text-xs px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700">✓ {fmtDate(l.지급일) || '지급완료'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-slate-700">{won(l.실지급)}</span>
+                              <button onClick={() => payLabor(l)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">지급확인</button>
+                            </>
+                          )}
+                          <button onClick={() => openEditLabor(l)} className="text-xs text-slate-400 hover:text-indigo-600">편집</button>
+                          <button onClick={() => deleteLabor(l)} className="text-xs text-slate-400 hover:text-rose-500">삭제</button>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {/* 원천세 (전월분 — 이번달 10일 납부) */}
+            {whtList.map((w) => (
+              <div key={w.월} className="px-4 py-2.5 flex items-center justify-between text-sm">
+                <span className="font-medium text-slate-700">🏛️ 원천세 <span className="text-slate-400 font-normal">{w.월}분 프리랜서 3.3% — 다음달 10일 납부</span></span>
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-800">{won(w.금액)}</span>
+                  {w.납부됨
+                    ? <span className="text-xs px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700">✓ 기록됨</span>
+                    : <button onClick={() => recordWht(w)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">지출기록</button>}
+                </span>
+              </div>
+            ))}
+            {/* 부가세 적립 권장 (지출 아님 — 세이프박스 이체 참고치) */}
+            <div className="px-4 py-2.5 flex items-center justify-between text-sm bg-slate-50/60">
+              <span className="font-medium text-slate-700">🧾 부가세 적립 권장 <span className="text-slate-400 font-normal">{prevYM} 입금분 부가세 합 — 세이프박스 이체 (지출 아님, 표시만)</span></span>
+              <span className="font-semibold text-slate-500">{won(부가세권장)}</span>
+            </div>
+            {/* 고정비 항목별 (크론이 납부일에 자동 기록) */}
+            <div className="px-4 py-2.5 bg-slate-50/60">
+              <div className="flex justify-between text-sm mb-1">
+                <span className="font-medium text-slate-700">📌 이번달 고정비 <span className="text-slate-400 font-normal">납부일에 자동으로 지출 기록됨</span></span>
+                <span className="font-semibold text-slate-600">{won(money?.고정비월합 ?? 0)}</span>
+              </div>
+              <div className="pl-4 space-y-0.5 text-sm">
+                {고정비목록.map((f, i) => {
+                  const 기록됨 = 고정비기록됨.has(f.항목);
+                  return (
+                    <div key={i} className="flex justify-between py-0.5">
+                      <span className={기록됨 ? 'text-slate-400' : 'text-slate-600'}>{f.항목} <span className="text-xs text-slate-400">{f.납부일 ? `매월 ${f.납부일}${/말/.test(f.납부일) ? '' : '일'}` : '납부일 미정'}{기록됨 ? ' · 기록됨' : ''}</span></span>
+                      <span className={기록됨 ? 'text-slate-400' : 'text-slate-600'}>{won(f.금액)}{기록됨 ? ' ✓' : ''}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* 합계 */}
+            <div className="px-4 py-3 flex items-center justify-between bg-indigo-50/50">
+              <span className="text-sm font-semibold text-indigo-800">10일 나갈 돈 <span className="text-xs font-normal text-indigo-400">(인건비 대기분 + 미납 원천세 · 적립/고정비 별도)</span></span>
+              <span className="text-lg font-bold text-indigo-700">{won(십일합계)}</span>
+            </div>
+          </div>
         </div>
 
         {/* 필터 바 + 추가 버튼 */}
@@ -447,12 +725,62 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
           <div className="relative w-72 bg-white h-full shadow-2xl flex flex-col">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-800 text-sm">
-                {panel.isNew ? '추가' : '수정'} — {panel.formType === 'rev' ? '매출' : '지출'}
+                {panel.isNew ? '추가' : '수정'} — {panel.formType === 'rev' ? '매출' : panel.formType === 'labor' ? '인건비' : '지출'}
               </h3>
               <button onClick={() => setPanel(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {panel.formType === 'exp' ? (
+              {panel.formType === 'labor' ? (
+                <>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">귀속월</label>
+                    <input type="month" value={form.lMonth || ''} onChange={e => setF('lMonth', e.target.value)}
+                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">구분</label>
+                    <select value={form.lType || '프리랜서'}
+                      onChange={e => {
+                        const t = e.target.value;
+                        setForm(p => ({ ...p, lType: t, lDeduct: t === '프리랜서' ? String(프리랜서공제(Number(p.lGross) || 0)) : p.lDeduct }));
+                      }}
+                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm">
+                      {['직원', '프리랜서', '기타'].map(s => <option key={s}>{s}</option>)}
+                    </select>
+                    {form.lType === '기타' && <p className="text-[11px] text-slate-400 mt-1">기타 = 줘야 할 돈 아무거나 (정산·환불 등). 지급확인 때 카테고리를 고릅니다.</p>}
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">{form.lType === '기타' ? '항목명' : '이름'}</label>
+                    <input type="text" value={form.lName || ''} onChange={e => setF('lName', e.target.value)}
+                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">세전 금액</label>
+                    <input type="number" value={form.lGross || ''}
+                      onChange={e => {
+                        const g = e.target.value;
+                        setForm(p => ({ ...p, lGross: g, lDeduct: p.lType === '프리랜서' ? String(프리랜서공제(Number(g) || 0)) : p.lDeduct }));
+                      }}
+                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">공제 {form.lType === '프리랜서' && <span className="text-indigo-400">자동 3.3% (수정 가능)</span>}</label>
+                    <input type="number" value={form.lDeduct || ''} onChange={e => setF('lDeduct', e.target.value)}
+                      className={`w-full rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400 ${form.lType === '프리랜서' ? 'bg-indigo-50/50' : ''}`} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">실지급 <span className="text-slate-400">자동 = 세전−공제</span></label>
+                    <input disabled value={((Number(form.lGross) || 0) - (Number(form.lDeduct) || 0)).toLocaleString('ko-KR')}
+                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm bg-slate-50 text-slate-500" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 block mb-1">비고</label>
+                    <input type="text" value={form.lNote || ''} onChange={e => setF('lNote', e.target.value)}
+                      placeholder="예: 기본급 1,683,297+식대 200,000"
+                      className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm outline-none focus:border-indigo-400" />
+                  </div>
+                </>
+              ) : panel.formType === 'exp' ? (
                 <>
                   {panel.isNew && (
                     <div>
@@ -507,14 +835,22 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   );
 }
 
-function Scorecard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
+function Scorecard({ label, value, sub, tone, onClick, active }: { label: string; value: string; sub?: string; tone?: string; onClick?: () => void; active?: boolean }) {
+  const inner = (
+    <>
       <div className="text-xs text-slate-400 mb-1">{label}</div>
       <div className={`text-2xl font-bold ${tone || 'text-slate-800'}`}>{value}</div>
       {sub && <div className="text-[11px] text-slate-400 mt-1">{sub}</div>}
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={`bg-white rounded-xl border p-4 text-left transition ${active ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-slate-300'}`}>
+        {inner}
+      </button>
+    );
+  }
+  return <div className="bg-white rounded-xl border border-slate-200 p-4">{inner}</div>;
 }
 
 // 고객 관리 CRM(#5) — 영업/과업/매출을 고객 기준으로 묶은 생애주기 overview(읽기 중심).
