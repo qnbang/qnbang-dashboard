@@ -29,6 +29,7 @@ export const HUB: Record<string, HubCfg> = {
     nav: [
       // 계획안·회의록은 마크다운 공유문서(슬러그) — 대시보드 '공유된 문서' 탭에서 바로 수정 가능
       { src: 'mangwon-plan', title: '1차 계획안', ic: '📋', t: '1차 계획안', d: '운영·경품·페이백·일정 (최신)', primary: true },
+      { src: 'mangwon-actionplan', title: '실행 액션플랜', ic: '📅', t: '실행 액션플랜', d: '계약 확정 후 실행 단계·역할·일정' },
       // 회의록 = 데이터화된 게시판(/board/mangwon). 새 회의는 화면에서 추가(배포 불필요).
       { src: 'board:mangwon', title: '회의록', ic: '📝', t: '회의록', d: '회의 기록 모음' },
     ],
