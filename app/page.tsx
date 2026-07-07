@@ -331,12 +331,6 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevYM = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
-  const ymAdd = (ym: string, n: number) => {
-    const [y, m] = ym.split('-').map(Number);
-    const d = new Date(y, m - 1 + n, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  };
-
   // 정산 카드 = 지급 안 된 인건비 전부(귀속월 무관 — 다음 10일에 나갈 돈) + 이번달에 지급 처리된 것(✓)
   const 대기인건비 = labor.filter(l => l.지급상태 !== '지급완료');
   const 최근지급 = labor.filter(l => l.지급상태 === '지급완료' && (l.지급일 || '').startsWith(curYM));
@@ -345,16 +339,18 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   const 프리분 = cardLabor.filter(l => l.구분 === '프리랜서');
   const 기타분 = cardLabor.filter(l => l.구분 !== '직원' && l.구분 !== '프리랜서');
 
-  // 원천세: 귀속월 M 프리랜서 공제분 → M+1/10 지급 때 원천징수 → M+2월 10일 납부. 납부 여부 = 지출 비고의 멱등키.
-  // ponytail: 이관분 2~4월 원천세는 기납부 간주 — 5월분(7/10 납부)부터 추적
-  const 원천세시작 = '2026-05';
-  const whtMonths = Array.from(new Set(labor.filter(l => l.구분 === '프리랜서' && l.공제 > 0 && l.월 >= 원천세시작 && ymAdd(l.월, 2) <= curYM).map(l => l.월))).sort();
-  const whtList = whtMonths.map(m => ({
-    월: m,
-    납부월: ymAdd(m, 2),
-    금액: labor.filter(l => l.구분 === '프리랜서' && l.월 === m).reduce((s, l) => s + l.공제, 0),
-    납부됨: expenses.some(e => (e.note || '').includes(`자동(원천세 ${m})`)),
-  }));
+  // 원천세: 프리랜서에게 지급(지급완료)하며 원천징수한 3.3% — 국세청에 낼 때까지 월별 미납으로 표시(밀린 것 전부).
+  // 대기 건은 아직 원천징수 전이라 제외 — 지급확인하면 그 달 원천세가 자동으로 나타남. 납부 여부 = 지출 비고의 멱등키.
+  const whtMonths = Array.from(new Set(labor.filter(l => l.구분 === '프리랜서' && l.공제 > 0 && l.지급상태 === '지급완료').map(l => l.월))).sort();
+  const whtList = whtMonths.map(m => {
+    const rec = expenses.find(e => (e.note || '').includes(`자동(원천세 ${m})`));
+    return {
+      월: m,
+      금액: labor.filter(l => l.구분 === '프리랜서' && l.월 === m && l.지급상태 === '지급완료').reduce((s, l) => s + l.공제, 0),
+      납부됨: !!rec,
+      이번달납부: !!rec && rec.month === now.getMonth() + 1,
+    };
+  }).filter(w => !w.납부됨 || w.이번달납부); // 옛날에 납부 끝난 달은 카드에서 숨김
   const whtDue = whtList.filter(w => !w.납부됨);
 
   // 미지급금(역미수) = 지급 안 된 인건비 전체 누적 + 미납 원천세
@@ -627,7 +623,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
             {/* 원천세 (전월분 — 이번달 10일 납부) */}
             {whtList.map((w) => (
               <div key={w.월} className="px-4 py-2.5 flex items-center justify-between text-sm">
-                <span className="font-medium text-slate-700">🏛️ 원천세 <span className="text-slate-400 font-normal">{w.월}분 프리랜서 3.3% — {w.납부월} 10일 납부</span></span>
+                <span className="font-medium text-slate-700">🏛️ 원천세 <span className="text-slate-400 font-normal">{w.월}분 프리랜서 3.3%{w.납부됨 ? '' : ' — 미납'}</span></span>
                 <span className="flex items-center gap-2">
                   <span className="font-semibold text-slate-800">{won(w.금액)}</span>
                   {w.납부됨
