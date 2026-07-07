@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic';
 const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 const TAB = '인건비';
-const 카테고리들 = ['실비', '업무비', '식비', '프로그램 사용료', '월세&공과금', '재료비', '세금', '급여'];
+// ponytail: 기타 항목 지급확인용 선택지 — 시트 실사용 분류 기준(고정 8종 + 외주·기타)
+const 카테고리들 = ['실비', '업무비', '식비', '프로그램 사용료', '월세&공과금', '재료비', '세금', '급여', '외주', '기타'];
 
 function api() {
   const sa = JSON.parse(SA_JSON!);
@@ -92,8 +93,8 @@ export async function PATCH(req: Request) {
       if (!row) return NextResponse.json({ ok: false, error: '해당 행 없음' }, { status: 404 });
       if (row.지급상태 === '지급완료') return NextResponse.json({ ok: true, already: true });
 
-      // 카테고리: 직원·프리랜서=급여 고정, 기타=클라이언트가 8개 중 선택(추측분류 금지 — 기본값 없음)
-      let 카테고리 = '급여';
+      // 카테고리: 직원=급여, 프리랜서=외주(기존 지출 기록 관례), 기타=클라이언트가 선택(추측분류 금지 — 기본값 없음)
+      let 카테고리 = row.구분 === '프리랜서' ? '외주' : '급여';
       if (row.구분 === '기타') {
         카테고리 = String(body.카테고리 || '');
         if (!카테고리들.includes(카테고리)) return NextResponse.json({ ok: false, error: '기타 항목은 카테고리 선택 필요' }, { status: 400 });

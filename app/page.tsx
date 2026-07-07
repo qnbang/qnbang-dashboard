@@ -339,23 +339,11 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   const 프리분 = cardLabor.filter(l => l.구분 === '프리랜서');
   const 기타분 = cardLabor.filter(l => l.구분 !== '직원' && l.구분 !== '프리랜서');
 
-  // 원천세: 프리랜서에게 지급(지급완료)하며 원천징수한 3.3% — 국세청에 낼 때까지 월별 미납으로 표시(밀린 것 전부).
-  // 대기 건은 아직 원천징수 전이라 제외 — 지급확인하면 그 달 원천세가 자동으로 나타남. 납부 여부 = 지출 비고의 멱등키.
-  const whtMonths = Array.from(new Set(labor.filter(l => l.구분 === '프리랜서' && l.공제 > 0 && l.지급상태 === '지급완료').map(l => l.월))).sort();
-  const whtList = whtMonths.map(m => {
-    const rec = expenses.find(e => (e.note || '').includes(`자동(원천세 ${m})`));
-    return {
-      월: m,
-      금액: labor.filter(l => l.구분 === '프리랜서' && l.월 === m && l.지급상태 === '지급완료').reduce((s, l) => s + l.공제, 0),
-      납부됨: !!rec,
-      이번달납부: !!rec && rec.month === now.getMonth() + 1,
-    };
-  }).filter(w => !w.납부됨 || w.이번달납부); // 옛날에 납부 끝난 달은 카드에서 숨김
-  const whtDue = whtList.filter(w => !w.납부됨);
+  // 원천세·근로소득세 등 세금은 세무사 고지대로 매달 납부하며 지출(세금)로 기록 — 대시보드가 따로 계산하지 않음(오판 방지, 2026-07-07 교훈)
 
-  // 미지급금(역미수) = 지급 안 된 인건비 전체 누적 + 미납 원천세
+  // 미지급금(역미수) = 지급 안 된 인건비 전체 누적
   const 미지급인건비 = labor.filter(l => l.지급상태 !== '지급완료');
-  const 미지급금합 = 미지급인건비.reduce((s, l) => s + l.실지급, 0) + whtDue.reduce((s, w) => s + w.금액, 0);
+  const 미지급금합 = 미지급인건비.reduce((s, l) => s + l.실지급, 0);
   const 예상손익 = net + (money?.미수금합 ?? 0) - 미지급금합;
 
   // 부가세 적립 권장 = 전월 입금분 부가세 합 (세이프박스 이체용 참고치 — 지출 아님)
@@ -370,7 +358,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
 
   const day = now.getDate();
   const dday = day < 10 ? `D-${10 - day}` : day === 10 ? 'D-DAY' : '10일 지남';
-  const 십일합계 = 대기인건비.reduce((s, l) => s + l.실지급, 0) + whtDue.reduce((s, w) => s + w.금액, 0);
+  const 십일합계 = 대기인건비.reduce((s, l) => s + l.실지급, 0);
 
   const reloadAll = () => Promise.all([reloadMoney(), reloadExp()]);
 
@@ -385,14 +373,6 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
     const res = await fetch('/api/office/labor', { method: 'PATCH', body: JSON.stringify({ action: 'pay', rowNum: l._row, 지급일: todayISO(), 카테고리 }), headers: { 'Content-Type': 'application/json' } });
     const j = await res.json().catch(() => ({ ok: res.ok }));
     if (!res.ok || j.ok === false) { alert('지급확인 실패: ' + (j.error || res.status)); return; }
-    await reloadAll();
-  };
-
-  const recordWht = async (w: { 월: string; 금액: number }) => {
-    if (!confirm(`원천세 ${w.월}분 ${won(w.금액)}을 오늘 날짜 지출(세금)로 기록할까요?\n(홈택스 납부 후 눌러주세요)`)) return;
-    const res = await fetch('/api/office/expense', { method: 'POST', body: JSON.stringify({ month: `${now.getMonth() + 1}월`, 날짜: todayISO(), 카테고리: '세금', 지출내용: `원천세(프리랜서 3.3%) ${w.월}분`, 비용: w.금액, 비고: `자동(원천세 ${w.월})` }), headers: { 'Content-Type': 'application/json' } });
-    const j = await res.json().catch(() => ({ ok: res.ok }));
-    if (!res.ok || j.ok === false) { alert('기록 실패: ' + (j.error || res.status)); return; }
     await reloadAll();
   };
 
@@ -502,7 +482,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
           <Scorecard label="보유현금" value={won(money?.잔고?.보유현금 ?? 0)} sub={money?.잔고?.업데이트 ? `${money.잔고.업데이트} 기준` : '잔고 탭에서 업데이트'} tone="text-indigo-600" />
           <Scorecard label="미수금 · 받을 돈" value={won(money?.미수금합 ?? 0)} sub="눌러서 목록 보기" tone="text-sky-600"
             onClick={() => setOpenList(openList === 'recv' ? null : 'recv')} active={openList === 'recv'} />
-          <Scorecard label="미지급금 · 줄 돈" value={won(미지급금합)} sub={`${미지급인건비.length + whtDue.length}건 · 눌러서 목록 보기`} tone="text-rose-600"
+          <Scorecard label="미지급금 · 줄 돈" value={won(미지급금합)} sub={`${미지급인건비.length}건 · 눌러서 목록 보기`} tone="text-rose-600"
             onClick={() => setOpenList(openList === 'pay' ? null : 'pay')} active={openList === 'pay'} />
         </div>
 
@@ -548,18 +528,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
                     </td>
                   </tr>
                 ))}
-                {whtDue.map((w) => (
-                  <tr key={`w${w.월}`} className="border-b border-slate-50 last:border-0">
-                    <td className="py-2 px-3 text-slate-400 text-xs whitespace-nowrap">{w.월}</td>
-                    <td className="py-2 px-3 text-slate-700">원천세(프리랜서 3.3%) {w.월}분</td>
-                    <td className="py-2 px-3"><span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">세금</span></td>
-                    <td className="py-2 px-3 text-right font-medium text-rose-600 whitespace-nowrap">{won(w.금액)}</td>
-                    <td className="py-2 px-3 text-right whitespace-nowrap">
-                      <button onClick={() => recordWht(w)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">지출기록</button>
-                    </td>
-                  </tr>
-                ))}
-                {미지급인건비.length === 0 && whtDue.length === 0 && (
+                {미지급인건비.length === 0 && (
                   <tr><td className="py-6 text-center text-slate-400" colSpan={5}>미지급금이 없어요. 👍</td></tr>
                 )}
               </tbody>
@@ -620,18 +589,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
                 </div>
               );
             })}
-            {/* 원천세 (전월분 — 이번달 10일 납부) */}
-            {whtList.map((w) => (
-              <div key={w.월} className="px-4 py-2.5 flex items-center justify-between text-sm">
-                <span className="font-medium text-slate-700">🏛️ 원천세 <span className="text-slate-400 font-normal">{w.월}분 프리랜서 3.3%{w.납부됨 ? '' : ' — 미납'}</span></span>
-                <span className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-800">{won(w.금액)}</span>
-                  {w.납부됨
-                    ? <span className="text-xs px-2 py-1 rounded-lg bg-emerald-100 text-emerald-700">✓ 기록됨</span>
-                    : <button onClick={() => recordWht(w)} className="text-xs px-2 py-1 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">지출기록</button>}
-                </span>
-              </div>
-            ))}
+            {/* 세금(원천세·근로소득세)은 세무사 고지대로 납부·지출 기록 — 여기서 계산하지 않음 */}
             {/* 부가세 적립 권장 (지출 아님 — 세이프박스 이체 참고치) */}
             <div className="px-4 py-2.5 flex items-center justify-between text-sm bg-slate-50/60">
               <span className="font-medium text-slate-700">🧾 부가세 적립 권장 <span className="text-slate-400 font-normal">{prevYM} 입금분 부가세 합 — 세이프박스 이체 (지출 아님, 표시만)</span></span>
@@ -657,7 +615,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
             </div>
             {/* 합계 */}
             <div className="px-4 py-3 flex items-center justify-between bg-indigo-50/50">
-              <span className="text-sm font-semibold text-indigo-800">10일 나갈 돈 <span className="text-xs font-normal text-indigo-400">(인건비 대기분 + 미납 원천세 · 적립/고정비 별도)</span></span>
+              <span className="text-sm font-semibold text-indigo-800">10일 나갈 돈 <span className="text-xs font-normal text-indigo-400">(인건비 대기분 · 세금은 고지서, 적립/고정비 별도)</span></span>
               <span className="text-lg font-bold text-indigo-700">{won(십일합계)}</span>
             </div>
           </div>
