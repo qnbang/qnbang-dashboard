@@ -82,7 +82,7 @@ function toOver(p: Record<string, string>): Partial<Task> { // 한글 patch → 
   for (const [k, v] of Object.entries(p)) { const f = K2F[k]; if (f) o[f] = f === 'ball' ? (KO2BALL[v] || v) : v; }
   return o as Partial<Task>;
 }
-const WHO: Record<string, string> = { 신종호: '🧑‍💼 종호', 김지영: '🎨 김지영' };
+const WHO: Record<string, string> = { 신종호: '🧑‍💼 종호', 김지영: '🎨 김지영', 전체: '👥 전체' };
 // 캘린더 담당자 색(시안 기준) — 신종호 파랑·김지영 분홍·그 외(외주) 회색.
 const OWNER_COLOR = (owner: string) => owner === '신종호' ? '#4a6fd6' : owner === '김지영' ? '#c95f8a' : '#7a8296';
 
@@ -270,7 +270,7 @@ function currentStep(t: { todos?: string[]; status?: string }) {
 // 대기 카드가 누구 답을 기다리는지 — 지금 단계(없으면 카드) 담당이 외부인이면 그 이름, 내부·미지정이면 '고객'
 function waitOn(t: { todos?: string[]; status?: string; owner?: string }): string {
   const o = currentStep(t)?.owner || t.owner || '';
-  return o && o !== '신종호' && o !== '김지영' ? o : '고객';
+  return o && o !== '신종호' && o !== '김지영' && o !== '전체' ? o : '고객';
 }
 
 export default function OfficeBoardView() {
@@ -322,7 +322,7 @@ export default function OfficeBoardView() {
     if (!txt || qaBusy) return;
     setQaBusy(true);
     try {
-      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: txt, ball, 출처: '단건할일' }) }); // 출처 태그로 매출 프로젝트 아카이브 집계에서 제외(archive.ts)
+      const r = await fetch('/api/office/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: txt, ball, owner: '전체', 출처: '단건할일' }) }); // 담당=전체(종호·지영 둘 다 봄), 출처 태그로 매출 프로젝트 아카이브 집계에서 제외(archive.ts)
       const j = await r.json();
       if (j.ok) { setQa(''); load(true); } else alert(j.error || '추가 실패'); // fresh=1 로 즉시 반영(캐시 인스턴스 지연 방지) — 새 프로젝트와 동일
     } catch (e) { alert(String(e)); } finally { setQaBusy(false); }
@@ -509,15 +509,15 @@ export default function OfficeBoardView() {
   // 외주 명단 = 지금 보드에 이미 박힌 외주 이름들(카드 담당 + 단계 담당, 내부 제외). 한 번 쓴 외주는 모든 카드 드롭다운에 뜸.
   const vendors = [...new Set(
     all.flatMap((t) => [t.owner, ...effTodos(t).map((s) => parseStep(s).owner)])
-       .filter((o) => o && o !== '신종호' && o !== '김지영')
+       .filter((o) => o && o !== '신종호' && o !== '김지영' && o !== '전체')
   )].sort();
   // 담당자(역할) 필터 — 카드 담당 + 단계 담당 모두 본다(준엽처럼 단계만 외주여도 외주 필터에 잡히게)
   const vis = all.filter((t) => {
     if (filter === 'all') return true;
     const owners = [t.owner || '신종호', ...effTodos(t).map((s) => parseStep(s).owner).filter(Boolean)];
-    if (filter === 'jh') return owners.includes('신종호');
-    if (filter === 'jy') return owners.includes('김지영');
-    return owners.some((o) => o !== '신종호' && o !== '김지영'); // 외주
+    if (filter === 'jh') return owners.includes('신종호') || owners.includes('전체'); // 전체=둘 다 봄
+    if (filter === 'jy') return owners.includes('김지영') || owners.includes('전체');
+    return owners.some((o) => o !== '신종호' && o !== '김지영' && o !== '전체'); // 외주
   });
   // 도구(판매 도구)는 과업 보드가 아니라 아래 도구 백로그로 빠짐. 나머지는 공위치대로 7칸.
   // 보드 = 대행+내부+자체사업 전 공위치(보류·예정 포함 — 활성만 올리면 보류로 옮긴 카드가 '실종'됨). 도구·리서치만 포트폴리오 섹션 전용.
