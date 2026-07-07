@@ -325,24 +325,33 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   const shown = filter === 'all' ? combined : combined.filter(r => r.type === filter);
 
   // ── 10일 정산 파생값 ──────────────────────────────────────────────
+  // 지급 규칙: 귀속월 M의 인건비는 M+1월 10일에 지급 (예: 6월분 급여 → 7/10 지급)
   const labor = money?.인건비목록 || [];
   const now = new Date();
   const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevYM = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+  const ymAdd = (ym: string, n: number) => {
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(y, m - 1 + n, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
 
-  const thisLabor = labor.filter(l => l.월 === curYM);
-  const 직원분 = thisLabor.filter(l => l.구분 === '직원');
-  const 프리분 = thisLabor.filter(l => l.구분 === '프리랜서');
-  const 기타분 = thisLabor.filter(l => l.구분 !== '직원' && l.구분 !== '프리랜서');
-  const 대기합 = (ls: LaborRow[]) => ls.filter(l => l.지급상태 !== '지급완료').reduce((s, l) => s + l.실지급, 0);
+  // 정산 카드 = 지급 안 된 인건비 전부(귀속월 무관 — 다음 10일에 나갈 돈) + 이번달에 지급 처리된 것(✓)
+  const 대기인건비 = labor.filter(l => l.지급상태 !== '지급완료');
+  const 최근지급 = labor.filter(l => l.지급상태 === '지급완료' && (l.지급일 || '').startsWith(curYM));
+  const cardLabor = [...대기인건비, ...최근지급];
+  const 직원분 = cardLabor.filter(l => l.구분 === '직원');
+  const 프리분 = cardLabor.filter(l => l.구분 === '프리랜서');
+  const 기타분 = cardLabor.filter(l => l.구분 !== '직원' && l.구분 !== '프리랜서');
 
-  // 원천세: 귀속월 프리랜서 공제분을 다음달 10일 납부. 납부 여부 = 지출 비고의 멱등키.
-  // ponytail: 2~5월(엑셀 이관분)은 과거 처리 완료로 간주 — 2026-06분부터 추적
-  const 원천세시작 = '2026-06';
-  const whtMonths = Array.from(new Set(labor.filter(l => l.구분 === '프리랜서' && l.공제 > 0 && l.월 >= 원천세시작 && l.월 < curYM).map(l => l.월))).sort();
+  // 원천세: 귀속월 M 프리랜서 공제분 → M+1/10 지급 때 원천징수 → M+2월 10일 납부. 납부 여부 = 지출 비고의 멱등키.
+  // ponytail: 이관분 2~4월 원천세는 기납부 간주 — 5월분(7/10 납부)부터 추적
+  const 원천세시작 = '2026-05';
+  const whtMonths = Array.from(new Set(labor.filter(l => l.구분 === '프리랜서' && l.공제 > 0 && l.월 >= 원천세시작 && ymAdd(l.월, 2) <= curYM).map(l => l.월))).sort();
   const whtList = whtMonths.map(m => ({
     월: m,
+    납부월: ymAdd(m, 2),
     금액: labor.filter(l => l.구분 === '프리랜서' && l.월 === m).reduce((s, l) => s + l.공제, 0),
     납부됨: expenses.some(e => (e.note || '').includes(`자동(원천세 ${m})`)),
   }));
@@ -365,7 +374,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
 
   const day = now.getDate();
   const dday = day < 10 ? `D-${10 - day}` : day === 10 ? 'D-DAY' : '10일 지남';
-  const 십일합계 = 대기합(thisLabor) + whtDue.reduce((s, w) => s + w.금액, 0);
+  const 십일합계 = 대기인건비.reduce((s, l) => s + l.실지급, 0) + whtDue.reduce((s, w) => s + w.금액, 0);
 
   const reloadAll = () => Promise.all([reloadMoney(), reloadExp()]);
 
@@ -392,15 +401,16 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   };
 
   const copyRoster = async () => {
-    if (!confirm(`지난달 인건비 명단을 ${curYM}로 복사할까요? (전부 '대기' 상태로 들어옵니다)`)) return;
-    const res = await fetch('/api/office/labor', { method: 'POST', body: JSON.stringify({ action: 'copy', to: curYM }), headers: { 'Content-Type': 'application/json' } });
+    // 귀속월 M은 M+1/10 지급 → 지금 준비할 명단 = 지난달(prevYM) 귀속분
+    if (!confirm(`귀속 ${prevYM} 인건비 명단을 만들까요? (그 전달 명단을 복사, 전부 '대기' 상태)`)) return;
+    const res = await fetch('/api/office/labor', { method: 'POST', body: JSON.stringify({ action: 'copy', to: prevYM }), headers: { 'Content-Type': 'application/json' } });
     const j = await res.json().catch(() => ({ ok: res.ok }));
     if (!res.ok || j.ok === false) { alert(j.error || '복사 실패'); return; }
     await reloadAll();
   };
 
   const openAddLabor = () => {
-    setForm({ lMonth: curYM, lType: '프리랜서', lName: '', lGross: '', lDeduct: '', lNote: '' });
+    setForm({ lMonth: prevYM, lType: '프리랜서', lName: '', lGross: '', lDeduct: '', lNote: '' });
     setPanel({ isNew: true, formType: 'labor' });
   };
   const openEditLabor = (l: LaborRow) => {
@@ -574,8 +584,8 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
             </div>
           </div>
           <div className="divide-y divide-slate-100">
-            {thisLabor.length === 0 && (
-              <div className="px-4 py-4 text-sm text-slate-400">이번달 인건비 명단이 아직 없어요 — [지난달 명단 복사]로 시작하세요.</div>
+            {cardLabor.length === 0 && (
+              <div className="px-4 py-4 text-sm text-slate-400">지급 대기 인건비가 없어요 — 새 달 명단은 [지난달 명단 복사]로 만드세요.</div>
             )}
             {[['직원', '👤 직원 급여', 직원분], ['프리랜서', '🧑‍💻 프리랜서(외주) · 3.3% 공제 후', 프리분], ['기타', '📎 기타 지급', 기타분]].map(([key, title, list]) => {
               const ls = list as LaborRow[];
@@ -589,7 +599,10 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
                   <div className="space-y-0.5 pl-4">
                     {ls.map((l) => (
                       <div key={l._row} className={`flex items-center justify-between text-sm py-1 px-1 -mx-1 rounded ${l.지급상태 === '지급완료' ? 'bg-emerald-50/60' : 'hover:bg-slate-50'}`}>
-                        <span className="text-slate-600">{l.이름} <span className="text-xs text-slate-400">{l.비고 || (l.공제 > 0 ? `세전 ${l.세전.toLocaleString()} − 공제 ${l.공제.toLocaleString()}` : '')}</span></span>
+                        <span className="text-slate-600">
+                          {l.이름} <span className="text-[10px] px-1 py-0.5 rounded bg-slate-100 text-slate-500 align-middle">{l.월}분</span>{' '}
+                          <span className="text-xs text-slate-400">{l.비고 || (l.공제 > 0 ? `세전 ${l.세전.toLocaleString()} − 공제 ${l.공제.toLocaleString()}` : '')}</span>
+                        </span>
                         <span className="flex items-center gap-2 whitespace-nowrap">
                           {l.지급상태 === '지급완료' ? (
                             <>
@@ -614,7 +627,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
             {/* 원천세 (전월분 — 이번달 10일 납부) */}
             {whtList.map((w) => (
               <div key={w.월} className="px-4 py-2.5 flex items-center justify-between text-sm">
-                <span className="font-medium text-slate-700">🏛️ 원천세 <span className="text-slate-400 font-normal">{w.월}분 프리랜서 3.3% — 다음달 10일 납부</span></span>
+                <span className="font-medium text-slate-700">🏛️ 원천세 <span className="text-slate-400 font-normal">{w.월}분 프리랜서 3.3% — {w.납부월} 10일 납부</span></span>
                 <span className="flex items-center gap-2">
                   <span className="font-semibold text-slate-800">{won(w.금액)}</span>
                   {w.납부됨
