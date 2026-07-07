@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
 export const dynamic = 'force-dynamic';
@@ -8,24 +9,28 @@ const READ_URL = process.env.SHEET_URL;
 const WRITE_URL = process.env.SHEET_WRITE_URL
   || 'https://script.google.com/macros/s/AKfycbxPt24eFUbUP1cPwsv5Gspc3pak_hvqIdGf7T4cbvqJSxKkKimCdEhxdSll0yMPJ5dPAw/exec';
 const KEY = process.env.SHEET_KEY || 'qnbang2026';
+const SHEET_ID = process.env.SHEET_ID;
+const SA_JSON = process.env.GOOGLE_SA_JSON;
 
-const 영업H = ['id', '대상', '단계', '다음액션', '예상금액', '마지막접촉일', '비고', '갱신일', '출처'];
 const 과업H = ['id', '프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일', '기한', '고객', '돈종류', '할일', '판정근거', '갱신일', '출처', '계약여부'];
 const 매출H = ['계약일', '계약명', '클라이언트', '계약금액', '부가세', '입금상태', '입금일', '입금예정일', '입금액', '순매출', '비고'];
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.]/g, '')) || 0;
 const todayKST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-function normCell(v: unknown): string {
-  const s = String(v ?? '');
-  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-  }
-  return s;
-}
 async function post(body: object) {
   const r = await fetch(WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return r.json().catch(() => ({}));
+}
+
+function saApi() {
+  const sa = JSON.parse(SA_JSON!);
+  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
+  return google.sheets({ version: 'v4', auth });
+}
+function colLetter(n: number) {
+  let s = '';
+  for (let i = n; i >= 0; i = Math.floor(i / 26) - 1) s = String.fromCharCode(65 + (i % 26)) + s;
+  return s;
 }
 
 export async function POST(req: Request) {
@@ -61,16 +66,29 @@ export async function POST(req: Request) {
       입금상태: '입금대기', 입금일: '', 입금예정일: '', 입금액: 0, 순매출: 금액 || '', 비고: '영업보드 계약전환 ' + today,
     } });
 
-    // 3. 영업 단계 = 계약 (보드서 빠짐) — read→rewrite
-    const 행들 = data.map((r) => {
-      const row = 영업H.map((h) => normCell(r[head.indexOf(h)] ?? ''));
-      if (String(r[gi('id')]) === String(id)) {
-        row[영업H.indexOf('단계')] = '계약';
-        row[영업H.indexOf('갱신일')] = today;
-      }
-      return row;
-    });
-    await post({ key: KEY, 종류: '영업', 헤더: 영업H, 행들, 드롭다운: { 단계: ['접촉', '제안', '계약대기', '계약', '종료'] }, 덮어쓰기: true });
+    // 3. 영업 단계 = 계약 (보드서 빠짐) — ⚠️ 구버전 전체 덮어쓰기는 경쟁조건(실패도감 #72) → SA 단일셀로 교체 2026-07-07
+    if (!SHEET_ID || !SA_JSON) return NextResponse.json({ ok: false, error: 'SA 설정 누락' }, { status: 500 });
+    const sheets = saApi();
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: '영업' });
+    const sheetRows = res.data.values || [];
+    if (sheetRows.length < 2) return NextResponse.json({ ok: false, error: '영업 탭 못읽음' }, { status: 502 });
+    const sheetHead = sheetRows[0].map((h) => String(h));
+    const rowIdx = sheetRows.findIndex((r, i) => i > 0 && String(r[sheetHead.indexOf('id')] ?? '') === String(id));
+    if (rowIdx > 0) {
+      const sheetRow = rowIdx + 1; // 1-indexed
+      const 단계Col = colLetter(sheetHead.indexOf('단계'));
+      const 갱신일Col = colLetter(sheetHead.indexOf('갱신일'));
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: {
+          valueInputOption: 'USER_ENTERED',
+          data: [
+            { range: `영업!${단계Col}${sheetRow}`, values: [['계약']] },
+            { range: `영업!${갱신일Col}${sheetRow}`, values: [[today]] },
+          ],
+        },
+      });
+    }
 
     invalidateSheets();
     if (!과업res.ok || !매출res.ok) return NextResponse.json({ ok: false, error: '일부 기록 실패', 과업res, 매출res }, { status: 502 });
