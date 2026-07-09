@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 const GLOBAL_KEY = 'posts'; // 전역 글 저장 파일 = qnbang-dashboard-data/boards/posts.json
 
-// 화면에 주는 글 한 줄. source=post 만 이 API로 삭제 가능(idx = posts.json 안 원본 인덱스).
+// 화면에 주는 글 한 줄. 수정 주소: post=idx(posts.json) / hub=hubKey+idx(boards/<key>.json) / sheet=sheetId(과업 시트 행).
 export type Post = {
   tag: string;           // 회의록 | 아이디어 | 리서치
   title: string;
@@ -23,6 +23,8 @@ export type Post = {
   project?: string;      // 어느 프로젝트에 달린 글인지(없으면 독립 글)
   source: 'post' | 'hub' | 'sheet';
   idx?: number;
+  hubKey?: string;       // source=hub — 어느 허브 게시판인지
+  sheetId?: string;      // source=sheet — 과업 시트 행 id (수정은 /api/office/update로)
 };
 
 // 시트 2차원 배열 → 헤더 기반 객체 배열 (archive.ts와 같은 소형 헬퍼)
@@ -58,10 +60,10 @@ export async function GET() {
     }));
     for (const { k, entries } of hubBoards) {
       const project = HUB[k].title.split('—')[0].trim();
-      for (const e of entries) posts.push({
+      entries.forEach((e, i) => posts.push({
         tag: '회의록', title: e.title, desc: e.desc, date: e.date,
-        href: e.href || `/board/${k}`, project, source: 'hub',
-      });
+        href: e.href || `/board/${k}`, project, source: 'hub', hubKey: k, idx: i,
+      }));
     }
 
     // ③ 과업 시트 분류=리서치 — 리서치 풀은 게시판으로만 보인다(원본은 시트 그대로)
@@ -73,7 +75,7 @@ export async function GET() {
         posts.push({
           tag: '리서치', title: t['프로젝트'] || t['과업명'] || '(이름 없음)',
           desc: memo.split('\n')[0] || t['현재상태'] || '', body: memo || undefined,
-          date: ymd(t['갱신일'] || ''), source: 'sheet',
+          date: ymd(t['갱신일'] || ''), source: 'sheet', sheetId: t['id'] || undefined,
         });
       }
     } catch { /* 시트 실패해도 게시판 자체는 뜨게 */ }
@@ -91,10 +93,27 @@ export async function POST(req: Request) {
   if (jar.get('qnbang_auth')?.value !== process.env.AUTH_TOKEN) {
     return NextResponse.json({ ok: false, error: '로그인이 필요합니다' }, { status: 401 });
   }
-  let body: { action?: 'add' | 'edit' | 'delete'; entry?: BoardEntry; index?: number };
+  let body: { action?: 'add' | 'edit' | 'delete'; entry?: BoardEntry; index?: number; hubKey?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: 'bad json' }, { status: 400 }); }
 
   try {
+    // 허브 회의록 수정 — boards/<hubKey>.json의 해당 항목 제목·설명만 바꾼다(날짜·링크 유지, 외부 게시판에도 반영).
+    if (body.action === 'edit' && body.hubKey) {
+      const k = body.hubKey;
+      if (!HUB[k] || !HUB[k].nav.some((n) => n.src === `board:${k}`)) {
+        return NextResponse.json({ ok: false, error: 'unknown hub board' }, { status: 404 });
+      }
+      const { entries } = await getBoard(k);
+      const i = body.index;
+      if (typeof i !== 'number' || i < 0 || i >= entries.length) {
+        return NextResponse.json({ ok: false, error: 'bad index' }, { status: 400 });
+      }
+      const title = (body.entry?.title || '').trim();
+      if (!title) return NextResponse.json({ ok: false, error: '제목은 필수예요' }, { status: 400 });
+      entries[i] = { ...entries[i], title, desc: (body.entry?.desc || '').trim() };
+      await saveBoard(k, entries, new Date().toISOString());
+      return NextResponse.json({ ok: true });
+    }
     const { entries } = await getBoard(GLOBAL_KEY);
     if (body.action === 'add') {
       const e = body.entry;

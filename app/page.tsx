@@ -1127,6 +1127,7 @@ function BizView() {
 type Post = {
   tag: string; title: string; desc: string; body?: string; date: string;
   href?: string; project?: string; source: 'post' | 'hub' | 'sheet'; idx?: number;
+  hubKey?: string; sheetId?: string;
 };
 const POST_BADGE: Record<string, string> = {
   회의록: 'bg-blue-600', 아이디어: 'bg-purple-600', 리서치: 'bg-teal-600',
@@ -1179,17 +1180,31 @@ function PostsView() {
     } catch (e) { alert(String(e)); } finally { setBusy(false); }
   };
 
+  // 수정 — 출처별로 저장 경로가 다르다: 직접 쓴 글=posts.json / 허브 회의록=boards/<key>.json / 시트 리서치=과업 시트(프로젝트·메모)
   const saveEdit = async (p: Post) => {
     const title = editForm.title.trim();
-    if (!title || typeof p.idx !== 'number' || busy) return;
+    if (!title || busy) return;
     setBusy(true);
     try {
-      const r = await fetch('/api/posts', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'edit', index: p.idx, entry: { tag: editForm.tag, title, desc: editForm.body.trim().split('\n')[0], body: editForm.body.trim() } }),
-      });
-      const j = await r.json();
-      if (j.ok) { setEditIdx(null); load(); } else alert(j.error || '수정 실패');
+      let r: Response;
+      if (p.source === 'sheet' && p.sheetId) {
+        r = await fetch('/api/office/update', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: p.sheetId, patch: { 프로젝트: title, 메모: editForm.body } }),
+        });
+      } else if (p.source === 'hub' && p.hubKey && typeof p.idx === 'number') {
+        r = await fetch('/api/posts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'edit', hubKey: p.hubKey, index: p.idx, entry: { title, desc: editForm.body.trim() } }),
+        });
+      } else if (p.source === 'post' && typeof p.idx === 'number') {
+        r = await fetch('/api/posts', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'edit', index: p.idx, entry: { tag: editForm.tag, title, desc: editForm.body.trim().split('\n')[0], body: editForm.body.trim() } }),
+        });
+      } else return;
+      const j = await r.json().catch(() => ({ ok: r.ok }));
+      if (j.ok !== false && r.ok) { setEditIdx(null); load(); } else alert(j.error || '수정 실패');
     } catch (e) { alert(String(e)); } finally { setBusy(false); }
   };
 
@@ -1250,15 +1265,22 @@ function PostsView() {
             return (
               <div key={`edit-${i}`} className="border-b border-slate-100 px-1.5 py-3 flex flex-col gap-2 bg-slate-50/60">
                 <div className="flex gap-2">
-                  <select value={editForm.tag} onChange={(e) => setEditForm({ ...editForm, tag: e.target.value })}
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-indigo-500">
-                    {tags.map((t) => <option key={t}>{t}</option>)}
-                  </select>
+                  {p.source === 'post' ? (
+                    <select value={editForm.tag} onChange={(e) => setEditForm({ ...editForm, tag: e.target.value })}
+                      className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-indigo-500">
+                      {tags.map((t) => <option key={t}>{t}</option>)}
+                    </select>
+                  ) : (
+                    <span className={`self-center shrink-0 text-[11px] font-bold text-white rounded px-2 py-0.5 ${POST_BADGE[p.tag] || 'bg-slate-500'}`}>{p.tag}</span>
+                  )}
                   <input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                     className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                 </div>
-                <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })} rows={4}
+                <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })} rows={p.source === 'hub' ? 2 : 4}
+                  placeholder={p.source === 'hub' ? '한 줄 설명' : '내용'}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-y" />
+                {p.source === 'hub' && <p className="text-[11px] text-slate-400">허브 회의 게시판에도 같이 반영됩니다. 회의 본문 문서는 링크라 공유된 문서 탭에서 수정해요.</p>}
+                {p.source === 'sheet' && <p className="text-[11px] text-slate-400">과업 시트(프로젝트명·메모)에 저장됩니다. 첫 줄이 목록 요약이 돼요.</p>}
                 <div className="flex gap-2 justify-end">
                   <button onClick={() => saveEdit(p)} disabled={busy || !editForm.title.trim()}
                     className="text-sm font-bold rounded-lg bg-slate-800 text-white px-4 py-1.5 hover:bg-slate-700 disabled:opacity-40">
@@ -1283,14 +1305,14 @@ function PostsView() {
                   {p.desc && <p className="text-[13px] text-slate-500 truncate">{p.desc}</p>}
                 </div>
                 <span className="shrink-0 text-xs text-slate-400 whitespace-nowrap mt-0.5">{fmtD(p.date)}</span>
-                {p.source === 'post' && (
-                  <span className="shrink-0 flex gap-0.5">
-                    <button onClick={(e) => { e.stopPropagation(); setEditForm({ tag: p.tag, title: p.title, body: p.body || p.desc || '' }); setEditIdx(i); setOpenIdx(null); }}
-                      disabled={busy} className="text-slate-300 hover:text-indigo-500 text-sm px-1">✏️</button>
+                <span className="shrink-0 flex gap-0.5">
+                  <button onClick={(e) => { e.stopPropagation(); setEditForm({ tag: p.tag, title: p.title, body: p.source === 'hub' ? (p.desc || '') : (p.body || p.desc || '') }); setEditIdx(i); setOpenIdx(null); }}
+                    disabled={busy} className="text-slate-300 hover:text-indigo-500 text-sm px-1">✏️</button>
+                  {p.source === 'post' && (
                     <button onClick={(e) => { e.stopPropagation(); del(p); }} disabled={busy}
                       className="text-slate-300 hover:text-rose-500 text-sm px-1">✕</button>
-                  </span>
-                )}
+                  )}
+                </span>
               </div>
               {isOpen && hasBody && (
                 <div className="mx-1.5 mb-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm text-slate-700">
