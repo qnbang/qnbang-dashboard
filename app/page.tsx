@@ -1140,9 +1140,27 @@ function PostsView() {
   const [form, setForm] = useState({ tag: '아이디어', title: '', body: '' });
   const [busy, setBusy] = useState(false);
   const [openIdx, setOpenIdx] = useState<number | null>(null); // 본문 펼친 글(목록 인덱스)
-  const [editIdx, setEditIdx] = useState<number | null>(null); // 편집 중인 글(목록 인덱스, source=post만)
+  const [editIdx, setEditIdx] = useState<number | null>(null); // 편집 중인 글(목록 인덱스)
   const [editForm, setEditForm] = useState({ tag: '아이디어', title: '', body: '' });
   const [frame, setFrame] = useState<Post | null>(null); // 링크 글(회의록 등) 모달
+  // 링크 글의 본문 문서(공유 마크다운) — 슬러그를 repo/path로 풀어 sha와 함께 불러오면 폼에서 같이 수정
+  const [editDoc, setEditDoc] = useState<null | 'loading' | 'unavailable' | { repo: string; path: string; sha: string; orig: string; draft: string }>(null);
+
+  const openEdit = async (p: Post, i: number) => {
+    setEditForm({ tag: p.tag, title: p.title, body: p.source === 'hub' ? (p.desc || '') : (p.body || p.desc || '') });
+    setEditIdx(i); setOpenIdx(null); setEditDoc(null);
+    const m = (p.href || '').match(/^\/share\/([a-z0-9-]+)$/i); // 정적 .html·외부 링크는 제외
+    if (!m) { if (p.source === 'hub' && p.href) setEditDoc('unavailable'); return; }
+    setEditDoc('loading');
+    try {
+      const sj = await fetch('/api/share?all=1').then((r) => r.json());
+      const s = (sj.shares || []).find((x: { slug: string }) => x.slug === m[1]);
+      if (!s) { setEditDoc('unavailable'); return; }
+      const dj = await fetch(`/api/git-projects/${s.repo}/doc?path=${encodeURIComponent(s.path)}`).then((r) => r.json());
+      if (dj?.sha) setEditDoc({ repo: s.repo, path: s.path, sha: dj.sha, orig: dj.content || '', draft: dj.content || '' });
+      else setEditDoc('unavailable');
+    } catch { setEditDoc('unavailable'); }
+  };
 
   const load = () => {
     fetch('/api/posts').then((r) => r.json()).then((j) => {
@@ -1181,11 +1199,20 @@ function PostsView() {
   };
 
   // 수정 — 출처별로 저장 경로가 다르다: 직접 쓴 글=posts.json / 허브 회의록=boards/<key>.json / 시트 리서치=과업 시트(프로젝트·메모)
+  // 본문 문서(editDoc)가 열려 있고 고쳐졌으면 그 마크다운도 함께 저장(sha 충돌검사 — 다른 데서 먼저 고쳤으면 거절).
   const saveEdit = async (p: Post) => {
     const title = editForm.title.trim();
     if (!title || busy) return;
     setBusy(true);
     try {
+      if (editDoc && typeof editDoc === 'object' && editDoc.draft !== editDoc.orig) {
+        const r = await fetch(`/api/git-projects/${editDoc.repo}/doc`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: editDoc.path, content: editDoc.draft, sha: editDoc.sha }),
+        });
+        const j = await r.json().catch(() => ({ ok: r.ok }));
+        if (!r.ok || j.ok === false) { alert('본문 저장 실패: ' + (j.error || r.status) + '\n(다른 곳에서 먼저 수정됐으면 수정을 다시 열어주세요)'); setBusy(false); return; }
+      }
       let r: Response;
       if (p.source === 'sheet' && p.sheetId) {
         r = await fetch('/api/office/update', {
@@ -1204,7 +1231,7 @@ function PostsView() {
         });
       } else return;
       const j = await r.json().catch(() => ({ ok: r.ok }));
-      if (j.ok !== false && r.ok) { setEditIdx(null); load(); } else alert(j.error || '수정 실패');
+      if (j.ok !== false && r.ok) { setEditIdx(null); setEditDoc(null); load(); } else alert(j.error || '수정 실패');
     } catch (e) { alert(String(e)); } finally { setBusy(false); }
   };
 
@@ -1279,14 +1306,23 @@ function PostsView() {
                 <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })} rows={p.source === 'hub' ? 2 : 4}
                   placeholder={p.source === 'hub' ? '한 줄 설명' : '내용'}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-y" />
-                {p.source === 'hub' && <p className="text-[11px] text-slate-400">허브 회의 게시판에도 같이 반영됩니다. 회의 본문 문서는 링크라 공유된 문서 탭에서 수정해요.</p>}
+                {p.source === 'hub' && <p className="text-[11px] text-slate-400">제목·설명은 허브 회의 게시판에도 같이 반영됩니다.</p>}
                 {p.source === 'sheet' && <p className="text-[11px] text-slate-400">과업 시트(프로젝트명·메모)에 저장됩니다. 첫 줄이 목록 요약이 돼요.</p>}
+                {editDoc === 'loading' && <p className="text-[11px] text-slate-400">📄 본문 문서 불러오는 중…</p>}
+                {editDoc === 'unavailable' && <p className="text-[11px] text-amber-500">📄 본문이 옛 정적 파일(또는 외부 링크)이라 여기서는 수정 못 해요 — 새 회의부터는 공유 문서로 연결하면 수정됩니다.</p>}
+                {editDoc && typeof editDoc === 'object' && (
+                  <div>
+                    <p className="text-[11px] font-semibold text-slate-500 mb-1">📄 본문 (마크다운 — 저장하면 공유 페이지에 바로 반영)</p>
+                    <textarea value={editDoc.draft} onChange={(e) => setEditDoc({ ...editDoc, draft: e.target.value })} rows={12} spellCheck={false}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[13px] font-mono leading-relaxed outline-none focus:border-indigo-500 resize-y" />
+                  </div>
+                )}
                 <div className="flex gap-2 justify-end">
                   <button onClick={() => saveEdit(p)} disabled={busy || !editForm.title.trim()}
                     className="text-sm font-bold rounded-lg bg-slate-800 text-white px-4 py-1.5 hover:bg-slate-700 disabled:opacity-40">
                     {busy ? '저장 중…' : '저장'}
                   </button>
-                  <button onClick={() => setEditIdx(null)} disabled={busy}
+                  <button onClick={() => { setEditIdx(null); setEditDoc(null); }} disabled={busy}
                     className="text-sm rounded-lg border border-slate-200 text-slate-500 px-3 py-1.5 hover:bg-slate-50">취소</button>
                 </div>
               </div>
@@ -1306,7 +1342,7 @@ function PostsView() {
                 </div>
                 <span className="shrink-0 text-xs text-slate-400 whitespace-nowrap mt-0.5">{fmtD(p.date)}</span>
                 <span className="shrink-0 flex gap-0.5">
-                  <button onClick={(e) => { e.stopPropagation(); setEditForm({ tag: p.tag, title: p.title, body: p.source === 'hub' ? (p.desc || '') : (p.body || p.desc || '') }); setEditIdx(i); setOpenIdx(null); }}
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(p, i); }}
                     disabled={busy} className="text-slate-300 hover:text-indigo-500 text-sm px-1">✏️</button>
                   {p.source === 'post' && (
                     <button onClick={(e) => { e.stopPropagation(); del(p); }} disabled={busy}
