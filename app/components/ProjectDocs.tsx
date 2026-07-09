@@ -78,7 +78,10 @@ function matchRepo(name: string, projects: ProjectRepo[]): ProjectRepo | undefin
   return projects.find((p) => { const P = toks(p.title); return P.some((x) => T.includes(x)); });
 }
 
-export default function ProjectDocs({ name, onClose }: { name: string; onClose: () => void }) {
+// slot = 진행률 아래 삽입되는 운영 뷰(자체사업 브랜드/도구용). fallbackDesc = repo 못 찾아도 보여줄 개요(자동화청년처럼 repo 없는 카드).
+export default function ProjectDocs({ name, onClose, slot, fallbackDesc }: {
+  name: string; onClose: () => void; slot?: React.ReactNode; fallbackDesc?: string;
+}) {
   const [repo, setRepo] = useState<string | null>(null);
   const [state, setState] = useState<'loading' | 'notfound' | 'ok'>('loading');
   const [workLog, setWorkLog] = useState<string | null>(null);
@@ -120,11 +123,19 @@ export default function ProjectDocs({ name, onClose }: { name: string; onClose: 
         </div>
         <div className="p-5 space-y-4">
           {state === 'loading' && <Loading text="문서 불러오는 중" pad="py-8" />}
-          {state === 'notfound' && <p className="text-slate-400 text-sm text-center py-8">연결된 GitHub 저장소를 못 찾았어요.<br /><span className="text-xs">(프로젝트.json·qnbang-project 토픽 확인)</span></p>}
+          {state === 'notfound' && (
+            slot || fallbackDesc
+              ? (<>
+                  {fallbackDesc && <div className="text-[12.5px] text-slate-600 leading-relaxed bg-slate-50 border-l-[3px] border-slate-300 rounded-r-md px-3 py-2">{fallbackDesc}</div>}
+                  {slot}
+                </>)
+              : <p className="text-slate-400 text-sm text-center py-8">연결된 GitHub 저장소를 못 찾았어요.<br /><span className="text-xs">(프로젝트.json·qnbang-project 토픽 확인)</span></p>
+          )}
           {state === 'ok' && (<>
-            {intro && (
-              <div className="text-[12.5px] text-slate-600 leading-relaxed bg-slate-50 border-l-[3px] border-slate-300 rounded-r-md px-3 py-2">{intro}</div>
+            {(intro || fallbackDesc) && (
+              <div className="text-[12.5px] text-slate-600 leading-relaxed bg-slate-50 border-l-[3px] border-slate-300 rounded-r-md px-3 py-2">{intro || fallbackDesc}</div>
             )}
+            {slot}
             {status && status.total > 0 && (
               <div>
                 <div className="text-xs font-semibold text-slate-500 mb-1">진행률 {Math.round((status.done / status.total) * 100)}% ({status.done}/{status.total})</div>

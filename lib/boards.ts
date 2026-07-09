@@ -56,3 +56,30 @@ export async function saveBoard(key: string, entries: BoardEntry[], nowIso: stri
   const put = await fetch(fileUrl(key), { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
   if (!put.ok) throw new Error(`게시판 저장 실패: ${put.status} ${await put.text()}`);
 }
+
+// ── 제네릭 JSON 파일 (같은 데이터 repo의 임의 경로) — 자체사업 운영 데이터(biz/<key>.json) 등 ──
+const anyUrl = (path: string) =>
+  `https://api.github.com/repos/${OWNER}/${REGISTRY_REPO}/contents/${path}`;
+
+export async function getJsonFile<T>(path: string): Promise<{ data: T | null; sha?: string }> {
+  const res = await fetch(anyUrl(path), { headers: headers(), cache: 'no-store' });
+  if (res.status === 404) return { data: null };
+  if (!res.ok) throw new Error(`읽기 실패(${path}): ${res.status} ${await res.text()}`);
+  const json = await res.json();
+  try {
+    return { data: JSON.parse(Buffer.from(json.content, 'base64').toString('utf8')) as T, sha: json.sha };
+  } catch {
+    return { data: null, sha: json.sha };
+  }
+}
+
+export async function saveJsonFile(path: string, data: unknown): Promise<void> {
+  const { sha } = await getJsonFile(path);
+  const body = {
+    message: `데이터 저장: ${path}`,
+    content: Buffer.from(JSON.stringify(data, null, 2) + '\n').toString('base64'),
+    sha,
+  };
+  const put = await fetch(anyUrl(path), { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
+  if (!put.ok) throw new Error(`저장 실패(${path}): ${put.status} ${await put.text()}`);
+}

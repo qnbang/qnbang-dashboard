@@ -91,7 +91,7 @@ export async function POST(req: Request) {
   if (jar.get('qnbang_auth')?.value !== process.env.AUTH_TOKEN) {
     return NextResponse.json({ ok: false, error: '로그인이 필요합니다' }, { status: 401 });
   }
-  let body: { action?: 'add' | 'delete'; entry?: BoardEntry; index?: number };
+  let body: { action?: 'add' | 'edit' | 'delete'; entry?: BoardEntry; index?: number };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: 'bad json' }, { status: 400 }); }
 
   try {
@@ -108,6 +108,21 @@ export async function POST(req: Request) {
         href: (e?.href || '').trim() || undefined,
         tag: (e?.tag || '아이디어').trim(),
       });
+    } else if (body.action === 'edit') {
+      const i = body.index;
+      if (typeof i !== 'number' || i < 0 || i >= entries.length) {
+        return NextResponse.json({ ok: false, error: 'bad index' }, { status: 400 });
+      }
+      const e = body.entry;
+      const title = (e?.title || '').trim();
+      if (!title) return NextResponse.json({ ok: false, error: '제목은 필수예요' }, { status: 400 });
+      entries[i] = {
+        ...entries[i], // 날짜·href 등 안 보낸 필드는 유지
+        title,
+        desc: (e?.desc || '').trim(),
+        body: (e?.body || '').trim() || undefined,
+        tag: (e?.tag || entries[i].tag || '아이디어').trim(),
+      };
     } else if (body.action === 'delete') {
       const i = body.index;
       if (typeof i !== 'number' || i < 0 || i >= entries.length) {

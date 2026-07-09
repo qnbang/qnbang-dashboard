@@ -7,6 +7,7 @@ import { MonthlyBar, CategoryPie } from './components/charts';
 import OfficeBoardView from './components/OfficeBoardView';
 import ProjectArchiveView from './components/ProjectArchiveView';
 import ProjectDocs from './components/ProjectDocs';
+import BizOps from './components/BizOps';
 import { renderMarkdown } from '@/lib/markdown';
 import { Loading, ErrorBox } from './components/ui';
 
@@ -34,13 +35,13 @@ const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
   { key: 'office', label: '🏢 사무실', ready: true },
+  { key: 'tools', label: '🚀 자체사업', ready: true },
   { key: 'archive', label: '📋 프로젝트', ready: true },
   { key: 'posts', label: '📝 게시판', ready: true },
   { key: 'crm', label: '👥 고객·영업', ready: true },
   { key: 'hubs', label: '협업 허브', ready: true },
   { key: 'shares', label: '공유된 문서', ready: true },
   { key: 'finance', label: '정산', ready: true },
-  { key: 'tools', label: '자체사업', ready: true },
 ];
 
 // 협업 허브 — 협업사·클라이언트에게 건네는 "프로젝트 진행 공유 창구" 모음.
@@ -79,29 +80,35 @@ type WorkTool = {
   links?: { label: string; href: string }[];
   status?: string;   // 배포됨·진행 중 등 (없으면 표시 안 함)
   owner?: string;    // 담당 뱃지 (예: 김지영)
+  bizKey?: 'banbo' | 'ikneunda' | 'autoboy'; // 브랜드 운영 뷰 식별자(모달 슬롯)
+  sheetId?: string;  // 과업 시트 행 id (시트 도구 카드 — 메모 편집용)
+  memo?: string;     // 시트 메모 원문 (도구 카드 모달 문서)
 };
 // 1. 브랜드 — 시장에 정착시키는 이름
 const BRANDS: WorkTool[] = [
   {
     name: '자동화청년',
-    desc: 'AI 자동화 콘텐츠 채널 — 릴스·레터·캐러셀·스레드. 외주 유입 깔때기.',
+    desc: '"자동화 잘하는 옆집 청년" — 인스타·스레드에 실제로 돌린 자동화를 순서대로 공유해 외주를 한 곳으로 모으는 콘텐츠 채널. 릴스·레터·캐러셀·스레드.',
     icon: '📣',
     color: 'bg-orange-50 text-orange-600 border-orange-200',
-    status: '운영 중',
+    status: '콘텐츠 제작 중',
+    bizKey: 'autoboy',
   },
   {
     name: '읽는다',
-    desc: '(설명 채우기)',
+    desc: '수요일 밤 충무로 인문학 사일런트 북클럽 — 침묵 독서 60분 + 해피아워("읽고 마신다"). 기획 확정, SNS 런칭 준비.',
     icon: '📖',
     color: 'bg-amber-50 text-amber-600 border-amber-200',
     status: '준비 중',
+    bizKey: 'ikneunda',
   },
   {
     name: '반보',
-    desc: '커뮤니티 모임 대시보드 — 모임 안내·신청과 운영 관리',
+    desc: '"반 보" 앞에서 함께 가는 지역 오프라인 커뮤니티 — 먼저 해본 멘토가 곁에서 같이 하는 모임. 오늘의 문장 1기 운영 중.',
     logo: '/logos/banbo.png',
     color: 'bg-orange-50 text-orange-600 border-orange-200',
     status: '운영 중',
+    bizKey: 'banbo',
     links: [
       { label: '사이트', href: 'https://banbo-preview.vercel.app' },
       { label: '어드민', href: 'https://banbo-preview.vercel.app/admin.html' },
@@ -132,6 +139,22 @@ const WORK_TOOLS: WorkTool[] = [
     href: 'https://collector.qnbang.com',
     icon: '🧲',
     color: 'bg-sky-50 text-sky-600 border-sky-200',
+    status: '배포됨',
+  },
+  {
+    name: '매크로 투자 브리핑',
+    desc: '글로벌 거시 흐름을 한국 투자자 언어(원화·코스피)로 번역해 매일 아침 자동 발행하는 브리핑 사이트',
+    href: 'https://qnbang-macro-briefing.vercel.app',
+    icon: '📈',
+    color: 'bg-blue-50 text-blue-600 border-blue-200',
+    status: '배포됨',
+  },
+  {
+    name: '가격 모니터링',
+    desc: '경쟁사·상품 가격을 자동 추적하는 모니터링 도구 — 서비스개발 1호',
+    href: 'https://qnbang-price-monitor.vercel.app',
+    icon: '💰',
+    color: 'bg-teal-50 text-teal-600 border-teal-200',
     status: '배포됨',
   },
   {
@@ -988,10 +1011,12 @@ function HubsView() {
   );
 }
 
-// 자체사업 탭 카드 하나 — 브랜드/서비스/실험실 공통 모양
-function BizCard({ t }: { t: WorkTool }) {
-  const head = (
-    <>
+// 자체사업 탭 카드 하나 — 브랜드/서비스/실험실 공통 모양. 카드 클릭=모달, 링크는 하단 버튼으로 분리.
+function BizCard({ t, onOpen }: { t: WorkTool; onOpen: (t: WorkTool) => void }) {
+  const links = t.links || (t.href ? [{ label: '열기', href: t.href }] : []);
+  return (
+    <div onClick={() => onOpen(t)}
+      className="group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col items-center text-center transition hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
       <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center overflow-hidden bg-white ${t.color}`}>
         {t.logo ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -1013,33 +1038,24 @@ function BizCard({ t }: { t: WorkTool }) {
           {t.status}
         </span>
       )}
-    </>
-  );
-  const cls = 'group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col items-center text-center transition hover:shadow-md hover:-translate-y-0.5';
-  if (t.links) {
-    return (
-      <div className={cls}>
-        {head}
+      {links.length > 0 && (
         <div className="mt-3 flex gap-2">
-          {t.links.map((l) => (
-            <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer"
+          {links.map((l) => (
+            <a key={l.label} href={l.href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
               className="text-xs font-medium px-3 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-600 transition">
-              {l.label}
+              {l.label} ↗
             </a>
           ))}
         </div>
-      </div>
-    );
-  }
-  if (t.href) {
-    return <a href={t.href} target="_blank" rel="noopener noreferrer" className={cls}>{head}</a>;
-  }
-  return <div className={cls.replace('group ', '')}>{head}</div>;
+      )}
+    </div>
+  );
 }
 
-// 자체사업 탭 — 1.브랜드 / 2.큐앤뱅 서비스(+시트 분류=도구 자동 합류) / 3.실험실
+// 자체사업 탭 — 1.브랜드 / 2.큐앤뱅 서비스(+시트 분류=도구 자동 합류) / 3.실험실. 카드 클릭=모달(개요·진행사항·운영 뷰).
 function BizView() {
   const [sheetTools, setSheetTools] = useState<WorkTool[]>([]);
+  const [biz, setBiz] = useState<WorkTool | null>(null); // 열린 카드(모달)
   useEffect(() => {
     // 시트에 분류=도구로 등록된 과업 행 → 서비스 카드로 합류(하드코딩 카드와 이름 겹치면 제외)
     fetch('/api/office').then((r) => r.json()).then((j) => {
@@ -1062,10 +1078,12 @@ function BizView() {
         seen.add(n);
         tools.push({
           name,
-          desc: (t.memo || '').split('\n')[0] || t.status || '설명 비어있음 — 시트 메모에 채우면 표시',
+          desc: (t.memo || '').split('\n')[0] || t.status || '설명 비어있음 — 카드 눌러 문서에 채우면 표시',
           icon: '🧰',
           color: 'bg-teal-50 text-teal-600 border-teal-200',
           status: t.status && t.status.length <= 12 ? t.status : undefined,
+          sheetId: t.id,
+          memo: t.memo || '',
         });
       }
       setSheetTools(tools);
@@ -1080,7 +1098,7 @@ function BizView() {
         <span className="text-xs text-slate-400 ml-auto">{hint}</span>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {items.map((t) => <BizCard key={t.name} t={t} />)}
+        {items.map((t) => <BizCard key={t.name} t={t} onOpen={setBiz} />)}
       </div>
     </section>
   );
@@ -1088,11 +1106,19 @@ function BizView() {
   return (
     <div className="space-y-8">
       <p className="text-sm text-slate-500">
-        큐앤뱅이 직접 굴리는 것 전부 — <b className="text-slate-700">브랜드 · 서비스(도구) · 실험</b>. 매출이 나는 프로젝트가 되면 프로젝트 탭으로 올라갑니다.
+        큐앤뱅이 직접 굴리는 것 전부 — <b className="text-slate-700">브랜드 · 서비스(도구) · 실험</b>. 카드를 누르면 개요·진행사항·운영 현황이 열립니다.
       </p>
       <Section no="1" title="브랜드" hint="시장에 정착시키는 이름" items={BRANDS} />
       <Section no="2" title="큐앤뱅 서비스" hint="사면·쓰면 작동하는 도구 — 시트 분류=도구 자동 합류" items={[...WORK_TOOLS, ...sheetTools]} />
       <Section no="3" title="실험실" hint="할지 말지 미정 · 테스트 중" items={LAB} />
+      {biz && (
+        <ProjectDocs
+          name={biz.name}
+          onClose={() => setBiz(null)}
+          fallbackDesc={biz.desc}
+          slot={<BizOps t={biz} />}
+        />
+      )}
     </div>
   );
 }
@@ -1113,6 +1139,9 @@ function PostsView() {
   const [form, setForm] = useState({ tag: '아이디어', title: '', body: '' });
   const [busy, setBusy] = useState(false);
   const [openIdx, setOpenIdx] = useState<number | null>(null); // 본문 펼친 글(목록 인덱스)
+  const [editIdx, setEditIdx] = useState<number | null>(null); // 편집 중인 글(목록 인덱스, source=post만)
+  const [editForm, setEditForm] = useState({ tag: '아이디어', title: '', body: '' });
+  const [frame, setFrame] = useState<Post | null>(null); // 링크 글(회의록 등) 모달
 
   const load = () => {
     fetch('/api/posts').then((r) => r.json()).then((j) => {
@@ -1147,6 +1176,20 @@ function PostsView() {
       });
       const j = await r.json();
       if (j.ok) load(); else alert(j.error || '삭제 실패');
+    } catch (e) { alert(String(e)); } finally { setBusy(false); }
+  };
+
+  const saveEdit = async (p: Post) => {
+    const title = editForm.title.trim();
+    if (!title || typeof p.idx !== 'number' || busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch('/api/posts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'edit', index: p.idx, entry: { tag: editForm.tag, title, desc: editForm.body.trim().split('\n')[0], body: editForm.body.trim() } }),
+      });
+      const j = await r.json();
+      if (j.ok) { setEditIdx(null); load(); } else alert(j.error || '수정 실패');
     } catch (e) { alert(String(e)); } finally { setBusy(false); }
   };
 
@@ -1203,23 +1246,50 @@ function PostsView() {
         {shown.map((p, i) => {
           const hasBody = !!(p.body && p.body.trim() && p.body.trim() !== p.desc.trim());
           const isOpen = openIdx === i;
+          if (editIdx === i) {
+            return (
+              <div key={`edit-${i}`} className="border-b border-slate-100 px-1.5 py-3 flex flex-col gap-2 bg-slate-50/60">
+                <div className="flex gap-2">
+                  <select value={editForm.tag} onChange={(e) => setEditForm({ ...editForm, tag: e.target.value })}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-indigo-500">
+                    {tags.map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                  <input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
+                </div>
+                <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })} rows={4}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-y" />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => saveEdit(p)} disabled={busy || !editForm.title.trim()}
+                    className="text-sm font-bold rounded-lg bg-slate-800 text-white px-4 py-1.5 hover:bg-slate-700 disabled:opacity-40">
+                    {busy ? '저장 중…' : '저장'}
+                  </button>
+                  <button onClick={() => setEditIdx(null)} disabled={busy}
+                    className="text-sm rounded-lg border border-slate-200 text-slate-500 px-3 py-1.5 hover:bg-slate-50">취소</button>
+                </div>
+              </div>
+            );
+          }
           return (
             <div key={`${p.source}-${p.idx ?? ''}-${p.title}-${i}`} className="border-b border-slate-100">
               <div className="flex items-start gap-3 px-1.5 py-3.5 hover:bg-slate-50 transition cursor-pointer"
-                onClick={() => hasBody ? setOpenIdx(isOpen ? null : i) : (p.href && window.open(p.href, '_blank'))}>
+                onClick={() => hasBody ? setOpenIdx(isOpen ? null : i) : (p.href && setFrame(p))}>
                 <span className={`shrink-0 mt-0.5 text-[11px] font-bold text-white rounded px-2 py-0.5 ${POST_BADGE[p.tag] || 'bg-slate-500'}`}>{p.tag}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-bold text-slate-800 leading-snug">
                     {p.title}
                     {p.project && <span className="ml-1.5 text-xs font-normal text-slate-400">{p.project}</span>}
-                    {p.href && <span className="ml-1 text-xs text-slate-300">↗</span>}
                   </p>
                   {p.desc && <p className="text-[13px] text-slate-500 truncate">{p.desc}</p>}
                 </div>
                 <span className="shrink-0 text-xs text-slate-400 whitespace-nowrap mt-0.5">{fmtD(p.date)}</span>
                 {p.source === 'post' && (
-                  <button onClick={(e) => { e.stopPropagation(); del(p); }} disabled={busy}
-                    className="shrink-0 text-slate-300 hover:text-rose-500 text-sm px-1">✕</button>
+                  <span className="shrink-0 flex gap-0.5">
+                    <button onClick={(e) => { e.stopPropagation(); setEditForm({ tag: p.tag, title: p.title, body: p.body || p.desc || '' }); setEditIdx(i); setOpenIdx(null); }}
+                      disabled={busy} className="text-slate-300 hover:text-indigo-500 text-sm px-1">✏️</button>
+                    <button onClick={(e) => { e.stopPropagation(); del(p); }} disabled={busy}
+                      className="text-slate-300 hover:text-rose-500 text-sm px-1">✕</button>
+                  </span>
                 )}
               </div>
               {isOpen && hasBody && (
@@ -1231,6 +1301,26 @@ function PostsView() {
           );
         })}
       </div>
+
+      {/* 링크 글(회의록 등) — 사이트 이동 대신 모달로 띄움 */}
+      {frame && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setFrame(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
+              <h3 className="text-sm font-bold text-slate-800 truncate pr-3">
+                <span className={`inline-block mr-2 text-[11px] font-bold text-white rounded px-2 py-0.5 align-middle ${POST_BADGE[frame.tag] || 'bg-slate-500'}`}>{frame.tag}</span>
+                {frame.title}
+              </h3>
+              <div className="flex items-center gap-2 shrink-0">
+                <a href={frame.href} target="_blank" rel="noopener noreferrer"
+                  className="text-xs font-semibold rounded-full px-3 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">새 창에서 열기</a>
+                <button onClick={() => setFrame(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+              </div>
+            </div>
+            <iframe src={frame.href} title={frame.title} className="flex-1 w-full border-0" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
