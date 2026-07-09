@@ -86,12 +86,6 @@ const WHO: Record<string, string> = { 신종호: '🧑‍💼 종호', 김지영
 // 캘린더 담당자 색(시안 기준) — 신종호 파랑·김지영 분홍·그 외(외주) 회색.
 const OWNER_COLOR = (owner: string) => owner === '신종호' ? '#4a6fd6' : owner === '김지영' ? '#c95f8a' : '#7a8296';
 
-// 🧪 실험실 — 과업 시트가 아닌 고정 참조. (도구 백로그는 분류=도구 행으로 이관됨)
-const EXPERIMENTS = [
-  { n: '풋살 케어·트레이닝', g: '개인 — v1 출시 판정 대기' },
-  { n: '생일 커뮤니티', g: '개인 — 할지 말지 미정' },
-];
-
 const CSS = `
 .qb{--ink:#1a1e30}
 .qb .note0{font-size:12px;color:#6b7088;margin:0 0 14px}
@@ -129,8 +123,6 @@ const CSS = `
 .qb .smalltk{display:flex;gap:7px;align-items:center;background:#fff;border:1px solid #e7e9f3;border-radius:12px;padding:8px 11px;margin-bottom:6px;cursor:pointer;font-size:12px;box-shadow:0 2px 8px -6px #1e225522}
 .qb .smalltk:hover{border-color:#c4c8d2}.qb .smalltk .task{font-size:12.5px;white-space:normal}.qb .smalltk .c{font-size:10px;color:#9298ac;font-weight:600;margin-top:1px}
 .qb .waitfor{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:6px;flex-shrink:0;background:#ede5ff;color:#6d4cd0}
-.qb .prodcard{flex:1;min-width:200px;background:#fff;border:1px solid #e0e3ee;border-radius:14px;padding:10px 13px;box-shadow:0 4px 14px -8px #2a335522}.qb .prodcard .pn{font-size:13px;font-weight:800;color:var(--ink)}.qb .prodcard .pv{font-size:10.5px;color:#3a3d44;font-weight:700;margin-top:2px}.qb .prodcard .pnext{font-size:10.5px;color:#9298ac;margin-top:4px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.qb .labcard{flex:1;min-width:200px;background:#fff;border:1px dashed #e0a8e8;border-radius:14px;padding:10px 13px}.qb .labcard .ln{font-size:13px;font-weight:700;color:var(--ink)}.qb .labcard .lg{font-size:10.5px;color:#a04ca0;margin-top:3px}
 .qb .divider{display:flex;align-items:center;gap:10px;margin:22px 0 10px;color:#7a8098;font-size:12.5px;font-weight:800}.qb .divider::after{content:"";flex:1;height:1px;background:#dde0ec}
 .qb .empty{color:#b0b5c6;font-size:12px;padding:12px;text-align:center;width:100%}
 .qb .qa{margin-bottom:8px;display:flex;flex-direction:column;gap:5px}
@@ -534,9 +526,6 @@ export default function OfficeBoardView() {
       start: s.start ? mdToYmd(s.start) : '', end: mdToYmd(s.date), // YYYY-MM-DD로 통일
     }))
     .filter((c) => c.end)); // 마감 파싱 실패는 제외
-  const 리서치들 = all.filter((t) => (t.category || '') === '리서치');
-  const 자체사업들 = all.filter((t) => (t.category || '') === '자체사업');
-  const 도구들 = all.filter((t) => (t.category || '') === '도구');
   // (깃 자동 섹션 폐기 — 깃 프로젝트는 크론 git-sync가 시트에 직접 등록해 위 보드로 통일됨)
   const byDday = (a: Task, b: Task) => (cardDday(a) ?? 9999) - (cardDday(b) ?? 9999); // 카드가 보여주는 D-day(단계날짜 우선) 임박순
   const inbox = board.filter((t) => t.ball === 'inbox' || t.ball === 'unset').sort(byDday); // 빈 공위치(미정)도 받은일 바구니로(office.ts 규칙) — 빠른추가가 공위치 빈칸으로 저장하므로
@@ -740,27 +729,8 @@ export default function OfficeBoardView() {
           {hold.length ? hold.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
       </div>
 
-      {cat === 'all' && filter !== 'jy' && (<>
-        <div className="divider" style={{ color: CAT['도구'].c }}>🧰 도구 백로그 — 판매 제품 ({도구들.length}) · 누르면 설명·사용법</div>
-        <section className="room product"><div className="rowwrap">{도구들.length ? 도구들.map((t) => (
-          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['도구'].c }}>🧰 {t.project || t.task}</div><div className="pnext">{(t.memo || '').split('\n')[0] || t.status || '설명 비어있음'}</div></div>
-        )) : <div className="empty">없음</div>}</div></section>
-
-        <div className="divider" style={{ color: CAT['자체사업'].c }}>🚀 자체사업 — 시장 벤처 → 브랜드 ({자체사업들.length})</div>
-        <section className="room product"><div className="rowwrap">{자체사업들.length ? 자체사업들.map((t) => (
-          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['자체사업'].c }}>🚀 {t.project || t.task}</div><div className="pnext">{(t.memo || '').split('\n')[0] || t.status || '설명 비어있음'}</div></div>
-        )) : <div className="empty">없음</div>}</div></section>
-
-        <div className="divider" style={{ color: CAT['리서치'].c }}>🔬 리서치 풀 — 탐색·자산 (쌓여 프로젝트 자산) ({리서치들.length})</div>
-        <section className="room product"><div className="rowwrap">{리서치들.length ? 리서치들.map((t) => (
-          <div key={t.id} className="prodcard" style={{ cursor: 'pointer' }} onClick={() => setSel(t)}><div className="pn" style={{ color: CAT['리서치'].c }}>🔬 {t.project || t.task}</div><div className="pnext">{(t.memo || '').split('\n')[0] || t.status || '설명 비어있음'}</div></div>
-        )) : <div className="empty">없음</div>}</div></section>
-
-        <div className="divider">🧪 실험실 — 개인·미공식 (공식화 게이트)</div>
-        <section className="room product"><div className="rowwrap">{EXPERIMENTS.map((x) => (
-          <div key={x.n} className="labcard"><div className="ln">🧪 {x.n}</div><div className="lg">{x.g}</div></div>
-        ))}</div></section>
-      </>)}
+      {/* 포트폴리오 섹션(도구·자체사업·리서치·실험실)은 2026-07-09 개편으로 이동 —
+          도구·실험실 → 자체사업 탭, 리서치 → 게시판 탭. 도구·리서치 카드 편집은 위 분류 칩으로 여전히 가능. */}
       </>)}
 
       {/* 아카이브 — 완수·폐기 프로젝트(접이식, 열 때 온디맨드 로드) */}

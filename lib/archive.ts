@@ -101,11 +101,16 @@ export async function buildArchive(): Promise<ArchiveData> {
     map.set(base, cur);
   }
 
+  // 매출 안 나는 컨테이너(도구·리서치·자체사업)는 프로젝트 탭 아닌 자체사업 탭·게시판 소관 (2026-07-09 개편)
+  const NON_REV = new Set(['도구', '리서치', '자체사업']);
+
   // 아카이브(완수) 카드 중 매출 없는 것 추가
   for (const a of 아카이브) {
     const status = a['현재상태'] || '';
     if (status.includes('폐기')) continue;
     if (a['출처'] === '단건할일') continue; // 잡일(월세 입금 등) — 프로젝트 아니므로 매출 집계 후보에서 제외
+    if (NON_REV.has(a['분류'] || '')) continue;
+    if (!a['고객']) continue; // 고객 없는 내부성 카드 — "매출 미입력" 리마인더는 대행 일에만 의미
     const base = baseName(a['프로젝트'] || '');  // 과업명 폴백 제거 — 명시된 프로젝트만
     if (!base) continue;
     // 기존 매출 프로젝트와 토큰 매칭 — 이미 있으면 스킵
@@ -127,6 +132,8 @@ export async function buildArchive(): Promise<ArchiveData> {
     const 공위치 = t['공위치'] || '';
     if (공위치 === '완수' || 공위치 === '보류') continue;
     if (!t['계약여부'] || t['계약여부'] === '영업') continue;  // 계약 없는 운영성 과업 제외
+    if (NON_REV.has(t['분류'] || '')) continue;
+    if (!t['고객']) continue; // 고객 없는 내부성 과업 — 매출 리마인더 대상 아님
     const base = baseName(t['프로젝트'] || '');  // 과업명 폴백 제거
     if (!base || 과업프로젝트.has(base)) continue;
     과업프로젝트.set(base, t);

@@ -13,12 +13,14 @@ const headers = () => ({
 });
 
 // 게시판 한 줄(회의 하나). date = 'YYYY-MM-DD'(표시할 때 'YYYY. MM. DD'로). href = 회의 본문 링크(없어도 됨).
+// body = 본문(전체 게시판 글에서 사용 — 허브 회의 게시판은 desc만 씀).
 export interface BoardEntry {
   title: string;
   desc: string;
   date: string;
   href?: string;
   tag?: string;
+  body?: string;
 }
 
 // key = 게시판 식별자(허브 키, 예 'm650'). 영숫자·하이픈만(경로 안전).
