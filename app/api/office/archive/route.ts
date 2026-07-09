@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { getSheets } from '@/lib/sheetCache';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,7 @@ export async function GET() {
       .reverse(); // 최근 것 위로
     return NextResponse.json({ ok: true, items });
   } catch (e) {
+    logError('/api/office/archive', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

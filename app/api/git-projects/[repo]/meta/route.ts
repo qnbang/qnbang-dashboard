@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { updateProjectMeta, META_KEYS } from '@/lib/github';
 
 // POST /api/git-projects/[repo]/meta — 프로젝트 정보(계약·입금·금액·진행상태) 저장
@@ -12,6 +13,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ repo: s
     await updateProjectMeta(repo, { [key]: value });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/git-projects/[repo]/meta', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

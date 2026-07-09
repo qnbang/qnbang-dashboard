@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
     invalidateSheets();
     return NextResponse.json({ ok: true, tab });
   } catch (e) {
+    logError('/api/office/contract', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

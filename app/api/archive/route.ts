@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { buildArchive } from '@/lib/archive';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -9,6 +10,7 @@ export async function GET(req: Request) {
   try {
     return NextResponse.json({ ok: true, archive: await buildArchive() });
   } catch (e) {
+    logError('/api/archive', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

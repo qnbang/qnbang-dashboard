@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError, logAudit } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
         requestBody: { values },
       });
       invalidateSheets();
+      logAudit('/api/office/labor', '인건비 명단 복사', { from, to, 건수: values.length });
       return NextResponse.json({ ok: true, from, to, 건수: values.length });
     }
 
@@ -70,8 +72,10 @@ export async function POST(req: Request) {
       requestBody: { values: [[월, 구분, 이름, String(num(세전)), String(num(공제)), String(num(실지급)), '대기', '', 비고 || '']] },
     });
     invalidateSheets();
+    logAudit('/api/office/labor', '인건비 추가', { 월, 구분, 이름, 실지급: num(실지급) });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/labor', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -118,6 +122,7 @@ export async function PATCH(req: Request) {
         requestBody: { values: [['지급완료', 지급일]] },
       });
       invalidateSheets();
+      logAudit('/api/office/labor', '인건비 지급확인(지출기록)', { rowNum, 이름: row.이름, 실지급: row.실지급, 카테고리, 지급일, 지출기록: !이미있음 });
       return NextResponse.json({ ok: true, 지출기록: !이미있음 });
     }
 
@@ -136,8 +141,10 @@ export async function PATCH(req: Request) {
       requestBody: { values: [[비고 || '']] },
     });
     invalidateSheets();
+    logAudit('/api/office/labor', '인건비 수정', { rowNum, 월, 구분, 이름, 실지급: num(실지급) });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/labor', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -162,8 +169,10 @@ export async function DELETE(req: Request) {
       }}}]},
     });
     invalidateSheets();
+    logAudit('/api/office/labor', '인건비 삭제', { rowNum });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/labor', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

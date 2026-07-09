@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
 
 export const dynamic = 'force-dynamic';
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
     invalidateSheets();
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/step', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError, logAudit } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -43,8 +44,10 @@ export async function POST(req: Request) {
       requestBody: { values: [toRow(body)] },
     });
     invalidateSheets();
+    logAudit('/api/office/revenue', '매출 추가', { 계약명: body['계약명'], 입금액: body['입금액'], 순매출: body['순매출'] });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/revenue', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -63,8 +66,10 @@ export async function PATCH(req: Request) {
       requestBody: { values: [toRow(body)] },
     });
     invalidateSheets();
+    logAudit('/api/office/revenue', '매출 수정', { rowNum, 계약명: body['계약명'], 입금액: body['입금액'], 순매출: body['순매출'] });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/revenue', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -87,8 +92,10 @@ export async function DELETE(req: Request) {
       }}}]},
     });
     invalidateSheets();
+    logAudit('/api/office/revenue', '매출 삭제', { rowNum });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/revenue', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

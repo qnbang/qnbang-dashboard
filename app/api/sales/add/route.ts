@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError, logAudit } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
 
 export const dynamic = 'force-dynamic';
@@ -55,8 +56,10 @@ export async function POST(req: Request) {
     const out = await res.json().catch(() => ({}));
     if (!out.ok) return NextResponse.json({ ok: false, error: out.error || '기록 실패', 행 }, { status: 502 });
     invalidateSheets();
+    logAudit('/api/sales/add', '영업대상 추가', { id: 행.id, 대상: 행.대상, 단계: 행.단계, 예상금액: 행.예상금액 });
     return NextResponse.json({ ok: true, 행 });
   } catch (e) {
+    logError('/api/sales/add', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

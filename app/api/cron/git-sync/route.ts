@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { syncGitProjects } from '@/lib/gitSync';
 
 // 깃 → 시트 자동 등록 크론(매일) — 어느 컴퓨터에서 푸시했든 클라우드가 시트에 등록.
@@ -18,6 +19,7 @@ export async function GET(req: Request) {
     const result = await syncGitProjects(dry);
     return NextResponse.json({ ok: true, dry, ...result });
   } catch (e) {
+    logError('/api/cron/git-sync', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

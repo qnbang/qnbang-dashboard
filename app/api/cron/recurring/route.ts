@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { google } from 'googleapis';
 import { getSheets, invalidateSheets } from '@/lib/sheetCache';
 
@@ -97,6 +98,7 @@ export async function GET(req: Request) {
     if (toAppend.length || 지출append.length) invalidateSheets();
     return NextResponse.json({ ok: true, 월: curYM, 매출생성: created, 매출건너뜀: skipped.length, 고정비생성: 지출생성 });
   } catch (e) {
+    logError('/api/cron/recurring', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

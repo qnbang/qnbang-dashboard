@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError, logAudit } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -36,6 +37,7 @@ export async function GET(req: Request) {
     })).filter((it) => it.날짜 || it.지출내용);
     return NextResponse.json({ ok: true, month, items });
   } catch (e) {
+    logError('/api/office/expense', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -55,8 +57,10 @@ export async function POST(req: Request) {
       requestBody: { values: [[날짜 || '', 카테고리 || '', 지출내용, String(비용), 비고 || '', '']] },
     });
     invalidateSheets();
+    logAudit('/api/office/expense', '지출 추가', { month, 카테고리, 지출내용, 비용 });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/expense', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -74,8 +78,10 @@ export async function PATCH(req: Request) {
       requestBody: { values: [[날짜 || '', 카테고리 || '', 지출내용 || '', String(비용 || 0), 비고 || '', '']] },
     });
     invalidateSheets();
+    logAudit('/api/office/expense', '지출 수정', { month, rowNum, 카테고리, 지출내용, 비용 });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/expense', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -101,8 +107,10 @@ export async function DELETE(req: Request) {
       }}}]},
     });
     invalidateSheets();
+    logAudit('/api/office/expense', '지출 삭제', { month, rowNum });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    logError('/api/office/expense', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

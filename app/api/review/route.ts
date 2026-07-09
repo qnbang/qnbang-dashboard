@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { getDoc } from '@/lib/github';
 import { mdToHtml } from '@/lib/md';
 import { getReview, saveReview, type ReviewItem } from '@/lib/review';
@@ -55,6 +56,7 @@ export async function GET(req: Request) {
     const { data } = await getReview(key);
     return NextResponse.json({ ok: true, title: src.title, intro, sections, review: data });
   } catch (e) {
+    logError('/api/review', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -76,6 +78,7 @@ export async function POST(req: Request) {
     const saved = await saveReview(key, clean, new Date().toISOString());
     return NextResponse.json({ ok: true, review: saved });
   } catch (e) {
+    logError('/api/review', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

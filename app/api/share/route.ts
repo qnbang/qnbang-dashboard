@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { findShare, enableShare, disableShare, listShares } from '@/lib/share';
 
 // 공유 링크는 항상 우리 도메인으로 통일한다. (vercel.app 주소로 접속해 토글해도
@@ -31,6 +32,7 @@ export async function GET(req: Request) {
       url: entry ? shareUrl(entry.slug) : null,
     });
   } catch (e) {
+    logError('/api/share', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -48,6 +50,7 @@ export async function POST(req: Request) {
     const entry = await enableShare(repo, path, title || path, new Date().toISOString());
     return NextResponse.json({ ok: true, shared: true, url: shareUrl(entry.slug) });
   } catch (e) {
+    logError('/api/share', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

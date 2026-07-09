@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { fetchExpenseData } from '@/lib/sheet';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,7 @@ export async function GET() {
     const data = await fetchExpenseData();
     return NextResponse.json({ ok: true, data });
   } catch (e) {
+    logError('/api/data', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

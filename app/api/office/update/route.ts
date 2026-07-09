@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError, logAudit } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -57,6 +58,7 @@ export async function POST(req: Request) {
         requestBody: { valueInputOption: 'USER_ENTERED', data: updates },
       });
       invalidateSheets();
+      logAudit('/api/office/update', '과업 수정', { id, 필드: Object.keys(값), cells: updates.length });
       return NextResponse.json({ ok: true, action: 'updated', cells: updates.length });
     }
 
@@ -70,8 +72,10 @@ export async function POST(req: Request) {
       requestBody: { requests: [{ deleteDimension: { range: { sheetId: sid, dimension: 'ROWS', startIndex: rowIdx, endIndex: rowIdx + 1 } } }] },
     });
     invalidateSheets();
+    logAudit('/api/office/update', '과업 삭제', { id });
     return NextResponse.json({ ok: true, action: 'deleted' });
   } catch (e) {
+    logError('/api/office/update', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

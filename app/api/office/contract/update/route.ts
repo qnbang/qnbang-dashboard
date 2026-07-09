@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -54,6 +55,7 @@ export async function PATCH(req: Request) {
     invalidateSheets();
     return NextResponse.json({ ok: true, row: rowIdx + 1 });
   } catch (e) {
+    logError('/api/office/contract/update', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

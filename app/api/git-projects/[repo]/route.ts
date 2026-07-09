@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { getWorkLog, getCommits, listProjectDocs, getStatusBoard, getProjectMeta } from '@/lib/github';
 
 // GET /api/git-projects/[repo] — 진행현황 + 작업로그(흐름) + 문서 목록 + 계약 메타(일정 포함)
@@ -14,6 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ repo: s
     ]);
     return NextResponse.json({ ok: true, workLog, commits, driveFolderId: meta.driveFolderId, meta, docs, statusBoard });
   } catch (e) {
+    logError('/api/git-projects/[repo]', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

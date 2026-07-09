@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError, logAudit } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -90,8 +91,10 @@ export async function POST(req: Request) {
       });
     }
     invalidateSheets(); // 이동 즉시 반영
+    logAudit('/api/office/complete', 사유 ? `과업 ${사유}` : '과업 완수', { id, 과업명: done['과업명'] || done['프로젝트'], 돈종류: done['돈종류'] });
     return NextResponse.json({ ok: true, archived: done['과업명'] || done['프로젝트'] });
   } catch (e) {
+    logError('/api/office/complete', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

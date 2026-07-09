@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
     invalidateSheets(); // 방금 쓴 게 바로 보이게 캐시 무효화
     return NextResponse.json({ ok: true, 행 });
   } catch (e) {
+    logError('/api/office/add', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

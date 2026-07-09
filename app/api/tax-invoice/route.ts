@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { issueTaxInvoice, type IssueInput } from '@/lib/popbill';
 
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
     const result = await issueTaxInvoice(body as IssueInput);
     return NextResponse.json(result, { status: result.ok ? 200 : 502 });
   } catch (e) {
+    logError('/api/tax-invoice', e);
     return NextResponse.json({ ok: false, message: String(e) }, { status: 500 });
   }
 }

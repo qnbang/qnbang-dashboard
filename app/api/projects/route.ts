@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { createProjectFolders } from '@/lib/drive';
 
 // POST /api/projects — 새 프로젝트 드라이브 폴더 생성 (루트 폴더만; 하위 분류는 로컬 구조 미러링이 만든다)
@@ -12,6 +13,7 @@ export async function POST(req: Request) {
     const folder = await createProjectFolders(name, type);
     return NextResponse.json({ ok: true, folder });
   } catch (e) {
+    logError('/api/projects', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError, logAudit } from '@/lib/log';
 import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -91,9 +92,11 @@ export async function POST(req: Request) {
     }
 
     invalidateSheets();
+    logAudit('/api/sales/win', '영업→계약 전환(과업생성+매출등록)', { id, 대상, 금액 });
     if (!과업res.ok || !매출res.ok) return NextResponse.json({ ok: false, error: '일부 기록 실패', 과업res, 매출res }, { status: 502 });
     return NextResponse.json({ ok: true, 대상, 금액, msg: `${대상} 계약 → 과업 생성 + 매출 등록(${금액 ? 금액.toLocaleString() + '원' : '금액 미정'})` });
   } catch (e) {
+    logError('/api/sales/win', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }

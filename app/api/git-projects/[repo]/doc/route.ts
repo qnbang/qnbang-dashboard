@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logError } from '@/lib/log';
 import { getDocFull, saveDoc } from '@/lib/github';
 
 // GET /api/git-projects/[repo]/doc?path=... — 특정 문서 내용 + sha(편집 충돌 검사용)
@@ -11,6 +12,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ repo: st
     if (!doc) return NextResponse.json({ ok: true, content: null, sha: null });
     return NextResponse.json({ ok: true, content: doc.content, sha: doc.sha });
   } catch (e) {
+    logError('/api/git-projects/[repo]/doc', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
@@ -34,6 +36,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ repo: st
     }
     return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
   } catch (e) {
+    logError('/api/git-projects/[repo]/doc', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
   }
 }
