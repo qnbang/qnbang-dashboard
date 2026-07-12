@@ -491,7 +491,19 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
                   </div>
                 ) : (
                   <div className="px-4 py-2.5 space-y-0.5">
-                    <div className="flex justify-between text-slate-600"><span>🎁 상여 권장 <span className="text-xs text-slate-400">기본급 외 추가 지급 여력</span></span><span className="font-medium">{won(b.상여권장)}</span></div>
+                    <div className="flex justify-between text-slate-600 items-center">
+                      <span>🎁 상여 권장 <span className="text-xs text-slate-400">기본급 외 추가 지급 여력</span></span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-medium">{won(b.상여권장)}</span>
+                        {b.상여권장 > 0 && (
+                          <button onClick={() => {
+                            // 확정 = 인건비 원장에 상여 행 등록 → 기존 10일 지급확인 흐름에 합류 (별도 기록경로 안 만듦)
+                            setForm({ lMonth: prevYM, lType: '직원', lName: '', lGross: String(b.상여권장), lDeduct: '0', lNote: '상여(예산 권장)' });
+                            setPanel({ isNew: true, formType: 'labor' });
+                          }} className="text-xs px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">상여 확정</button>
+                        )}
+                      </span>
+                    </div>
                     <div className="flex justify-between text-slate-600"><span>🏦 비상금 적립 <span className="text-xs text-slate-400">비상금통장 이체 · 잔액 {won(b.비상금잔액)} / 목표 {won(b.비상금목표)} ({비상금달성}%)</span></span><span className="font-medium">{won(b.비상금적립)}</span></div>
                     {b.저축 > 0 && <div className="flex justify-between text-slate-600"><span>💎 저축 <span className="text-xs text-slate-400">비상금 목표 달성 — 투자 여력으로 전환</span></span><span className="font-medium">{won(b.저축)}</span></div>}
                   </div>
