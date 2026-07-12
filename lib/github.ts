@@ -59,9 +59,10 @@ export const META_KEYS: Record<string, string> = {
 };
 
 // repo 루트 프로젝트.json 을 읽어 메타데이터로 (없으면 빈 객체)
-export async function getProjectMeta(repo: string): Promise<ProjectMeta> {
+// owner 생략 시 기본 조직(OWNER). 회사지도의 '자체 제품 라인'처럼 다른 계정(chalrie92 등) 소유 repo를 읽을 때만 넘긴다(읽기 전용 — 쓰기는 아래 updateProjectMeta가 여전히 OWNER 고정).
+export async function getProjectMeta(repo: string, owner: string = OWNER): Promise<ProjectMeta> {
   const res = await fetch(
-    `https://api.github.com/repos/${OWNER}/${repo}/contents/프로젝트.json`,
+    `https://api.github.com/repos/${owner}/${repo}/contents/프로젝트.json`,
     { headers: headers(), cache: 'no-store' }
   );
   if (!res.ok) return {};
