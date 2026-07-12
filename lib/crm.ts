@@ -128,7 +128,14 @@ export async function buildCRM(): Promise<CRMData> {
   // ── 완수: 아카이브·입금완료 고객 중 진행/영업에 없는 곳 ──
   const 완수names = new Set<string>();
   // 고객명 있는 것만 = 완수 '고객'. 프로젝트명 폴백 제거(고객 없는 내부 프로젝트가 가짜 고객으로 둔갑하던 버그).
-  for (const t of 아카이브) { const k = (t['고객'] || '').trim(); if (k) 완수names.add(k); }
+  // 폐기·보류로 접힌 건은 완수가 아님(2026-07-12: 금문도 "폐기(접음)"가 완수 고객으로 둔갑하던 버그 —
+  // 아카이브의 공위치는 넘길 때 관행상 "완수"로 오염돼 있어 자유텍스트 현재상태로 거른다).
+  for (const t of 아카이브) {
+    const k = (t['고객'] || '').trim();
+    if (!k) continue;
+    if (/폐기|보류|드롭|접음|중단/.test(t['현재상태'] || '')) continue;
+    완수names.add(k);
+  }
   for (const c of 매출) { if (c['입금상태'] === '입금완료' && c['분류'] !== '자체') { const k = (c['클라이언트'] || '').trim(); if (k) 완수names.add(k); } }
   const 완수후보 = [...완수names]
     .filter((k) => !/^_|테스트|삭제예정|검증/.test(k)) // 테스트·삭제예정 등 잡 데이터 제외
