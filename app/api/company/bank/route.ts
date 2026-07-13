@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { google } from 'googleapis';
+import { decrypt } from 'officecrypto-tool';
+import * as XLSX from 'xlsx';
 import { logError } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
 
@@ -58,14 +60,9 @@ export async function POST(req: Request) {
     if (!(f instanceof File)) return NextResponse.json({ ok: false, error: '파일이 없습니다' }, { status: 400 });
     const buf = Buffer.from(await f.arrayBuffer());
 
-    // 웹팩 CJS 인터롭 방어 — named export가 비면 default에서 꺼냄
-    const oc = await import('officecrypto-tool');
-    const decrypt = oc.decrypt ?? (oc as { default?: { decrypt: typeof oc.decrypt } }).default?.decrypt;
-    const xm = await import('xlsx');
-    const XLSX = (xm.read ? xm : (xm as { default?: typeof xm }).default)!;
     let dec: Buffer;
     try {
-      dec = await decrypt!(buf, { password: XLSX_PW });
+      dec = await decrypt(buf, { password: XLSX_PW });
     } catch {
       dec = buf; // 암호 없는 파일도 허용
     }
