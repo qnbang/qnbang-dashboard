@@ -1,9 +1,8 @@
 // 사무실뷰 — 과업 단위. "공이 누구에게" 6방에 과업을 배치한다.
-// 데이터 소스: 구글시트 "큐앤뱅 지출장부"의 '과업' 탭(읽기 엔드포인트가 모든 탭 export).
-//   시트를 못 읽으면 lib/seed-tasks.json(미리보기 시드)으로 폴백.
+// 데이터 소스: 구글시트 "큐앤뱅 지출장부"의 '과업' 탭(읽기 엔드포인트가 모든 탭 export) — 유일 원장.
+//   seed 폴백은 2026-07-13 제거(이중원장 금지 — 못 읽으면 unavailable로 정직하게 빈 화면).
 // 공위치: start🌱 시작전 / mywork🛠️ 내작업 / myreply📤 내회신 / client📥 고객대기 / hold⏸️ 보류 / done✅ 완수
 
-import seed from '@/lib/seed-tasks.json';
 import { getSheets } from './sheetCache';
 
 const SHEET_URL = process.env.SHEET_URL;
@@ -38,8 +37,8 @@ export interface OfficeData {
   rooms: OfficeRoom[];
   가동률: Record<string, number>;
   과업수: number;
-  // 데이터 출처 — 정직한 신뢰(P1): sheet=실데이터 / seed=로컬 미리보기(시트 미설정) / unavailable=설정됐으나 못읽음(빈화면)
-  source: 'sheet' | 'seed' | 'unavailable';
+  // 데이터 출처 — 정직한 신뢰(P1): sheet=실데이터 / unavailable=시트 미설정 또는 못읽음(빈화면)
+  source: 'sheet' | 'unavailable';
   syncedAt: string;   // 이 화면을 만든(=시트를 읽은) 시각(KST). "지금 보는 게 언제 것"인지.
   언젠가: OfficeTask[];   // 보류=언제 할지 모르는 아이디어. 메인서 빼고 따로(접힘). 오래되면 resurface.
   자체: OfficeTask[];     // 자체(내부·투자) 사업 — 고객 '공 차례' 개념 없어 방에서 빼고 따로 관리.
@@ -164,17 +163,12 @@ async function fetchTasksFromSheet(): Promise<Seed[] | null> {
 }
 
 export async function buildOffice(): Promise<OfficeData> {
-  // 정직한 신뢰(P1): 시트 미설정=seed 미리보기 / 설정됐는데 못읽음=unavailable(빈화면, 박제 안 보여줌) / 정상=sheet
-  let source: 'sheet' | 'seed' | 'unavailable';
+  // 정직한 신뢰(P1): 시트가 유일 원장 — 미설정·못읽음 모두 unavailable(빈화면, 박제 금지)
+  let source: 'sheet' | 'unavailable';
   let src: Seed[];
-  if (!SHEET_URL || !SHEET_KEY) {
-    source = 'seed';
-    src = seed as Seed[];
-  } else {
-    const fromSheet = await fetchTasksFromSheet();
-    if (fromSheet) { source = 'sheet'; src = fromSheet; }
-    else { source = 'unavailable'; src = []; }   // 시트 연결 끊김 → 빈 화면으로 정직하게(seed 박제 금지)
-  }
+  const fromSheet = (SHEET_URL && SHEET_KEY) ? await fetchTasksFromSheet() : null;
+  if (fromSheet) { source = 'sheet'; src = fromSheet; }
+  else { source = 'unavailable'; src = []; }
   const syncedAt = new Date().toLocaleString('ko-KR', {
     timeZone: 'Asia/Seoul', dateStyle: 'medium', timeStyle: 'short',
   });
