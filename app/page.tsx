@@ -172,13 +172,6 @@ type RevMoney = {
   인건비목록?: LaborRow[];
   잔고?: { 통장잔고: number; 세이프박스: number; 보유현금: number; 업데이트: string };
 };
-type BudgetData = {
-  기준월: string; 전월: string; 재원: number; 부가세적립: number; 기본급: number; 고정비: number; 세금적립: number;
-  여유: number; 등급: '적자' | '빠듯' | '보통' | '좋음';
-  상여권장: number; 비상금적립: number; 저축: number; 써도되는돈: number;
-  이미쓴돈: number; 남은한도: number; 비상금인출: number; 비상금잔액: number; 비상금목표: number;
-  전월지출: number; 코멘트: string[];
-};
 
 const 지출카테고리 = ['실비', '업무비', '식비', '프로그램 사용료', '월세&공과금', '재료비', '세금', '급여'];
 // 프리랜서 3.3% 공제 (10원 미만 절사: 소득세 3% + 지방소득세 0.3%)
@@ -219,7 +212,6 @@ function fmtDate(s: string) {
 // 정산 탭 — 매출·지출 통합, 수정 가능
 function FinanceView({ data, loading, error }: { data: DashboardData | null; loading: boolean; error: string }) {
   const [money, setMoney] = useState<RevMoney | null>(null);
-  const [budget, setBudget] = useState<BudgetData | null>(null);
   const [moneyLoading, setMoneyLoading] = useState(true);
   const [moneyErr, setMoneyErr] = useState('');
   const [localExp, setLocalExp] = useState<Expense[] | null>(null);
@@ -235,7 +227,7 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
   const reloadMoney = () => {
     setMoneyLoading(true);
     fetch('/api/office').then(r => r.json()).then(j => {
-      if (j.ok) { setMoney(j.money); setBudget(j.budget ?? null); }
+      if (j.ok) setMoney(j.money);
     }).catch(console.error).finally(() => setMoneyLoading(false));
   };
 
@@ -454,80 +446,6 @@ function FinanceView({ data, loading, error }: { data: DashboardData | null; loa
           <Scorecard label="미지급금 · 줄 돈" value={won(미지급금합)} sub={`${미지급인건비.length}건 · 눌러서 목록 보기`} tone="text-rose-600"
             onClick={() => setOpenList(openList === 'pay' ? null : 'pay')} active={openList === 'pay'} />
         </div>
-
-        {/* 이번달 예산 — 재무팀 브리핑 (재원=전월 실입금, 규칙=시트 예산 탭) */}
-        {!budget && (
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-400">
-            💼 예산 규칙 미설정 — 시트에 &lsquo;예산&rsquo; 탭을 만들면 여기에 이번달 예산이 표시됩니다.
-          </div>
-        )}
-        {budget && (() => {
-          const b = budget;
-          const 등급색 = b.등급 === '좋음' ? 'bg-emerald-100 text-emerald-700' : b.등급 === '보통' ? 'bg-sky-100 text-sky-700' : b.등급 === '빠듯' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
-          const 사용률 = b.써도되는돈 > 0 ? Math.min(100, Math.round(b.이미쓴돈 / b.써도되는돈 * 100)) : (b.이미쓴돈 > 0 ? 100 : 0);
-          const 바색 = b.남은한도 < 0 ? 'bg-rose-500' : 사용률 >= 80 ? 'bg-amber-400' : 'bg-emerald-500';
-          const 비상금달성 = b.비상금목표 > 0 ? Math.min(100, Math.round(b.비상금잔액 / b.비상금목표 * 100)) : 0;
-          return (
-            <div className="rounded-2xl border border-emerald-200 bg-white overflow-hidden">
-              <div className="px-4 py-3 bg-emerald-50 flex flex-wrap items-center justify-between gap-2">
-                <span className="font-semibold text-emerald-800 text-sm">💼 이번달 예산 — 재무팀 브리핑 <span className="ml-1 text-xs text-emerald-500 font-normal">{b.기준월} · 재원 = {b.전월} 입금</span></span>
-                <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold ${등급색}`}>이번달 등급: {b.등급}</span>
-              </div>
-              <div className="divide-y divide-slate-100 text-sm">
-                <div className="px-4 py-2.5 flex justify-between">
-                  <span className="font-medium text-slate-700">들어온 돈 <span className="text-xs text-slate-400 font-normal">{b.전월} 실입금</span></span>
-                  <span className="font-semibold text-emerald-600">{won(b.재원)}</span>
-                </div>
-                <div className="px-4 py-2.5 space-y-0.5">
-                  <div className="flex justify-between text-slate-600"><span>− 부가세 적립 <span className="text-xs text-slate-400">세이프박스 이체 (지출 아님)</span></span><span>{won(b.부가세적립)}</span></div>
-                  <div className="flex justify-between text-slate-600"><span>− 기본급 2인 <span className="text-xs text-slate-400">10일 지급</span></span><span>{won(b.기본급)}</span></div>
-                  <div className="flex justify-between text-slate-600"><span>− 고정비</span><span>{won(b.고정비)}</span></div>
-                  {b.세금적립 > 0 && <div className="flex justify-between text-slate-600"><span>− 세금 적립</span><span>{won(b.세금적립)}</span></div>}
-                  <div className="flex justify-between pt-1 font-medium text-slate-700"><span>= 여유</span><span className={b.여유 >= 0 ? 'text-slate-800' : 'text-rose-600'}>{won(b.여유)}</span></div>
-                </div>
-                {b.등급 === '적자' ? (
-                  <div className="px-4 py-2.5 bg-rose-50/60 text-rose-700">
-                    ⚠️ 지난달 수입으로 필수비용이 부족합니다 — <b>{won(b.비상금인출)}</b>을 비상금에서 보전하거나 미수금을 회수해야 합니다. 이번달 상여·저축은 없습니다.
-                  </div>
-                ) : (
-                  <div className="px-4 py-2.5 space-y-0.5">
-                    <div className="flex justify-between text-slate-600 items-center">
-                      <span>🎁 상여 권장 <span className="text-xs text-slate-400">기본급 외 추가 지급 여력</span></span>
-                      <span className="flex items-center gap-2">
-                        <span className="font-medium">{won(b.상여권장)}</span>
-                        {b.상여권장 > 0 && (
-                          <button onClick={() => {
-                            // 확정 = 인건비 원장에 상여 행 등록 → 기존 10일 지급확인 흐름에 합류 (별도 기록경로 안 만듦)
-                            setForm({ lMonth: prevYM, lType: '직원', lName: '', lGross: String(b.상여권장), lDeduct: '0', lNote: '상여(예산 권장)' });
-                            setPanel({ isNew: true, formType: 'labor' });
-                          }} className="text-xs px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">상여 확정</button>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-slate-600"><span>🏦 비상금 적립 <span className="text-xs text-slate-400">비상금통장 이체 · 잔액 {won(b.비상금잔액)} / 목표 {won(b.비상금목표)} ({비상금달성}%)</span></span><span className="font-medium">{won(b.비상금적립)}</span></div>
-                    {b.저축 > 0 && <div className="flex justify-between text-slate-600"><span>💎 저축 <span className="text-xs text-slate-400">비상금 목표 달성 — 투자 여력으로 전환</span></span><span className="font-medium">{won(b.저축)}</span></div>}
-                  </div>
-                )}
-                <div className="px-4 py-3 bg-emerald-50/50">
-                  <div className="flex justify-between mb-1.5">
-                    <span className="font-semibold text-emerald-800">✅ 써도 되는 돈</span>
-                    <span className="font-bold text-emerald-700">{won(b.써도되는돈)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-slate-200 overflow-hidden"><div className={`h-full ${바색}`} style={{ width: `${사용률}%` }} /></div>
-                  <div className="flex justify-between mt-1 text-xs text-slate-500">
-                    <span>이미 씀 {won(b.이미쓴돈)}</span>
-                    <span className={b.남은한도 < 0 ? 'text-rose-600 font-semibold' : ''}>{b.남은한도 < 0 ? `한도 초과 ${won(-b.남은한도)}` : `남은 한도 ${won(b.남은한도)}`}</span>
-                  </div>
-                </div>
-                {b.코멘트.length > 0 && (
-                  <div className="px-4 py-2.5 bg-amber-50/50 space-y-1">
-                    {b.코멘트.map((c, i) => <div key={i} className="text-xs text-amber-800">💬 {c}</div>)}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
 
         {/* 미수금 목록 (카드 클릭 시) */}
         {openList === 'recv' && (

@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     } else {
       lines.push(`· 비상금 적립 ${won(b.비상금적립)} → 비상금통장 (잔액 ${won(b.비상금잔액)}, 목표의 ${b.비상금목표 > 0 ? Math.min(100, Math.round(b.비상금잔액 / b.비상금목표 * 100)) : 0}%)`);
       if (b.저축 > 0) lines.push(`· 저축(투자 여력) ${won(b.저축)}`);
-      lines.push(`· 상여 권장: 최대 ${won(b.상여권장)} — 확정은 대시보드 예산 카드 [상여 확정] 버튼`);
+      lines.push(`· 상여 권장: 최대 ${won(b.상여권장)} — 확정은 회장 금고(/company) [상여 확정] 버튼`);
       lines.push(`= 이번달 써도 되는 돈: ${won(b.써도되는돈)} (남은 한도 ${won(b.남은한도)})`);
     }
 
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
       for (const c of 미수.slice(0, 8)) lines.push(`  · ${c.클라이언트 || c.계약명} ${won(c.미수금)}${c.입금예정일 ? ` (예정 ${c.입금예정일})` : ' (예정일 없음❗)'}`);
     }
     for (const c of b.코멘트) lines.push(`💬 ${c}`);
-    lines.push(`대시보드 → dashboard.qnbang.com 정산 탭`);
+    lines.push(`회장 금고 → dashboard.qnbang.com/company`);
     const text = lines.join('\n');
 
     if (url.searchParams.get('dry')) return NextResponse.json({ ok: true, dry: true, text });

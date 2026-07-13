@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import type { CompanyMapData, MapNode, Branch } from '@/lib/companyMap';
 import ProjectDocs from '../components/ProjectDocs';
+import CompanyFinance from './CompanyFinance';
 
 const 원 = (n?: number) => (n ? n.toLocaleString('ko-KR') : '0');
 const DONE_STATUS = new Set(['완료', '폐기', '중단']);
@@ -209,6 +210,9 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
           </div>
           <p className="text-[12px] text-[#6d6e73] mt-2">계약은 각 프로젝트 카드, 입금·미수는 매출 시트(통장 원장) 기준 — 두 값이 다르면 시트가 정답입니다.</p>
         </section>
+
+        {/* 회장 금고 — 예산·통장 업로드·잔고·상여 (CompanyFinance.tsx) */}
+        <CompanyFinance />
 
         {/* 회사 지도 */}
         <section className="mt-14">
