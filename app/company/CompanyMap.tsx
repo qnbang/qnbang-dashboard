@@ -197,7 +197,7 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
           <div className="bg-[#4545da] text-white rounded-2xl p-5 grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-[clamp(22px,2.6vw,32px)] font-bold tabular-nums">{원(data.돈.계약)}원</div>
-              <div className="text-[13px] font-medium opacity-85 mt-0.5">계약 합계 (대행·카드)</div>
+              <div className="text-[13px] font-medium opacity-85 mt-0.5">계약 합계 (매출 시트)</div>
             </div>
             <div>
               <div className="text-[clamp(22px,2.6vw,32px)] font-bold tabular-nums">{원(data.돈.입금)}원</div>
@@ -208,7 +208,7 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
               <div className="text-[13px] font-medium opacity-85 mt-0.5">미수금</div>
             </div>
           </div>
-          <p className="text-[12px] text-slate-400 mt-2">계약은 각 프로젝트 카드, 입금·미수는 매출 시트(통장 원장) 기준 — 두 값이 다르면 시트가 정답입니다.</p>
+          <p className="text-[12px] text-slate-400 mt-2">세 값 모두 매출 시트(통장 원장) 기준 — 대시보드 정산 탭과 같은 숫자입니다. 아래 회장 금고에서 미수금 상세를 확인하세요.</p>
         </section>
 
         {/* 회장 금고 — 예산·통장 업로드·잔고·상여 (CompanyFinance.tsx) */}

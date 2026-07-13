@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 const 원 = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 
 type Contract = {
+  _row: number;
   계약명: string; 클라이언트: string; 계약일: string;
   미수금: number; 미수종류: '받을예정' | '단순미수' | ''; 입금예정일: string; 입금상태: string;
 };
@@ -93,6 +94,23 @@ export default function CompanyFinance() {
     alert(`상여 등록됨 — ${이름} ${원(금액)} (대기 상태, 실제 이체 후 대시보드 정산 탭에서 지급확인)`);
   };
 
+  // 미수금 입금예정일 기록 — 매출 시트 그 행의 입금예정일 칸만 콕 찍어 수정
+  const setDueDate = async (c: Contract) => {
+    const v = window.prompt(`"${c.클라이언트 || c.계약명}" 입금 예정일 (예: 2026-08-15, 비우면 삭제)`, c.입금예정일 || '');
+    if (v === null) return;
+    const 값 = v.trim();
+    if (값 && !/^\d{4}-\d{1,2}-\d{1,2}$/.test(값)) { alert('YYYY-MM-DD 형식으로 입력해주세요 (예: 2026-08-15)'); return; }
+    setBusy(true);
+    const res = await fetch('/api/office/revenue', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rowNum: c._row, field: '입금예정일', value: 값 }),
+    });
+    const j = await res.json().catch(() => ({ ok: res.ok }));
+    setBusy(false);
+    if (!res.ok || j.ok === false) { alert(`실패: ${j.error || res.status}`); return; }
+    await reload(true);
+  };
+
   if (loading) return <section className="mt-14"><p className="text-[13px] text-slate-400">회장 금고 여는 중…</p></section>;
 
   const b = budget;
@@ -159,9 +177,10 @@ export default function CompanyFinance() {
                     <td className="py-2.5 px-4 text-slate-700 font-medium">{c.클라이언트 || c.계약명}</td>
                     <td className="py-2.5 px-3 text-slate-400 text-[13px] hidden sm:table-cell">{c.계약명}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
-                      {예정없음
-                        ? <span className="text-[12px] font-semibold text-rose-500">예정일 없음</span>
-                        : <span className="text-[12px] text-slate-500">예정 {c.입금예정일}</span>}
+                      <button onClick={() => !busy && setDueDate(c)}
+                        className={`text-[12px] rounded-md px-2 py-1 transition ${예정없음 ? 'font-semibold text-rose-500 hover:bg-rose-50' : 'text-slate-500 hover:bg-slate-100'}`}>
+                        {예정없음 ? '＋ 예정일 기록' : `예정 ${c.입금예정일} ✎`}
+                      </button>
                     </td>
                     <td className="py-2.5 px-4 text-right font-semibold text-sky-600 tabular-nums whitespace-nowrap">{원(c.미수금)}</td>
                   </tr>

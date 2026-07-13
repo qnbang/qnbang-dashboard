@@ -212,15 +212,18 @@ export async function buildCompanyMap(): Promise<CompanyMapData> {
     ...대행노드들.filter((n) => !n.장부매칭안됨 && (n.미수 || 0) > 0).sort((a, b) => (b.미수 || 0) - (a.미수 || 0)),
   ];
 
-  // ── 돈 밴드(대행 카테고리만) ──
-  const 계약합계 = 대행노드들.reduce((s, n) => s + (n.계약 || 0), 0);
-  const 입금합계 = 대행노드들.reduce((s, n) => s + (n.입금 || 0), 0);
+  // ── 돈 밴드(매출 시트 전체 = 정산 탭과 동일 소스) ──
+  // 개별 대행 카드의 계약/입금/미수(NodeMoney)는 카드+매칭 관점 그대로 두되,
+  // 헤드라인 밴드는 정산 탭과 어긋나지 않게 매출 시트(통장 원장) 전체로 집계한다.
+  const 계약합계 = contracts.reduce((s, c) => s + c.계약금액, 0);
+  const 입금합계 = money?.순매출누계 ?? contracts.reduce((s, c) => s + c.입금액, 0);
+  const 미수합계 = money?.미수금합 ?? 0;
 
   return {
     생성: 오늘(),
     대행수: 대행Repos.length, 제품수: PRODUCT_REPOS.length, 브랜드수: BRANDS.length,
     이번주: { 대기, 마감, 미수: 미수큐 },
-    돈: { 계약: 계약합계, 입금: 입금합계, 미수: Math.max(0, 계약합계 - 입금합계) },
+    돈: { 계약: 계약합계, 입금: 입금합계, 미수: 미수합계 },
     branches,
     제안,
   };

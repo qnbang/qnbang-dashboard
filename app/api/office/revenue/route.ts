@@ -60,6 +60,18 @@ export async function PATCH(req: Request) {
     const { rowNum } = body;
     if (!rowNum) return NextResponse.json({ ok: false, error: 'rowNum 필요' }, { status: 400 });
     const sheets = api();
+    // 단일 칸만 콕 찍어 수정(다른 칸 보존) — 예: 입금예정일 기록. 매출 헤더 A~K 중 칸 위치 매핑.
+    const 칸 = body['field'] as string | undefined;
+    const COL: Record<string, string> = { 입금예정일: 'H', 입금상태: 'F', 비고: 'K' };
+    if (칸 && COL[칸]) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID!, range: `매출!${COL[칸]}${rowNum}`,
+        valueInputOption: 'USER_ENTERED', requestBody: { values: [[body['value'] ?? '']] },
+      });
+      invalidateSheets();
+      logAudit('/api/office/revenue', '매출 칸수정', { rowNum, 칸, value: body['value'] });
+      return NextResponse.json({ ok: true });
+    }
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID!, range: `매출!A${rowNum}:K${rowNum}`,
       valueInputOption: 'USER_ENTERED',
