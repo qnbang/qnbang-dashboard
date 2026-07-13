@@ -20,9 +20,9 @@ function chip(n: MapNode, today: string): { text: string; cls: string } | null {
 }
 
 const CHIP_CLS: Record<string, string> = {
-  run: 'text-[#7b7bf5] bg-transparent border border-[#7b7bf5]',
+  run: 'text-indigo-600 bg-transparent border border-indigo-400',
   signal: 'text-[#ff5e30] bg-transparent border border-[#ff5e30]',
-  plain: 'text-[#adaeb3] bg-white/5',
+  plain: 'text-slate-500 bg-slate-100',
 };
 
 function NodeMoney({ n }: { n: MapNode }) {
@@ -35,28 +35,28 @@ function NodeMoney({ n }: { n: MapNode }) {
     );
   }
   return (
-    <div className="text-[13px] font-medium text-[#adaeb3] tabular-nums mt-0.5">
+    <div className="text-[13px] font-medium text-slate-500 tabular-nums mt-0.5">
       계약 {원(n.계약)} · 입금 {원(n.입금)}
       {(n.미수 || 0) > 0 && <span className="text-[#ff5e30]"> · 미수 {원(n.미수)}</span>}
       {typeof n.카드입금 === 'number' && n.카드입금 !== n.입금 && (
-        <span className="text-[11px] text-[#6d6e73]"> (카드값 {원(n.카드입금)})</span>
+        <span className="text-[11px] text-slate-400"> (카드값 {원(n.카드입금)})</span>
       )}
     </div>
   );
 }
 
 function InboxList({ nodes, money, onPick }: { nodes: MapNode[]; money?: boolean; onPick: (n: MapNode, e: React.MouseEvent) => void }) {
-  if (!nodes.length) return <li className="text-[13px] text-[#6d6e73] px-2 py-1">없음</li>;
+  if (!nodes.length) return <li className="text-[13px] text-slate-400 px-2 py-1">없음</li>;
   return (
     <>
       {nodes.map((n) => (
         <li key={n.key} onClick={(e) => onPick(n, e)}
-          className="relative pl-4 py-1.5 rounded-lg cursor-pointer hover:bg-white/5 transition">
+          className="relative pl-4 py-1.5 rounded-lg cursor-pointer hover:bg-slate-50 transition">
           <span className="text-[14px] font-semibold">{n.이름}</span>
           {n.제안 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#cbfe03] text-[#1d2138] align-middle">🤖 제안</span>}
           {money && <NodeMoney n={n} />}
           {(n.담당 || n.마감) && (
-            <div className="text-[12px] text-[#6d6e73] mt-0.5">
+            <div className="text-[12px] text-slate-400 mt-0.5">
               {[n.담당, n.마감 && `마감 ${n.마감}`].filter(Boolean).join(' · ')}
             </div>
           )}
@@ -144,12 +144,12 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
   const bandMisu = data.돈.미수;
 
   return (
-    <div className="min-h-screen bg-[#0b0b12] text-[#f2f4ff]" style={{ fontFamily: '"Helvetica Neue", Pretendard, "Pretendard Variable", system-ui, sans-serif', letterSpacing: '-0.02em', wordBreak: 'keep-all' }}>
+    <div className="min-h-screen bg-slate-50 text-slate-800" style={{ fontFamily: '"Helvetica Neue", Pretendard, "Pretendard Variable", system-ui, sans-serif', letterSpacing: '-0.02em', wordBreak: 'keep-all' }}>
       <div className="max-w-[1280px] mx-auto px-6 pt-12 pb-24">
         {/* 꼭대기 */}
         <div className="max-w-[640px] mx-auto text-center">
           <h1 className="text-[28px] font-bold">큐앤뱅</h1>
-          <p className="text-[13px] font-medium text-[#6d6e73] mt-1">
+          <p className="text-[13px] font-medium text-slate-400 mt-1">
             생성 {data.생성} · 대행 {data.대행수} · 제품 {data.제품수} · 브랜드 {data.브랜드수} · 데이터: 등록카드 자동집계
           </p>
         </div>
@@ -157,10 +157,10 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
         {/* AI 제안 */}
         {data.제안 && data.제안.종합?.length > 0 && (
           <section className="mt-10">
-            <h2 className="text-[15px] font-semibold text-[#cbfe03] mb-2">🤖 제안</h2>
-            <div className="bg-white/[0.04] rounded-2xl p-4 space-y-1.5">
+            <h2 className="text-[15px] font-semibold text-lime-600 mb-2">🤖 제안</h2>
+            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 space-y-1.5">
               {data.제안.종합.map((s, i) => (
-                <p key={i} className="text-[13px] text-[#c8cad6] leading-relaxed">· {s}</p>
+                <p key={i} className="text-[13px] text-slate-600 leading-relaxed">· {s}</p>
               ))}
             </div>
           </section>
@@ -170,20 +170,20 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
         <section className="mt-10">
           <h2 className="text-[20px] font-semibold mb-4">이번 주 챙길 것</h2>
           <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))' }}>
-            <div className="bg-white/[0.04] rounded-2xl p-4">
-              <h3 className="text-[14px] font-semibold text-[#adaeb3] mb-1.5">결정·회신 대기</h3>
+            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4">
+              <h3 className="text-[14px] font-semibold text-slate-500 mb-1.5">결정·회신 대기</h3>
               <ul className="ml-0">
                 <InboxList nodes={data.이번주.대기} onPick={inboxPop('결정·회신 대기')} />
               </ul>
             </div>
-            <div className="bg-white/[0.04] rounded-2xl p-4">
-              <h3 className="text-[14px] font-semibold text-[#adaeb3] mb-1.5">마감 임박·지남 (7일)</h3>
+            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4">
+              <h3 className="text-[14px] font-semibold text-slate-500 mb-1.5">마감 임박·지남 (7일)</h3>
               <ul>
                 <InboxList nodes={data.이번주.마감} onPick={inboxPop('마감 임박·지남')} />
               </ul>
             </div>
-            <div className="bg-white/[0.04] rounded-2xl p-4">
-              <h3 className="text-[14px] font-semibold text-[#adaeb3] mb-1.5">미수 청구</h3>
+            <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4">
+              <h3 className="text-[14px] font-semibold text-slate-500 mb-1.5">미수 청구</h3>
               <ul>
                 <InboxList nodes={data.이번주.미수} money onPick={inboxPop('미수 청구')} />
               </ul>
@@ -208,7 +208,7 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
               <div className="text-[13px] font-medium opacity-85 mt-0.5">미수금</div>
             </div>
           </div>
-          <p className="text-[12px] text-[#6d6e73] mt-2">계약은 각 프로젝트 카드, 입금·미수는 매출 시트(통장 원장) 기준 — 두 값이 다르면 시트가 정답입니다.</p>
+          <p className="text-[12px] text-slate-400 mt-2">계약은 각 프로젝트 카드, 입금·미수는 매출 시트(통장 원장) 기준 — 두 값이 다르면 시트가 정답입니다.</p>
         </section>
 
         {/* 회장 금고 — 예산·통장 업로드·잔고·상여 (CompanyFinance.tsx) */}
@@ -224,32 +224,32 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
                 <details key={b.key} open={openBranch[b.key]} className="min-w-0">
                   <summary
                     onClick={(e) => { e.preventDefault(); setOpenBranch((s) => ({ ...s, [b.key]: !s[b.key] })); }}
-                    className="list-none cursor-pointer bg-white/[0.04] rounded-xl px-4 py-3 flex items-baseline gap-2 hover:bg-white/[0.07] transition">
-                    <span className="text-[12px] text-[#6d6e73] transition-transform" style={{ transform: openBranch[b.key] ? 'rotate(90deg)' : 'none' }}>▶</span>
+                    className="list-none cursor-pointer bg-white border border-slate-200 shadow-sm rounded-xl px-4 py-3 flex items-baseline gap-2 hover:bg-slate-50 transition">
+                    <span className="text-[12px] text-slate-400 transition-transform" style={{ transform: openBranch[b.key] ? 'rotate(90deg)' : 'none' }}>▶</span>
                     <h3 className="text-[16px] font-semibold">{b.title}</h3>
-                    <span className="text-[13px] text-[#adaeb3] tabular-nums ml-auto">{산것.length}건</span>
+                    <span className="text-[13px] text-slate-500 tabular-nums ml-auto">{산것.length}건</span>
                   </summary>
                   {openBranch[b.key] && (
-                    <ul className="mt-2 ml-3.5 border-l border-white/10 pl-0">
+                    <ul className="mt-2 ml-3.5 border-l border-slate-200 pl-0">
                       {산것.map((n) => (
                         <li key={n.key} onClick={(e) => openPop(b.key, b.title)(n, e)}
-                          className="relative pl-4 py-2 rounded-lg cursor-pointer hover:bg-white/5 transition">
+                          className="relative pl-4 py-2 rounded-lg cursor-pointer hover:bg-slate-50 transition">
                           <span className="text-[15px] font-semibold">{n.이름}</span>
                           {(() => { const c = chip(n, data.생성); return c ? <span className={`ml-1.5 text-[11px] font-semibold tracking-wide rounded-full px-2 py-0.5 align-middle ${CHIP_CLS[c.cls]}`}>{c.text}</span> : null; })()}
                           {flagged.has(n.key) && <span className="ml-1.5 text-[11px] font-semibold rounded-full px-2 py-0.5 align-middle bg-[#cbfe03] text-[#1d2138]">정리</span>}
-                          {n.제안 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#cbfe03]/30 text-[#cbfe03] align-middle" title={n.제안}>🤖</span>}
+                          {n.제안 && <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#cbfe03]/30 text-lime-600 align-middle" title={n.제안}>🤖</span>}
                           {b.moneyVisible && <NodeMoney n={n} />}
                           {(n.owner || n.담당 || n.마감) && (
-                            <div className="text-[12px] text-[#6d6e73] mt-0.5">{[n.담당, n.마감 && `마감 ${n.마감}`].filter(Boolean).join(' · ')}</div>
+                            <div className="text-[12px] text-slate-400 mt-0.5">{[n.담당, n.마감 && `마감 ${n.마감}`].filter(Boolean).join(' · ')}</div>
                           )}
                         </li>
                       ))}
                       {끝난것.length > 0 && (
                         <details className="ml-3.5 mt-1">
-                          <summary className="text-[13px] text-[#6d6e73] cursor-pointer py-1 hover:text-[#adaeb3]">완료·폐기 {끝난것.length}건</summary>
-                          <ul className="ml-3.5 border-l border-white/10">
+                          <summary className="text-[13px] text-slate-400 cursor-pointer py-1 hover:text-slate-500">완료·폐기 {끝난것.length}건</summary>
+                          <ul className="ml-3.5 border-l border-slate-200">
                             {끝난것.map((n) => (
-                              <li key={n.key} onClick={(e) => openPop(b.key, b.title)(n, e)} className="opacity-50 relative pl-4 py-2 rounded-lg cursor-pointer hover:bg-white/5 hover:opacity-70 transition">
+                              <li key={n.key} onClick={(e) => openPop(b.key, b.title)(n, e)} className="opacity-50 relative pl-4 py-2 rounded-lg cursor-pointer hover:bg-slate-50 hover:opacity-70 transition">
                                 <span className="text-[15px] font-semibold">{n.이름}</span>
                                 {b.moneyVisible && <NodeMoney n={n} />}
                               </li>
@@ -268,15 +268,15 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
 
       {/* 노드 팝오버 */}
       {pop && (
-        <div id="company-pop" className="fixed z-50 bg-[#15161f] border border-white/15 rounded-xl shadow-2xl p-4 w-[264px]"
+        <div id="company-pop" className="fixed z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-4 w-[264px]"
           style={{ left: pop.x, top: pop.y }}>
           <h4 className="text-[15px] font-semibold mb-2.5">{pop.node.이름}</h4>
-          {pop.node.제안 && <p className="text-[12px] text-[#cbfe03] mb-2.5 leading-relaxed">🤖 {pop.node.제안}</p>}
+          {pop.node.제안 && <p className="text-[12px] text-lime-600 mb-2.5 leading-relaxed">🤖 {pop.node.제안}</p>}
           {pop.node.editable && pop.node.repo && (
             <>
-              <label className="text-[12px] font-semibold text-[#adaeb3] block mb-1">진행상태 변경</label>
+              <label className="text-[12px] font-semibold text-slate-500 block mb-1">진행상태 변경</label>
               <select disabled={busy} value={pop.node.상태 || ''} onChange={(e) => setStatus(e.target.value)}
-                className="w-full h-10 border border-white/15 rounded-lg bg-white/5 text-white text-[14px] px-2 mb-2.5">
+                className="w-full h-10 border border-slate-200 rounded-lg bg-slate-100 text-slate-800 text-[14px] px-2 mb-2.5">
                 <option value="">(미정)</option>
                 <option>시작 전</option><option>진행 중</option><option>피드백 대기</option>
                 <option>보류</option><option>완료</option><option>중단</option><option>폐기</option>
@@ -284,17 +284,17 @@ export default function CompanyMap({ data }: { data: CompanyMapData }) {
             </>
           )}
           <button disabled={busy} onClick={toggleFlag}
-            className="w-full h-10 border border-white/30 rounded-xl bg-transparent text-white text-[14px] font-semibold hover:bg-white/10 transition">
+            className="w-full h-10 border border-slate-300 rounded-xl bg-transparent text-slate-800 text-[14px] font-semibold hover:bg-slate-100 transition">
             {flagged.has(pop.node.key) ? '정리표시 해제' : '정리표시 달기'}
           </button>
           {pop.node.repo && (
             <button onClick={() => { setDocName(pop.node.이름); setPop(null); }}
-              className="w-full h-10 mt-2 border border-white/15 rounded-xl bg-transparent text-[#adaeb3] text-[13px] hover:bg-white/5 transition">
+              className="w-full h-10 mt-2 border border-slate-200 rounded-xl bg-transparent text-slate-500 text-[13px] hover:bg-slate-50 transition">
               작업로그 보기
             </button>
           )}
           {!pop.node.editable && pop.node.repo && (
-            <p className="text-[11px] text-[#6d6e73] mt-2 leading-relaxed">다른 조직 소유 저장소 — 진행상태는 여기서 못 바꿔요(읽기 전용).</p>
+            <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">다른 조직 소유 저장소 — 진행상태는 여기서 못 바꿔요(읽기 전용).</p>
           )}
         </div>
       )}

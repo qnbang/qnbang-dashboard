@@ -30,22 +30,22 @@ export default function CompanyLogin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0b0b12] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-4">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm bg-[#15161f] rounded-2xl border border-white/10 p-8"
+        className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-sm p-8"
       >
-        <h1 className="text-xl font-bold text-white">큐앤뱅 회사지도</h1>
-        <p className="text-sm text-white/50 mt-1">회장 전용 — 비밀번호를 한 번 더 입력하세요</p>
+        <h1 className="text-xl font-bold text-slate-800">큐앤뱅 회사지도</h1>
+        <p className="text-sm text-slate-500 mt-1">회장 전용 — 비밀번호를 한 번 더 입력하세요</p>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="비밀번호"
           autoFocus
-          className="mt-5 w-full rounded-lg border border-white/15 bg-transparent px-3 py-2.5 text-white outline-none focus:border-[#4545da] focus:ring-2 focus:ring-[#4545da]/30"
+          className="mt-5 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-800 outline-none focus:border-[#4545da] focus:ring-2 focus:ring-[#4545da]/20"
         />
-        {error && <p className="mt-2 text-sm text-[#ff5e30]">{error}</p>}
+        {error && <p className="mt-2 text-sm text-rose-500">{error}</p>}
         <button
           type="submit"
           disabled={loading}

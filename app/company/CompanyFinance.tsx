@@ -1,12 +1,16 @@
 'use client';
-// 회장 금고 — /company 안의 재무 운영 섹션 (예산·통장 업로드·잔고·상여 확정).
+// 회장 금고 — /company 안의 재무 운영 섹션 (예산·통장 파일 업로드·잔고·상여·미수금).
 // 데이터는 /api/office(budget·money 재사용), 통장 파일·잔고 수정은 /api/company/bank.
-// 다크 보스룩(CompanyMap과 동일 팔레트): 인디고 #4545da · 라임 #cbfe03 · 시그널 #ff5e30.
+// 라이트 테마(흰 배경) — 회사지도와 함께 밝게. 강조: 인디고·에메랄드, 경고: 로즈/앰버.
 
 import { useEffect, useRef, useState } from 'react';
 
 const 원 = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`;
 
+type Contract = {
+  계약명: string; 클라이언트: string; 계약일: string;
+  미수금: number; 미수종류: '받을예정' | '단순미수' | ''; 입금예정일: string; 입금상태: string;
+};
 type Budget = {
   기준월: string; 전월: string; 재원: number; 부가세적립: number; 기본급: number; 고정비: number; 세금적립: number;
   여유: number; 등급: '적자' | '빠듯' | '보통' | '좋음';
@@ -16,6 +20,7 @@ type Budget = {
 };
 type Money = {
   미수금합: number;
+  계약목록?: Contract[];
   인건비목록?: { 실지급: number; 지급상태: string }[];
   잔고?: { 통장잔고: number; 세이프박스: number; 보유현금: number; 업데이트: string };
 };
@@ -88,7 +93,7 @@ export default function CompanyFinance() {
     alert(`상여 등록됨 — ${이름} ${원(금액)} (대기 상태, 실제 이체 후 대시보드 정산 탭에서 지급확인)`);
   };
 
-  if (loading) return <section className="mt-14"><p className="text-[13px] text-[#6d6e73]">회장 금고 여는 중…</p></section>;
+  if (loading) return <section className="mt-14"><p className="text-[13px] text-slate-400">회장 금고 여는 중…</p></section>;
 
   const b = budget;
   const 잔고 = money?.잔고;
@@ -98,109 +103,144 @@ export default function CompanyFinance() {
     return isNaN(d.getTime()) ? 999 : Math.floor((Date.now() - d.getTime()) / 86400000);
   })();
   const 대기인건비 = (money?.인건비목록 || []).filter((l) => l.지급상태 !== '지급완료').reduce((s, l) => s + l.실지급, 0);
+  const 미수목록 = (money?.계약목록 || []).filter((c) => c.미수금 > 0).sort((a, z) => z.미수금 - a.미수금);
 
   return (
     <section className="mt-14">
       <h2 className="text-[20px] font-semibold mb-4">회장 금고</h2>
 
-      {/* 잔고 3칸 + 통장 파일 업로드 */}
+      {/* 잔고 3칸 */}
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
-        <div className="bg-white/[0.04] rounded-2xl p-4">
-          <div className="text-[13px] font-semibold text-[#adaeb3]">통장 (운영)</div>
-          <div className="text-[24px] font-bold tabular-nums mt-1">{원(잔고?.통장잔고 ?? 0)}</div>
-          <div className={`text-[12px] mt-0.5 ${잔고나이 > 3 ? 'text-[#ff5e30]' : 'text-[#6d6e73]'}`}>
+        <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4">
+          <div className="text-[13px] font-semibold text-slate-500">통장 (운영)</div>
+          <div className="text-[24px] font-bold tabular-nums mt-1 text-slate-800">{원(잔고?.통장잔고 ?? 0)}</div>
+          <div className={`text-[12px] mt-0.5 ${잔고나이 > 3 ? 'text-rose-500' : 'text-slate-400'}`}>
             {잔고?.업데이트 || '기준일 없음'} 기준{잔고나이 > 3 && 잔고나이 < 999 ? ` · ${잔고나이}일 전 — 통장 파일 올려서 갱신` : ''}
           </div>
         </div>
-        <div onClick={() => !busy && setBalance('세이프박스')} className="bg-white/[0.04] rounded-2xl p-4 cursor-pointer hover:bg-white/[0.07] transition">
-          <div className="text-[13px] font-semibold text-[#adaeb3]">세이프박스 (부가세·세금 전용)</div>
-          <div className="text-[24px] font-bold tabular-nums mt-1">{원(잔고?.세이프박스 ?? 0)}</div>
-          <div className="text-[12px] text-[#6d6e73] mt-0.5">눌러서 금액 수정</div>
+        <div onClick={() => !busy && setBalance('세이프박스')} className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 cursor-pointer hover:bg-slate-50 transition">
+          <div className="text-[13px] font-semibold text-slate-500">세이프박스 (부가세·세금 전용)</div>
+          <div className="text-[24px] font-bold tabular-nums mt-1 text-slate-800">{원(잔고?.세이프박스 ?? 0)}</div>
+          <div className="text-[12px] text-slate-400 mt-0.5">눌러서 금액 수정</div>
         </div>
-        <div onClick={() => !busy && setBalance('비상금')} className="bg-white/[0.04] rounded-2xl p-4 cursor-pointer hover:bg-white/[0.07] transition">
-          <div className="text-[13px] font-semibold text-[#adaeb3]">비상금 (별도 통장)</div>
-          <div className="text-[24px] font-bold tabular-nums mt-1">{원(b?.비상금잔액 ?? 0)}</div>
-          <div className="text-[12px] text-[#6d6e73] mt-0.5">
+        <div onClick={() => !busy && setBalance('비상금')} className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 cursor-pointer hover:bg-slate-50 transition">
+          <div className="text-[13px] font-semibold text-slate-500">비상금 (별도 통장)</div>
+          <div className="text-[24px] font-bold tabular-nums mt-1 text-slate-800">{원(b?.비상금잔액 ?? 0)}</div>
+          <div className="text-[12px] text-slate-400 mt-0.5">
             목표 {원(b?.비상금목표 ?? 0)}의 {b && b.비상금목표 > 0 ? Math.min(100, Math.round(b.비상금잔액 / b.비상금목표 * 100)) : 0}% · 눌러서 수정
           </div>
         </div>
       </div>
 
       {/* 통장 파일 넣는 칸 */}
-      <label className={`mt-3 block bg-white/[0.04] border border-dashed border-white/20 rounded-2xl p-4 text-center transition ${busy ? 'opacity-50' : 'cursor-pointer hover:bg-white/[0.07]'}`}>
+      <label className={`mt-3 block bg-white border border-dashed border-slate-300 rounded-2xl p-4 text-center transition ${busy ? 'opacity-50' : 'cursor-pointer hover:bg-slate-50'}`}>
         <input ref={fileRef} type="file" accept=".xlsx" className="hidden" disabled={busy}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadBank(f); }} />
-        <span className="text-[14px] font-semibold text-[#c8cad6]">📄 통장 파일 넣기 — 카카오뱅크 거래내역 .xlsx</span>
-        <p className="text-[12px] text-[#6d6e73] mt-1">카카오뱅크 앱 → 거래내역 내보내기 파일을 그대로. 암호는 자동 해제되고, 통장 잔고·기준일이 장부에 바로 반영됩니다.</p>
-        {upMsg && <p className="text-[13px] mt-2 text-[#cbfe03]">{upMsg}</p>}
+        <span className="text-[14px] font-semibold text-slate-700">📄 통장 파일 넣기 — 카카오뱅크 거래내역 .xlsx</span>
+        <p className="text-[12px] text-slate-400 mt-1">카카오뱅크 앱 → 거래내역 내보내기 파일을 그대로. 암호는 자동 해제되고, 통장 잔고·기준일이 장부에 바로 반영됩니다.</p>
+        {upMsg && <p className="text-[13px] mt-2 text-emerald-600">{upMsg}</p>}
       </label>
+
+      {/* 미수금 — 받을 돈 목록 */}
+      <div className="mt-3 bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100">
+          <span className="text-[15px] font-semibold text-slate-800">💰 받을 돈 (미수금) <span className="text-[12px] text-slate-400 font-normal">{미수목록.length}건</span></span>
+          <span className="text-[17px] font-bold text-sky-600 tabular-nums">{원(money?.미수금합 ?? 0)}</span>
+        </div>
+        {미수목록.length === 0 ? (
+          <p className="px-4 py-4 text-[13px] text-slate-400">받을 돈이 없어요. 👍</p>
+        ) : (
+          <table className="w-full text-[14px]">
+            <tbody>
+              {미수목록.map((c, i) => {
+                const 예정없음 = c.미수종류 === '단순미수' || !c.입금예정일;
+                return (
+                  <tr key={i} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                    <td className="py-2.5 px-4 text-slate-700 font-medium">{c.클라이언트 || c.계약명}</td>
+                    <td className="py-2.5 px-3 text-slate-400 text-[13px] hidden sm:table-cell">{c.계약명}</td>
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      {예정없음
+                        ? <span className="text-[12px] font-semibold text-rose-500">예정일 없음</span>
+                        : <span className="text-[12px] text-slate-500">예정 {c.입금예정일}</span>}
+                    </td>
+                    <td className="py-2.5 px-4 text-right font-semibold text-sky-600 tabular-nums whitespace-nowrap">{원(c.미수금)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+        {미수목록.some((c) => c.미수종류 === '단순미수' || !c.입금예정일) && (
+          <p className="px-4 py-2 text-[12px] text-rose-500 bg-rose-50/60">❗ 입금예정일 없는 건은 먼저 연락해 예정일부터 받아내세요.</p>
+        )}
+      </div>
 
       {/* 이번달 예산 — 재무팀 */}
       {!b ? (
-        <p className="text-[13px] text-[#6d6e73] mt-3">예산 규칙 미설정 — 시트 &lsquo;예산&rsquo; 탭이 있어야 표시됩니다.</p>
+        <p className="text-[13px] text-slate-400 mt-3">예산 규칙 미설정 — 시트 &lsquo;예산&rsquo; 탭이 있어야 표시됩니다.</p>
       ) : (() => {
-        const 등급색 = b.등급 === '좋음' ? 'text-[#cbfe03] border-[#cbfe03]' : b.등급 === '보통' ? 'text-[#7b7bf5] border-[#7b7bf5]' : b.등급 === '빠듯' ? 'text-[#ffb03a] border-[#ffb03a]' : 'text-[#ff5e30] border-[#ff5e30]';
+        const 등급색 = b.등급 === '좋음' ? 'text-emerald-700 border-emerald-300 bg-emerald-50' : b.등급 === '보통' ? 'text-sky-700 border-sky-300 bg-sky-50' : b.등급 === '빠듯' ? 'text-amber-700 border-amber-300 bg-amber-50' : 'text-rose-700 border-rose-300 bg-rose-50';
         const 사용률 = b.써도되는돈 > 0 ? Math.min(100, Math.round(b.이미쓴돈 / b.써도되는돈 * 100)) : (b.이미쓴돈 > 0 ? 100 : 0);
-        const 바색 = b.남은한도 < 0 ? 'bg-[#ff5e30]' : 사용률 >= 80 ? 'bg-[#ffb03a]' : 'bg-[#cbfe03]';
+        const 바색 = b.남은한도 < 0 ? 'bg-rose-500' : 사용률 >= 80 ? 'bg-amber-400' : 'bg-emerald-500';
         return (
-          <div className="mt-3 bg-white/[0.04] rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 border-b border-white/10">
-              <span className="text-[15px] font-semibold">💼 이번달 예산 <span className="text-[12px] text-[#6d6e73] font-normal">{b.기준월} · 재원 = {b.전월} 실입금</span></span>
-              <span className={`text-[12px] px-2 py-0.5 rounded-full font-semibold border bg-transparent ${등급색}`}>등급: {b.등급}</span>
+          <div className="mt-3 bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100">
+              <span className="text-[15px] font-semibold text-slate-800">💼 이번달 예산 <span className="text-[12px] text-slate-400 font-normal">{b.기준월} · 재원 = {b.전월} 실입금</span></span>
+              <span className={`text-[12px] px-2 py-0.5 rounded-full font-semibold border ${등급색}`}>등급: {b.등급}</span>
             </div>
-            <div className="divide-y divide-white/5 text-[14px]">
-              <div className="px-4 py-2.5 flex justify-between"><span className="font-semibold text-[#c8cad6]">들어온 돈</span><span className="font-bold text-[#cbfe03] tabular-nums">{원(b.재원)}</span></div>
-              <div className="px-4 py-2.5 space-y-0.5 text-[#adaeb3]">
-                <div className="flex justify-between"><span>− 부가세 적립 <span className="text-[11px] text-[#6d6e73]">세이프박스 이체</span></span><span className="tabular-nums">{원(b.부가세적립)}</span></div>
-                <div className="flex justify-between"><span>− 기본급 2인 <span className="text-[11px] text-[#6d6e73]">10일 지급</span></span><span className="tabular-nums">{원(b.기본급)}</span></div>
+            <div className="divide-y divide-slate-100 text-[14px]">
+              <div className="px-4 py-2.5 flex justify-between"><span className="font-semibold text-slate-700">들어온 돈</span><span className="font-bold text-emerald-600 tabular-nums">{원(b.재원)}</span></div>
+              <div className="px-4 py-2.5 space-y-0.5 text-slate-500">
+                <div className="flex justify-between"><span>− 부가세 적립 <span className="text-[11px] text-slate-400">세이프박스 이체</span></span><span className="tabular-nums">{원(b.부가세적립)}</span></div>
+                <div className="flex justify-between"><span>− 기본급 2인 <span className="text-[11px] text-slate-400">10일 지급</span></span><span className="tabular-nums">{원(b.기본급)}</span></div>
                 <div className="flex justify-between"><span>− 고정비</span><span className="tabular-nums">{원(b.고정비)}</span></div>
                 {b.세금적립 > 0 && <div className="flex justify-between"><span>− 세금 적립</span><span className="tabular-nums">{원(b.세금적립)}</span></div>}
-                <div className="flex justify-between pt-1 font-semibold text-[#c8cad6]"><span>= 여유</span><span className={`tabular-nums ${b.여유 < 0 ? 'text-[#ff5e30]' : ''}`}>{원(b.여유)}</span></div>
+                <div className="flex justify-between pt-1 font-semibold text-slate-700"><span>= 여유</span><span className={`tabular-nums ${b.여유 < 0 ? 'text-rose-600' : ''}`}>{원(b.여유)}</span></div>
               </div>
               {b.등급 === '적자' ? (
-                <div className="px-4 py-2.5 text-[13px] text-[#ff5e30]">
+                <div className="px-4 py-2.5 text-[13px] text-rose-600 bg-rose-50/60">
                   ⚠️ 지난달 수입으로 필수비용 부족 — {원(b.비상금인출)}은 비상금 또는 미수금 회수로 보전. 이번달 상여·저축 없음.
                 </div>
               ) : (
-                <div className="px-4 py-2.5 space-y-1 text-[#adaeb3]">
+                <div className="px-4 py-2.5 space-y-1 text-slate-600">
                   <div className="flex justify-between items-center">
-                    <span>🎁 상여 권장 <span className="text-[11px] text-[#6d6e73]">기본급 외 추가 여력</span></span>
+                    <span>🎁 상여 권장 <span className="text-[11px] text-slate-400">기본급 외 추가 여력</span></span>
                     <span className="flex items-center gap-2">
                       <span className="font-semibold tabular-nums">{원(b.상여권장)}</span>
                       {b.상여권장 > 0 && (
                         <button onClick={confirmBonus} disabled={busy}
-                          className="text-[12px] px-2.5 py-1 rounded-lg bg-[#4545da] text-white font-semibold hover:opacity-90 disabled:opacity-50">상여 확정</button>
+                          className="text-[12px] px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-50">상여 확정</button>
                       )}
                     </span>
                   </div>
-                  <div className="flex justify-between"><span>🏦 비상금 적립 <span className="text-[11px] text-[#6d6e73]">비상금통장 이체</span></span><span className="font-semibold tabular-nums">{원(b.비상금적립)}</span></div>
+                  <div className="flex justify-between"><span>🏦 비상금 적립 <span className="text-[11px] text-slate-400">비상금통장 이체</span></span><span className="font-semibold tabular-nums">{원(b.비상금적립)}</span></div>
                   {b.저축 > 0 && <div className="flex justify-between"><span>💎 저축(투자 여력)</span><span className="font-semibold tabular-nums">{원(b.저축)}</span></div>}
                 </div>
               )}
               <div className="px-4 py-3">
                 <div className="flex justify-between mb-1.5">
-                  <span className="font-semibold">✅ 써도 되는 돈</span>
-                  <span className="font-bold text-[#cbfe03] tabular-nums">{원(b.써도되는돈)}</span>
+                  <span className="font-semibold text-slate-800">✅ 써도 되는 돈</span>
+                  <span className="font-bold text-emerald-600 tabular-nums">{원(b.써도되는돈)}</span>
                 </div>
-                <div className="h-2 rounded-full bg-white/10 overflow-hidden"><div className={`h-full ${바색}`} style={{ width: `${사용률}%` }} /></div>
-                <div className="flex justify-between mt-1 text-[12px] text-[#6d6e73]">
+                <div className="h-2 rounded-full bg-slate-200 overflow-hidden"><div className={`h-full ${바색}`} style={{ width: `${사용률}%` }} /></div>
+                <div className="flex justify-between mt-1 text-[12px] text-slate-400">
                   <span>이미 씀 {원(b.이미쓴돈)}</span>
-                  <span className={b.남은한도 < 0 ? 'text-[#ff5e30] font-semibold' : ''}>{b.남은한도 < 0 ? `한도 초과 ${원(-b.남은한도)}` : `남은 한도 ${원(b.남은한도)}`}</span>
+                  <span className={b.남은한도 < 0 ? 'text-rose-600 font-semibold' : ''}>{b.남은한도 < 0 ? `한도 초과 ${원(-b.남은한도)}` : `남은 한도 ${원(b.남은한도)}`}</span>
                 </div>
               </div>
-              <div className="px-4 py-2.5 flex justify-between text-[13px] text-[#adaeb3]">
+              <div className="px-4 py-2.5 flex justify-between text-[13px] text-slate-500">
                 <span>💸 다음 10일에 나갈 인건비(대기)</span><span className="font-semibold tabular-nums">{원(대기인건비)}</span>
               </div>
               {b.코멘트.length > 0 && (
-                <div className="px-4 py-2.5 space-y-1">
-                  {b.코멘트.map((c, i) => <p key={i} className="text-[12px] text-[#ffb03a] leading-relaxed">💬 {c}</p>)}
+                <div className="px-4 py-2.5 space-y-1 bg-amber-50/50">
+                  {b.코멘트.map((c, i) => <p key={i} className="text-[12px] text-amber-700 leading-relaxed">💬 {c}</p>)}
                 </div>
               )}
             </div>
           </div>
         );
       })()}
-      <p className="text-[12px] text-[#6d6e73] mt-2">규칙(비율·목표) 조정 = 지출장부 시트 &lsquo;예산&rsquo; 탭 숫자 수정 · 매달 9일 아침 라크 브리핑 · 지급확인은 대시보드 정산 탭에서.</p>
+      <p className="text-[12px] text-slate-400 mt-2">규칙(비율·목표) 조정 = 지출장부 시트 &lsquo;예산&rsquo; 탭 숫자 수정 · 매달 9일 아침 라크 브리핑 · 지급확인은 대시보드 정산 탭에서.</p>
     </section>
   );
 }
