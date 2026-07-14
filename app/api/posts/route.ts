@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { HUB } from '@/lib/hubs';
 import { getBoard, saveBoard, type BoardEntry } from '@/lib/boards';
 import { getSheets } from '@/lib/sheetCache';
+import { sheetToObjects } from '@/lib/sheetUtil';
 import { logError } from '@/lib/log';
 
 export const dynamic = 'force-dynamic';
@@ -27,14 +28,8 @@ export type Post = {
   sheetId?: string;      // source=sheet — 과업 시트 행 id (수정은 /api/office/update로)
 };
 
-// 시트 2차원 배열 → 헤더 기반 객체 배열 (archive.ts와 같은 소형 헬퍼)
-function objs(sheet: unknown[][] | undefined): Record<string, string>[] {
-  if (!Array.isArray(sheet) || sheet.length < 2) return [];
-  const head = (sheet[0] as unknown[]).map((h) => String(h));
-  return sheet.slice(1)
-    .filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''))
-    .map((r) => Object.fromEntries(head.map((h, i) => [h, String((r as unknown[])[i] ?? '').trim()])));
-}
+// 시트 2차원 배열 → 헤더 기반 객체 배열 (lib/sheetUtil.ts 공용 헬퍼)
+const objs = sheetToObjects;
 
 // 날짜 문자열에서 YYYY-MM-DD만 (파싱 실패는 빈값 — 정렬 시 뒤로)
 function ymd(s: string): string {

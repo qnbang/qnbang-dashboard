@@ -3,6 +3,8 @@
 
 // popbill 패키지는 타입 정의가 없어 require로 불러옵니다.
 
+import { todayKST } from './date';
+
 const popbill = require('popbill');
 
 // --- 환경변수에서 설정값을 읽습니다 ---
@@ -57,15 +59,9 @@ export interface IssueResult {
   message: string;
 }
 
-// 오늘 날짜를 YYYYMMDD(한국시간)로 만듭니다.
-function todayKST(): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-  return parts.replace(/-/g, ''); // 2026-06-08 -> 20260608
+// 오늘 날짜를 YYYYMMDD(한국시간)로 만듭니다. 날짜 자체는 lib/date.ts 공용 todayKST()를 쓰고 형식만 압축.
+function todayKSTCompact(): string {
+  return todayKST().replace(/-/g, ''); // 2026-06-08 -> 20260608
 }
 
 // 콜백 기반인 팝빌 발행을 Promise로 감싸 await로 쓸 수 있게 합니다.
@@ -82,7 +78,7 @@ export function issueTaxInvoice(input: IssueInput): Promise<IssueResult> {
 
     // 문서번호: 같은 번호로 두 번 발행할 수 없으므로 시각 기반으로 고유하게 만듭니다.
     const mgtKey = 'QB' + new Date().getTime();
-    const writeDate = input.writeDate || todayKST();
+    const writeDate = input.writeDate || todayKSTCompact();
 
     const Taxinvoice = {
       // 작성 정보

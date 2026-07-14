@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { logError } from '@/lib/log';
-import { google } from 'googleapis';
 import { getSheets, invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
+import { sheetToObjects } from '@/lib/sheetUtil';
 
 // 정기(구독) 매출 자동 기록 — 매일 1회 실행(크론).
 // '정기매출' 탭에 계약을 한 번만 등록(활성=Y)해두면, 매달 그 달 매출행이 없을 때 '매출' 탭에 자동 생성.
@@ -12,19 +13,8 @@ const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 const KEY = 'qnbang2026';
 
-function api() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
-
-function objs(rows: unknown[][] | undefined): Record<string, string>[] {
-  if (!Array.isArray(rows) || rows.length < 2) return [];
-  const h = (rows[0] as unknown[]).map((x) => String(x));
-  return rows.slice(1)
-    .filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''))
-    .map((r) => Object.fromEntries(h.map((k, i) => [k, String((r as unknown[])[i] ?? '').trim()])));
-}
+const api = sheetsWriteClient;
+const objs = sheetToObjects;
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

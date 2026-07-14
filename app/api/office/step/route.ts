@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logError } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { todayKST } from '@/lib/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,6 @@ const KEY = process.env.SHEET_KEY || 'qnbang2026';
 function nowKST() {
   return new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
-function todayKST() { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }); }
 async function w(body: Record<string, unknown>) {
   const r = await fetch(WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return r.json().catch(() => ({} as { ok?: boolean; error?: string }));

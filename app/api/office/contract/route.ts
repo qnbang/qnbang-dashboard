@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { logError } from '@/lib/log';
-import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
+import { todayKST as today } from '@/lib/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,14 +12,9 @@ export const dynamic = 'force-dynamic';
 const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 
-const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
 
-function api() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
+const api = sheetsWriteClient;
 
 export async function POST(req: Request) {
   try {

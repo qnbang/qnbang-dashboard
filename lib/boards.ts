@@ -3,14 +3,16 @@
 // 목록이 코드 밖에 있어 "새 회의 추가"가 코드 배포 없이 이 JSON 만 바꿔 반영된다.
 
 const TOKEN = process.env.GITHUB_TOKEN!;
-const OWNER = process.env.GITHUB_OWNER || 'qnbang';
+const DEFAULT_OWNER = process.env.GITHUB_OWNER || 'qnbang';
 const REGISTRY_REPO = process.env.DASHBOARD_DATA_REPO || 'qnbang-dashboard-data';
 
-const headers = () => ({
+// GitHub Contents API 공용 인증 헤더 — share.ts·review.ts·github.ts 가 모두 이 한 곳을 쓴다.
+export const ghHeaders = () => ({
   Authorization: `Bearer ${TOKEN}`,
   Accept: 'application/vnd.github+json',
   'X-GitHub-Api-Version': '2022-11-28',
 });
+const headers = ghHeaders;
 
 // 게시판 한 줄(회의 하나). date = 'YYYY-MM-DD'(표시할 때 'YYYY. MM. DD'로). href = 회의 본문 링크(없어도 됨).
 // body = 본문(전체 게시판 글에서 사용 — 허브 회의 게시판은 desc만 씀).
@@ -27,42 +29,17 @@ export interface BoardEntry {
 function safeKey(key: string): string {
   return key.replace(/[^a-z0-9-]/gi, '').toLowerCase() || 'board';
 }
-const fileUrl = (key: string) =>
-  `https://api.github.com/repos/${OWNER}/${REGISTRY_REPO}/contents/boards/${safeKey(key)}.json`;
 
-// 게시판 읽기 → 회의 목록 + 쓰기용 sha. 없으면 빈 목록.
-export async function getBoard(key: string): Promise<{ entries: BoardEntry[]; sha?: string }> {
-  const res = await fetch(fileUrl(key), { headers: headers(), cache: 'no-store' });
-  if (res.status === 404) return { entries: [] };
-  if (!res.ok) throw new Error(`게시판 읽기 실패: ${res.status} ${await res.text()}`);
-  const json = await res.json();
-  try {
-    const decoded = Buffer.from(json.content, 'base64').toString('utf8');
-    const data = JSON.parse(decoded) as { entries?: BoardEntry[] };
-    return { entries: Array.isArray(data.entries) ? data.entries : [], sha: json.sha };
-  } catch {
-    return { entries: [], sha: json.sha };
-  }
-}
+// ── 제네릭 JSON 파일 (GitHub Contents API) — owner·repo 생략 시 기본 데이터 repo(qnbang-dashboard-data).
+// share.ts·review.ts·github.ts(프로젝트.json)가 모두 이 두 함수로 읽기·쓰기를 통일한다.
+const contentsUrl = (path: string, owner: string = DEFAULT_OWNER, repo: string = REGISTRY_REPO) =>
+  `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
 
-// 게시판 저장 — 현재 sha 와 함께 PUT(동시 수정 덮어쓰기 방지). nowIso 는 호출부에서 전달.
-export async function saveBoard(key: string, entries: BoardEntry[], nowIso: string): Promise<void> {
-  const { sha } = await getBoard(key);
-  const body = {
-    message: `회의 게시판 저장: ${safeKey(key)}`,
-    content: Buffer.from(JSON.stringify({ entries, updatedAt: nowIso }, null, 2) + '\n').toString('base64'),
-    sha,
-  };
-  const put = await fetch(fileUrl(key), { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
-  if (!put.ok) throw new Error(`게시판 저장 실패: ${put.status} ${await put.text()}`);
-}
-
-// ── 제네릭 JSON 파일 (같은 데이터 repo의 임의 경로) — 자체사업 운영 데이터(biz/<key>.json) 등 ──
-const anyUrl = (path: string) =>
-  `https://api.github.com/repos/${OWNER}/${REGISTRY_REPO}/contents/${path}`;
-
-export async function getJsonFile<T>(path: string): Promise<{ data: T | null; sha?: string }> {
-  const res = await fetch(anyUrl(path), { headers: headers(), cache: 'no-store' });
+export async function getJsonFile<T>(
+  path: string,
+  opts?: { owner?: string; repo?: string }
+): Promise<{ data: T | null; sha?: string }> {
+  const res = await fetch(contentsUrl(path, opts?.owner, opts?.repo), { headers: headers(), cache: 'no-store' });
   if (res.status === 404) return { data: null };
   if (!res.ok) throw new Error(`읽기 실패(${path}): ${res.status} ${await res.text()}`);
   const json = await res.json();
@@ -73,13 +50,32 @@ export async function getJsonFile<T>(path: string): Promise<{ data: T | null; sh
   }
 }
 
-export async function saveJsonFile(path: string, data: unknown): Promise<void> {
-  const { sha } = await getJsonFile(path);
+export async function saveJsonFile(
+  path: string,
+  data: unknown,
+  opts?: { owner?: string; repo?: string; message?: string; sha?: string }
+): Promise<void> {
+  const sha = opts && Object.prototype.hasOwnProperty.call(opts, 'sha')
+    ? opts.sha
+    : (await getJsonFile(path, opts)).sha;
   const body = {
-    message: `데이터 저장: ${path}`,
+    message: opts?.message || `데이터 저장: ${path}`,
     content: Buffer.from(JSON.stringify(data, null, 2) + '\n').toString('base64'),
     sha,
   };
-  const put = await fetch(anyUrl(path), { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
+  const put = await fetch(contentsUrl(path, opts?.owner, opts?.repo), { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
   if (!put.ok) throw new Error(`저장 실패(${path}): ${put.status} ${await put.text()}`);
+}
+
+// 게시판 읽기 → 회의 목록 + 쓰기용 sha. 없으면 빈 목록.
+export async function getBoard(key: string): Promise<{ entries: BoardEntry[]; sha?: string }> {
+  const { data, sha } = await getJsonFile<{ entries?: BoardEntry[] }>(`boards/${safeKey(key)}.json`);
+  return { entries: Array.isArray(data?.entries) ? data.entries : [], sha };
+}
+
+// 게시판 저장 — 현재 sha 와 함께 PUT(동시 수정 덮어쓰기 방지). nowIso 는 호출부에서 전달.
+export async function saveBoard(key: string, entries: BoardEntry[], nowIso: string): Promise<void> {
+  await saveJsonFile(`boards/${safeKey(key)}.json`, { entries, updatedAt: nowIso }, {
+    message: `회의 게시판 저장: ${safeKey(key)}`,
+  });
 }

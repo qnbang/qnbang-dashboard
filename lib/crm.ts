@@ -7,16 +7,10 @@
 //
 // (계약여부 필드는 판단에 사용하지 않음 — 데이터 입력 여부로 분류가 바뀌던 버그 제거)
 import { getSheets } from './sheetCache';
+import { sheetToObjects } from './sheetUtil';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
-
-function objs(sheet: unknown[][] | undefined): Record<string, string>[] {
-  if (!Array.isArray(sheet) || sheet.length < 2) return [];
-  const head = (sheet[0] as unknown[]).map((h) => String(h));
-  return sheet.slice(1)
-    .filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''))
-    .map((r) => Object.fromEntries(head.map((h, i) => [h, String((r as unknown[])[i] ?? '').trim()])));
-}
+const objs = sheetToObjects;
 
 // 고객명 매칭 — 공백 무시 + 접미 차이 흡수(소리쉼↔소리쉼티, 김창수 위스키↔김창수위스키증류소, 사단법인점프↔사단법인 점프).
 // 짧은 쪽(3글자 이상)이 긴 쪽에 포함되면 같은 고객. 2글자 과병합 방지 가드.

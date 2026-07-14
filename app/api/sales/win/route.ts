@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { logError, logAudit } from '@/lib/log';
-import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
+import { todayKST } from '@/lib/date';
+import { colLetter } from '@/lib/sheetUtil';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,22 +19,12 @@ const 과업H = ['id', '프로젝트', '과업명', '담당자', '공위치', '�
 const 매출H = ['계약일', '계약명', '클라이언트', '계약금액', '부가세', '입금상태', '입금일', '입금예정일', '입금액', '순매출', '비고'];
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.]/g, '')) || 0;
-const todayKST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
 async function post(body: object) {
   const r = await fetch(WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   return r.json().catch(() => ({}));
 }
 
-function saApi() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
-function colLetter(n: number) {
-  let s = '';
-  for (let i = n; i >= 0; i = Math.floor(i / 26) - 1) s = String.fromCharCode(65 + (i % 26)) + s;
-  return s;
-}
+const saApi = sheetsWriteClient;
 
 export async function POST(req: Request) {
   try {

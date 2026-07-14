@@ -88,9 +88,3 @@ export function mdToHtml(src: string): string {
   closeList(); closeQuote();
   return html;
 }
-
-// 첫 H1 을 문서 제목으로 (없으면 빈 문자열)
-export function firstHeading(src: string): string {
-  const m = src.match(/^#\s+(.+)$/m);
-  return m ? m[1].trim() : '';
-}

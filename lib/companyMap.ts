@@ -13,6 +13,7 @@ import { buildOffice } from './office';
 import { buildCRM } from './crm';
 import { getBoard, getJsonFile } from './boards';
 import { getSheets } from './sheetCache';
+import { sheetToObjects } from './sheetUtil';
 import { BRANDS } from '@/app/components/bizCatalog';
 
 export interface MapNode {
@@ -86,13 +87,7 @@ function 대행노드(p: ProjectRepo, contracts: Contract[]): MapNode {
   };
 }
 
-function 시트행들(sheet: unknown[][] | undefined): Record<string, string>[] {
-  if (!Array.isArray(sheet) || sheet.length < 2) return [];
-  const head = (sheet[0] as unknown[]).map((h) => String(h));
-  return sheet.slice(1)
-    .filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''))
-    .map((r) => Object.fromEntries(head.map((h, i) => [h, String((r as unknown[])[i] ?? '').trim()])));
-}
+const 시트행들 = sheetToObjects;
 
 // 자체 제품 라인 — 4개 저장소 고정(각자 자기 프로젝트.json으로 관리). owner가 기본 조직과 다르면 읽기 전용.
 const PRODUCT_REPOS: { owner: string; repo: string }[] = [

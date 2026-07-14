@@ -4,6 +4,7 @@
 //          고정비=[항목,금액,주기,납부일,종류,할부종료월,활성]
 
 import { getSheets } from './sheetCache';
+import { sheetToObjects } from './sheetUtil';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
 const ym = (v: unknown) => {
@@ -44,18 +45,8 @@ export interface MoneyData {
   잔고: { 통장잔고: number; 세이프박스: number; 보유현금: number; 업데이트: string };
 }
 
-// 시트 탭을 객체배열로 (헤더 행 기준), _row = 실제 시트 행 번호
-function rows(sheet: unknown[][] | undefined): Record<string, unknown>[] {
-  if (!Array.isArray(sheet) || sheet.length < 2) return [];
-  const head = (sheet[0] as unknown[]).map((h) => String(h));
-  return sheet.slice(1)
-    .map((r, i) => {
-      const obj: Record<string, unknown> = Object.fromEntries(head.map((h, j) => [h, Array.isArray(r) ? (r as unknown[])[j] : undefined]));
-      obj['_row'] = i + 2; // 헤더=1행, 첫 데이터=2행
-      return obj;
-    })
-    .filter((r) => head.some((h) => h !== '_row' && String(r[h] ?? '').trim() !== ''));
-}
+// 시트 탭을 객체배열로 (헤더 행 기준), _row = 실제 시트 행 번호 (lib/sheetUtil.ts 공용 헬퍼)
+const rows = (sheet: unknown[][] | undefined) => sheetToObjects(sheet, true);
 
 export async function fetchMoneyData(): Promise<MoneyData> {
   const sheets = await getSheets();

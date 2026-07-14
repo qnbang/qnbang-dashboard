@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server';
 import { logError, logAudit } from '@/lib/log';
-import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
 
 export const dynamic = 'force-dynamic';
 
 const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 
-function api() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
+const api = sheetsWriteClient;
 
 // 헤더: 계약일, 계약명, 클라이언트, 계약금액, 부가세, 입금상태, 입금일, 입금예정일, 입금액, 순매출, 비고
 function toRow(d: Record<string, string | number>) {

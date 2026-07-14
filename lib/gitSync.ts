@@ -1,6 +1,8 @@
-import { google } from 'googleapis';
 import { listProjectRepos, updateProjectMeta } from './github';
 import { getSheets, invalidateSheets } from './sheetCache';
+import { sheetsWriteClient } from './sheets';
+import { todayKST } from './date';
+import { colLetter } from './sheetUtil';
 
 // 깃 → 시트 자동 등록(클라우드 동기화) — "푸시하면 곧 카드가 된다".
 // 원칙: 저장소 slug가 시트↔깃의 유일한 열쇠. 이름 추측은 등록 판단에만 쓰고, 결과는 항상 열쇠로 고정.
@@ -14,7 +16,6 @@ const WRITE_URL = process.env.SHEET_WRITE_URL
   || 'https://script.google.com/macros/s/AKfycbxPt24eFUbUP1cPwsv5Gspc3pak_hvqIdGf7T4cbvqJSxKkKimCdEhxdSll0yMPJ5dPAw/exec';
 const KEY = process.env.SHEET_KEY || 'qnbang2026';
 const SHEET_ID = process.env.SHEET_ID;
-const SA_JSON = process.env.GOOGLE_SA_JSON;
 
 // 프로젝트동기화.py 와 동일한 18칸(단일 진실원은 실제 시트 헤더지만, append는 이 순서로 매핑됨)
 const HEADER = ['id', '프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일',
@@ -28,14 +29,6 @@ function words(s: unknown): Set<string> {
   return new Set(String(s ?? '').replace(/_/g, ' ').split(/\s+/).filter((w) => w.length >= 2 && !STOP.has(w)));
 }
 const overlap = (a: Set<string>, b: Set<string>) => [...a].some((w) => b.has(w));
-function todayKST(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
-}
-function colLetter(n: number) {
-  let s = '';
-  for (let i = n; i >= 0; i = Math.floor(i / 26) - 1) s = String.fromCharCode(65 + (i % 26)) + s;
-  return s;
-}
 function 공위치_from(진행: string | undefined): string {
   const p = 진행 || '';
   if (p.includes('피드백') || p.includes('대기')) return '고객대기';
@@ -89,9 +82,7 @@ export async function syncGitProjects(dry: boolean): Promise<SyncResult> {
       norm(r[ci.프로젝트]) === t || (ci.고객 >= 0 && norm(r[ci.고객]) === t && t !== ''));
     if (strict.length === 1) {
       if (!dry) {
-        const sa = JSON.parse(SA_JSON!);
-        const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-        const api = google.sheets({ version: 'v4', auth });
+        const api = sheetsWriteClient();
         await api.spreadsheets.values.update({
           spreadsheetId: SHEET_ID!, range: `과업!${colLetter(ci.저장소)}${strict[0].sheetRow}`,
           valueInputOption: 'RAW', requestBody: { values: [[p.repo]] },

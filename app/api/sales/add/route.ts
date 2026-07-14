@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logError, logAudit } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { todayKST } from '@/lib/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,6 @@ const STAGE_WORDS: Record<string, string> = {
   제안: '제안', 견적: '제안',
   계약대기: '계약대기', 계약: '계약대기', 사인: '계약대기', 착수금: '계약대기',
 };
-
-function todayKST() { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }); }
 
 // "망원카페 브랜딩 제안 200만" → 대상=망원카페, 단계=제안, 예상금액=2000000, 다음액션=브랜딩
 function parseLine(line: string) {

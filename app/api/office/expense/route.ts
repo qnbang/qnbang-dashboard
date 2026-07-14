@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server';
 import { logError, logAudit } from '@/lib/log';
-import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
 
 export const dynamic = 'force-dynamic';
 
 const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 
-function api() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
+const api = sheetsWriteClient;
 
 const MONTHS = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 const HEAD = ['날짜', '카테고리', '지출 내용', '비용', '비고', '과업 관리'];

@@ -3,6 +3,7 @@
 // 흐름 체크(년·월별 매출) + 프로젝트별 매출·미수·작업 아카이빙이 목적.
 
 import { getSheets } from './sheetCache';
+import { sheetToObjects } from './sheetUtil';
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
 
@@ -48,13 +49,7 @@ export interface ArchiveData {
   source: 'sheet' | 'unavailable';
 }
 
-function objs(sheet: unknown[][] | undefined): Record<string, string>[] {
-  if (!Array.isArray(sheet) || sheet.length < 2) return [];
-  const head = (sheet[0] as unknown[]).map((h) => String(h));
-  return sheet.slice(1)
-    .filter((r) => Array.isArray(r) && r.some((c) => String(c ?? '').trim() !== ''))
-    .map((r) => Object.fromEntries(head.map((h, i) => [h, String((r as unknown[])[i] ?? '').trim()])));
-}
+const objs = sheetToObjects;
 
 export async function buildArchive(): Promise<ArchiveData> {
   let sh: Record<string, unknown[][]>;

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { google } from 'googleapis';
 import { decrypt } from 'officecrypto-tool';
 import * as XLSX from 'xlsx';
 import { logError } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
 
 // 회장 금고 — 통장 파일(카카오뱅크 거래내역 .xlsx) 업로드 → 잔고 탭 자동 갱신.
 // POST: 파일 → 암호 해제(고정 비번) → 마지막 거래의 '거래 후 잔액'+거래일을 잔고 탭 통장잔고 행에 기록.
@@ -17,11 +17,7 @@ const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 const XLSX_PW = process.env.BANK_XLSX_PW || '920623'; // 카카오뱅크 내보내기 고정 암호(생년월일)
 
-function api() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
+const api = sheetsWriteClient;
 
 async function guard(): Promise<string | null> {
   const jar = await cookies();

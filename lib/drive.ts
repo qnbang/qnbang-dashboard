@@ -46,14 +46,3 @@ export async function createProjectFolders(
   const r = await call('createProject', { name, type });
   return { id: r.id, name: r.name };
 }
-
-// 파일 업로드 (base64). 자동 업로드·대시보드 업로드 공용.
-export async function uploadFile(
-  folderId: string,
-  filename: string,
-  mimeType: string,
-  dataBase64: string
-): Promise<{ id: string; name: string }> {
-  const r = await call('upload', { folderId, filename, mimeType, dataBase64 });
-  return { id: r.id, name: r.name };
-}

@@ -1,15 +1,13 @@
 // GitHub API 유틸 — 프로젝트 repo의 작업로그·커밋을 읽어 대시보드에 보여준다 (서버 전용).
 // 'qnbang-project' 토픽이 붙은 private repo를 프로젝트로 인식한다.
 
-const TOKEN = process.env.GITHUB_TOKEN!;
+import { ghHeaders, getJsonFile, saveJsonFile } from './boards';
+
 const OWNER = process.env.GITHUB_OWNER || 'chalrie92';
 const TOPIC = 'qnbang-project';
 
-const headers = () => ({
-  Authorization: `Bearer ${TOKEN}`,
-  Accept: 'application/vnd.github+json',
-  'X-GitHub-Api-Version': '2022-11-28',
-});
+// GitHub Contents API 인증 헤더 — boards.ts 의 공용 함수를 그대로 쓴다(TOKEN도 같은 GITHUB_TOKEN).
+const headers = ghHeaders;
 
 export interface ProjectRepo {
   repo: string;        // repo 이름 (slug)
@@ -61,53 +59,38 @@ export const META_KEYS: Record<string, string> = {
 // repo 루트 프로젝트.json 을 읽어 메타데이터로 (없으면 빈 객체)
 // owner 생략 시 기본 조직(OWNER). 회사지도의 '자체 제품 라인'처럼 다른 계정(chalrie92 등) 소유 repo를 읽을 때만 넘긴다(읽기 전용 — 쓰기는 아래 updateProjectMeta가 여전히 OWNER 고정).
 export async function getProjectMeta(repo: string, owner: string = OWNER): Promise<ProjectMeta> {
-  const res = await fetch(
-    `https://api.github.com/repos/${owner}/${repo}/contents/프로젝트.json`,
-    { headers: headers(), cache: 'no-store' }
-  );
-  if (!res.ok) return {};
-  const json = await res.json();
-  if (!json.content) return {};
+  let c: Record<string, unknown> | null;
   try {
-    const c = JSON.parse(Buffer.from(json.content, 'base64').toString('utf8'));
-    return {
-      driveFolderId: c.driveFolderId,
-      name: c['이름'],
-      category: c['분류'],
-      manager: c['담당자'],
-      progressStatus: c['진행상태'],
-      contractStatus: c['계약상태'],
-      paymentStatus: c['입금상태'],
-      amount: typeof c['계약금액'] === 'number' ? c['계약금액'] : undefined,
-      paidAmount: typeof c['입금액'] === 'number' ? c['입금액'] : undefined,
-      startDate: c['착수일'],
-      endDate: c['마감일'],
-      contractUrl: c['계약서링크'],
-    };
+    ({ data: c } = await getJsonFile<Record<string, unknown>>('프로젝트.json', { owner, repo }));
   } catch {
-    return {};
+    return {}; // 읽기 실패(권한·네트워크 등)도 원래 동작대로 조용히 빈 값
   }
+  if (!c) return {};
+  return {
+    driveFolderId: c.driveFolderId as string | undefined,
+    name: c['이름'] as string | undefined,
+    category: c['분류'] as string | undefined,
+    manager: c['담당자'] as string | undefined,
+    progressStatus: c['진행상태'] as string | undefined,
+    contractStatus: c['계약상태'] as string | undefined,
+    paymentStatus: c['입금상태'] as string | undefined,
+    amount: typeof c['계약금액'] === 'number' ? c['계약금액'] as number : undefined,
+    paidAmount: typeof c['입금액'] === 'number' ? c['입금액'] as number : undefined,
+    startDate: c['착수일'] as string | undefined,
+    endDate: c['마감일'] as string | undefined,
+    contractUrl: c['계약서링크'] as string | undefined,
+  };
 }
 
 // 프로젝트.json 일부 필드를 GitHub에 직접 저장 (대시보드에서 편집)
 export async function updateProjectMeta(repo: string, patch: Record<string, unknown>): Promise<void> {
-  const url = `https://api.github.com/repos/${OWNER}/${repo}/contents/프로젝트.json`;
-  const cur = await fetch(url, { headers: headers(), cache: 'no-store' });
-  let sha: string | undefined;
   let existing: Record<string, unknown> = {};
-  if (cur.ok) {
-    const j = await cur.json();
-    sha = j.sha;
-    try { existing = JSON.parse(Buffer.from(j.content, 'base64').toString('utf8')); } catch {}
-  }
+  try {
+    const { data } = await getJsonFile<Record<string, unknown>>('프로젝트.json', { owner: OWNER, repo });
+    if (data) existing = data;
+  } catch { /* 읽기 실패해도 원래 동작대로 빈 값에서 시작 */ }
   const merged = { ...existing, ...patch };
-  const body = {
-    message: '대시보드에서 프로젝트 정보 수정',
-    content: Buffer.from(JSON.stringify(merged, null, 2) + '\n').toString('base64'),
-    sha,
-  };
-  const put = await fetch(url, { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
-  if (!put.ok) throw new Error(`프로젝트.json 저장 실패: ${put.status} ${await put.text()}`);
+  await saveJsonFile('프로젝트.json', merged, { owner: OWNER, repo, message: '대시보드에서 프로젝트 정보 수정' });
 }
 
 export interface Commit {
@@ -353,23 +336,6 @@ export async function saveDoc(
   // 409(Conflict) 또는 422(sha 불일치) = 그 사이 다른 곳에서 먼저 바뀜
   const conflict = put.status === 409 || put.status === 422;
   return { ok: false, conflict, error: `${put.status} ${text}` };
-}
-
-// 프로젝트 설정 — repo 루트의 프로젝트.json { driveFolderId } 을 읽는다 (없으면 null)
-export async function getDriveFolderId(repo: string): Promise<string | null> {
-  const res = await fetch(
-    `https://api.github.com/repos/${OWNER}/${repo}/contents/프로젝트.json`,
-    { headers: headers(), cache: 'no-store' }
-  );
-  if (!res.ok) return null;
-  const json = await res.json();
-  if (!json.content) return null;
-  try {
-    const cfg = JSON.parse(Buffer.from(json.content, 'base64').toString('utf8'));
-    return cfg.driveFolderId || null;
-  } catch {
-    return null;
-  }
 }
 
 // 최근 커밋 목록

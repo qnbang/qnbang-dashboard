@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { logError, logAudit } from '@/lib/log';
-import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
+import { todayKST } from '@/lib/date';
+import { colLetter } from '@/lib/sheetUtil';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,17 +11,7 @@ const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 const PATCHABLE = new Set(['프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일', '기한', '고객', '돈종류', '할일', '메모', '갱신일', '분류', '저장소']);
 
-function saApi() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
-function colLetter(n: number) {
-  let s = '';
-  for (let i = n; i >= 0; i = Math.floor(i / 26) - 1) s = String.fromCharCode(65 + (i % 26)) + s;
-  return s;
-}
-function todayKST() { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }); }
+const saApi = sheetsWriteClient;
 
 export async function POST(req: Request) {
   try {

@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
 import { logError } from '@/lib/log';
-import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
+import { colLetter } from '@/lib/sheetUtil';
 
 export const dynamic = 'force-dynamic';
 
 const SHEET_ID = process.env.SHEET_ID;
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 
-function api() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
+const api = sheetsWriteClient;
 
 // 매출 탭에서 계약명+계약금액으로 행을 찾아 입금 정보(입금액·입금일·입금상태) 수정
 export async function PATCH(req: Request) {
@@ -46,7 +43,6 @@ export async function PATCH(req: Request) {
     set('입금일', 입금일);
     set('입금상태', 입금상태);
 
-    const colLetter = (n: number) => String.fromCharCode(65 + n); // A=0, B=1 …
     const range = `매출!A${rowIdx + 1}:${colLetter(head.length - 1)}${rowIdx + 1}`;
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID!, range, valueInputOption: 'USER_ENTERED',

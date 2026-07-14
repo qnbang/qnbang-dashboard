@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logError, logAudit } from '@/lib/log';
-import { google } from 'googleapis';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { sheetsWriteClient } from '@/lib/sheets';
 
 // 인건비 원장 API — '인건비' 탭(월,구분,이름,세전,공제,실지급,지급상태,지급일,비고)의 추가·수정·삭제와
 // 지급확인(실제 이체 후 버튼 → 그때만 지출 탭에 기록: 통장단일원장 원칙), 지난달 명단 복사.
@@ -14,11 +14,7 @@ const TAB = '인건비';
 // ponytail: 기타 항목 지급확인용 선택지 — 시트 실사용 분류 기준(고정 8종 + 외주·기타)
 const 카테고리들 = ['실비', '업무비', '식비', '프로그램 사용료', '월세&공과금', '재료비', '세금', '급여', '외주', '기타'];
 
-function api() {
-  const sa = JSON.parse(SA_JSON!);
-  const auth = new google.auth.JWT({ email: sa.client_email, key: sa.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-  return google.sheets({ version: 'v4', auth });
-}
+const api = sheetsWriteClient;
 
 const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
 const isYM = (s: unknown) => /^\d{4}-\d{2}$/.test(String(s ?? ''));

@@ -8,18 +8,10 @@
 // 벌어진다(diverge). 사람이 손대지 않는 별도 repo 에 두면 코드 repo 는 한 줄로 흐른다.
 
 import { createHash } from 'node:crypto';
+import { getJsonFile, saveJsonFile } from './boards';
 
-const TOKEN = process.env.GITHUB_TOKEN!;
-const OWNER = process.env.GITHUB_OWNER || 'qnbang';
-// 공유 기록 파일을 둘 곳 = 런타임 상태 전용 repo (사람은 안 만짐)
-const REGISTRY_REPO = process.env.DASHBOARD_DATA_REPO || 'qnbang-dashboard-data';
+// 공유 기록 파일 경로 — 저장 위치(owner·repo)는 boards.ts 의 기본 데이터 repo(qnbang-dashboard-data)를 그대로 쓴다.
 const REGISTRY_PATH = 'share-registry.json';
-
-const headers = () => ({
-  Authorization: `Bearer ${TOKEN}`,
-  Accept: 'application/vnd.github+json',
-  'X-GitHub-Api-Version': '2022-11-28',
-});
 
 export interface ShareEntry {
   slug: string;    // 공개 링크의 추측 어려운 식별자
@@ -29,33 +21,15 @@ export interface ShareEntry {
   sharedAt: string; // 공개 시작 시각(ISO)
 }
 
-const fileUrl = () =>
-  `https://api.github.com/repos/${OWNER}/${REGISTRY_REPO}/contents/${REGISTRY_PATH}`;
-
 // 기록 파일을 통째로 읽는다 → 항목 목록 + 쓰기에 필요한 sha. 파일이 없으면 빈 목록.
 async function readRegistry(): Promise<{ entries: ShareEntry[]; sha?: string }> {
-  const res = await fetch(fileUrl(), { headers: headers(), cache: 'no-store' });
-  if (res.status === 404) return { entries: [] };
-  if (!res.ok) throw new Error(`공유 기록 읽기 실패: ${res.status} ${await res.text()}`);
-  const json = await res.json();
-  try {
-    const decoded = Buffer.from(json.content, 'base64').toString('utf8');
-    const entries = JSON.parse(decoded) as ShareEntry[];
-    return { entries: Array.isArray(entries) ? entries : [], sha: json.sha };
-  } catch {
-    return { entries: [], sha: json.sha };
-  }
+  const { data, sha } = await getJsonFile<ShareEntry[]>(REGISTRY_PATH);
+  return { entries: Array.isArray(data) ? data : [], sha };
 }
 
 // 항목 목록을 파일에 다시 쓴다 (sha 기반 → 동시 수정 충돌 방지)
 async function writeRegistry(entries: ShareEntry[], sha: string | undefined, message: string): Promise<void> {
-  const body = {
-    message,
-    content: Buffer.from(JSON.stringify(entries, null, 2) + '\n').toString('base64'),
-    sha,
-  };
-  const put = await fetch(fileUrl(), { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
-  if (!put.ok) throw new Error(`공유 기록 저장 실패: ${put.status} ${await put.text()}`);
+  await saveJsonFile(REGISTRY_PATH, entries, { sha, message });
 }
 
 // 공개 중인 전체 목록
