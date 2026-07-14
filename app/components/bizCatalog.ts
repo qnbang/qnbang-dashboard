@@ -98,8 +98,4 @@ export const WORK_TOOLS: WorkTool[] = [
     owner: '김지영',
   },
 ];
-// 3. 실험실 — 할지 말지 미정·테스트 (사무실뷰에서 이사옴)
-export const LAB: WorkTool[] = [
-  { name: '풋살 케어·트레이닝', desc: '개인 — v1 출시 판정 대기', icon: '⚽', color: 'bg-slate-50 text-slate-600 border-slate-200', status: '판정 대기' },
-  { name: '생일 커뮤니티', desc: '개인 — 할지 말지 미정', icon: '🎂', color: 'bg-slate-50 text-slate-600 border-slate-200', status: '미정' },
-];
+// 실험실은 2026-07-14 게시판 '실험실' 배지로 이사 — 미정·테스트는 게시판 글, 끝그림이 잡히면 여기(브랜드/서비스)로 승격.

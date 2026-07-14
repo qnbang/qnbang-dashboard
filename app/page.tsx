@@ -10,7 +10,7 @@ import ProjectDocs from './components/ProjectDocs';
 import BizOps from './components/BizOps';
 import { renderMarkdown } from '@/lib/markdown';
 import { Loading, ErrorBox } from './components/ui';
-import { type WorkTool, BRANDS, WORK_TOOLS, LAB } from './components/bizCatalog';
+import { type WorkTool, BRANDS, WORK_TOOLS } from './components/bizCatalog';
 
 type Expense = {
   _row: number;
@@ -181,8 +181,7 @@ function 프리랜서공제(세전: number) {
   return 소득세 + 지방세;
 }
 function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return new Date().toLocaleDateString('en-CA');
 }
 
 function parseM(d: string) {
@@ -964,7 +963,7 @@ function BizView() {
       const norm = (s: string) => s.replace(/\s/g, '').toLowerCase();
       // 시트 행 이름이 하드코딩 카드와 다른 같은 제품 — 별칭으로 중복 차단
       const ALIAS = ['네이버키워드검색기', 'seo상품명작명기'];
-      const known = [...BRANDS, ...WORK_TOOLS, ...LAB].map((t) => norm(t.name)).concat(ALIAS.map(norm));
+      const known = [...BRANDS, ...WORK_TOOLS].map((t) => norm(t.name)).concat(ALIAS.map(norm));
       const seen = new Set<string>();
       const tools: WorkTool[] = [];
       for (const t of all) {
@@ -974,12 +973,15 @@ function BizView() {
         if (!name || seen.has(n)) continue;
         if (known.some((k) => k.includes(n) || n.includes(k))) continue; // 하드코딩 카드와 중복
         seen.add(n);
+        const url = (t.memo || '').match(/https?:\/\/\S+/); // 메모 속 링크 → 카드 '열기 ↗' 버튼(배포됨 카드처럼)
         tools.push({
           name,
-          desc: (t.memo || '').split('\n')[0] || t.status || '설명 비어있음 — 카드 눌러 문서에 채우면 표시',
+          desc: (t.memo || '').split('\n').find((ln) => ln.trim() && !/^https?:\/\/\S+$/.test(ln.trim())) || t.status || '설명 비어있음 — 카드 눌러 문서에 채우면 표시',
           icon: '🧰',
           color: 'bg-teal-50 text-teal-600 border-teal-200',
           status: t.status && t.status.length <= 12 ? t.status : undefined,
+          owner: t.owner || undefined, // 시트 담당자 → 🎨 뱃지(팀원이 올린 자체사업 카드도 김지영 위키처럼 표시)
+          href: url ? url[0] : undefined,
           sheetId: t.id,
           memo: t.memo || '',
         });
@@ -1004,11 +1006,10 @@ function BizView() {
   return (
     <div className="space-y-8">
       <p className="text-sm text-slate-500">
-        큐앤뱅이 직접 굴리는 것 전부 — <b className="text-slate-700">브랜드 · 서비스(도구) · 실험</b>. 카드를 누르면 개요·진행사항·운영 현황이 열립니다.
+        큐앤뱅이 직접 굴리는 것 전부 — <b className="text-slate-700">브랜드 · 서비스(도구)</b>. 카드를 누르면 개요·진행사항·운영 현황이 열립니다. 미정·실험은 📝게시판의 <b className="text-slate-700">실험실</b> 배지로.
       </p>
       <Section no="1" title="브랜드" hint="시장에 정착시키는 이름" items={BRANDS} />
       <Section no="2" title="큐앤뱅 서비스" hint="사면·쓰면 작동하는 도구 — 시트 분류=도구 자동 합류" items={[...WORK_TOOLS, ...sheetTools]} />
-      <Section no="3" title="실험실" hint="할지 말지 미정 · 테스트 중" items={LAB} />
       {biz && (
         <ProjectDocs
           name={biz.name}
@@ -1028,7 +1029,7 @@ type Post = {
   hubKey?: string; sheetId?: string;
 };
 const POST_BADGE: Record<string, string> = {
-  회의록: 'bg-blue-600', 아이디어: 'bg-purple-600', 리서치: 'bg-teal-600',
+  회의록: 'bg-blue-600', 아이디어: 'bg-purple-600', 리서치: 'bg-teal-600', 실험실: 'bg-amber-600',
 };
 
 function PostsView() {
@@ -1136,14 +1137,14 @@ function PostsView() {
   if (err) return <ErrorBox msg={err} pad="py-20" />;
   if (!posts) return <Loading text="게시판 불러오는 중" pad="py-20" />;
 
-  const tags = ['회의록', '아이디어', '리서치'];
+  const tags = ['회의록', '아이디어', '리서치', '실험실'];
   const shown = tagFilter === 'all' ? posts : posts.filter((p) => p.tag === tagFilter);
   const fmtD = (d: string) => (/^\d{4}-\d{2}-\d{2}$/.test(d) ? d.replace(/-/g, '. ') : d);
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">
-        회의록·아이디어·리서치를 한 곳에서. 허브 회의록과 시트 리서치는 자동으로 합쳐 보이고, 새 글은 여기서 바로 씁니다.
+        회의록·아이디어·리서치·실험실(미정·테스트)을 한 곳에서. 허브 회의록과 시트 리서치는 자동으로 합쳐 보이고, 새 글은 여기서 바로 씁니다. 하기로 확정한 일만 🚀자체사업·프로젝트 카드로 승격.
       </p>
 
       {/* 배지 필터 */}

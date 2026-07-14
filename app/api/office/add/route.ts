@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { logError } from '@/lib/log';
 import { invalidateSheets } from '@/lib/sheetCache';
+import { todayKST } from '@/lib/date';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,9 +11,9 @@ const WRITE_URL = process.env.SHEET_WRITE_URL
   || 'https://script.google.com/macros/s/AKfycbxPt24eFUbUP1cPwsv5Gspc3pak_hvqIdGf7T4cbvqJSxKkKimCdEhxdSll0yMPJ5dPAw/exec';
 const KEY = process.env.SHEET_KEY || 'qnbang2026';
 
-// 과업POST.py HEADER 와 동일 순서(단일 진실원)
+// 과업POST.py·gitSync.ts HEADER 와 동일한 18칸(단일 진실원) — 분류·메모·저장소까지 한 번에 써져야 팀원 입력도 신종호 경로(과업POST.py)와 같아짐
 const HEADER = ['id', '프로젝트', '과업명', '담당자', '공위치', '현재상태', '다음할일',
-  '기한', '고객', '돈종류', '할일', '판정근거', '갱신일', '출처', '계약여부'];
+  '기한', '고객', '돈종류', '할일', '판정근거', '갱신일', '출처', '계약여부', '분류', '메모', '저장소'];
 const 공위치_LIST = ['받은일', '시작전', '내작업', '내회신', '고객대기', '보류', '완수']; // 받은일 포함 — 드래그로 받은일 이동한 셀이 드롭다운 경고 안 뜨게(office.ts POS2BALL과 동일 어휘)
 const 돈종류_LIST = ['매출', '투자'];
 
@@ -25,10 +26,6 @@ const POS_WORDS: Record<string, string> = {
   '보류': '보류', hold: '보류',
   '완수': '완수', done: '완수', '완료': '완수',
 };
-
-function todayKST(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }); // YYYY-MM-DD
-}
 
 // "소리쉼 시안 client 6/20" 같은 한 줄을 과업 필드로 약식 파싱.
 // 규칙: 공위치 단어 1개 + 날짜(YYYY-MM-DD 또는 M/D) 1개를 빼내고, 남은 토큰의 첫 단어=프로젝트, 나머지=과업명.
@@ -77,6 +74,9 @@ export async function POST(req: Request) {
       판정근거: '',
       갱신일: today,
       출처: String(b.출처 || '대시보드'),
+      분류: String(b.category || ''),  // 도구·리서치 등 — 분류=도구면 자체사업 탭 카드로 자동 합류
+      메모: String(b.memo || ''),      // 첫 줄=카드 설명, https 줄=열기 버튼
+      저장소: String(b.repo || ''),    // 깃 repo slug — git-sync 크론과의 이중등록 방지 열쇠
     };
     // '처리됨으로(완수)'는 과업 탭이 아니라 아카이브 탭에 직행 — 과업 탭의 완수 행은 화면 어디에도 안 그려져 증발함(complete 라우트와 같은 목적지)
     const 탭 = p.공위치 === '완수' ? '아카이브' : '과업';
