@@ -414,8 +414,10 @@ export default function OfficeBoardView() {
     fetch('/api/office/contract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(() => load(true)).catch(() => load(true));
   };
   // 여정 단계 — 완료/되돌림·추가. 패널 유지(setSel 안 닫음)하고 새로고침해 이력·단계 갱신.
-  const stepPost = (id: string, todos: string[], 내용: string) => { // 시트는 백그라운드 저장(over로 보드 즉시 반영, load 안 함=무플래시)
-    fetch('/api/office/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 할일: todos.join(';'), 내용 }) }).catch(() => null);
+  const stepPost = (id: string, todos: string[], 내용: string) => { // 성공=무플래시 유지, 실패만 되돌리고 알림(조용한 유실 방지)
+    fetch('/api/office/step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, 할일: todos.join(';'), 내용 }) })
+      .then((r) => r.json()).catch(() => ({ ok: false, error: '네트워크 오류' }))
+      .then((j) => { if (!j || !j.ok) { alert(`단계 저장이 안 됐어요 — ${(j && j.error) || '다시 눌러주세요'}`); load(true); } }); // ponytail: alert면 충분, 시끄러우면 토스트로
   };
   const optimistic = (t: Task, todos: string[], 내용: string) => { // 패널 + 보드(over) 동시 즉시 반영 — 체크·되돌리기 둘 다
     setSel({ ...t, todos, history: [{ when: '방금', what: 내용 }, ...(t.history || [])] });
