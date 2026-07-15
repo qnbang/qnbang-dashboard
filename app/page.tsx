@@ -781,7 +781,7 @@ function Scorecard({ label, value, sub, tone, onClick, active }: { label: string
 }
 
 // 고객 관리 CRM(#5) — 영업/과업/매출을 고객 기준으로 묶은 생애주기 overview(읽기 중심).
-type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number; 프로젝트들?: { 이름: string; 금액: number; 미수: number; 단계?: string }[] };
+type CRMClient = { 고객: string; 단계?: string; 예상금액?: number | null; 과업수?: number; 공위치?: string[]; 담당?: string[]; 계약금액?: number; 미수?: number; 미표시?: boolean; 프로젝트들?: { 이름: string; 금액: number; 미수: number; 단계?: string }[] };
 type CRMD = { 영업중: CRMClient[]; 진행중: CRMClient[]; 완수: CRMClient[]; source: string };
 // 프로젝트 문서 뷰(읽기 전용)는 ./components/ProjectDocs 로 분리 — CRM·아카이브에서 같은 모달 재사용.
 
@@ -826,6 +826,7 @@ function CRMView() {
                     {x.단계 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-600">{x.단계}</span>}
                     {x.예상금액 != null && <span className="text-[11px] text-emerald-600">{won(x.예상금액)}</span>}
                     {x.예상금액 === null && x.단계 && <span className="text-[11px] text-amber-500">협의전</span>}
+                    {x.미표시 && c.key !== 'done' && <span title="계약여부 미표시 — 매출로 자동 추정된 상태. 시트 계약여부 칸에 영업/진행을 적으면 확정됩니다." className="text-[11px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">⚠️ 미표시</span>}
                     {x.과업수 != null && x.과업수 > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">과업 {x.과업수}</span>}
                     {x.공위치 && x.공위치.map((p) => <span key={p} className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{p}</span>)}
                     {x.미수 != null && x.미수 > 0 && <span className="text-[11px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-medium">미수 {won(x.미수)}</span>}

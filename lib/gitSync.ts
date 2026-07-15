@@ -117,7 +117,7 @@ export async function syncGitProjects(dry: boolean): Promise<SyncResult> {
       공위치: 공위치_from(p.progressStatus), 현재상태: p.progressStatus || '',
       다음할일: '', 기한: p.endDate || '', 고객: p.category === '대행' ? p.title : '',
       돈종류: p.category === '자체' ? '투자' : '매출', 할일: '', 판정근거: '',
-      갱신일: today, 출처: '깃동기화', 계약여부: '',
+      갱신일: today, 출처: '깃동기화', 계약여부: p.category === '대행' ? '영업' : '', // 새 대행은 영업 단계로 시작 → 영업중 칸에 뜸(계약되면 사람이 '진행'으로 변경)
       분류: p.category === '대행' ? '대행' : '', // 보드 분류 어휘(대행·도구·리서치·자체사업·내부)에 없는 '자체'는 기록 안 함(칩 필터 미아 방지)
       메모: '', 저장소: p.repo,
     };
