@@ -117,7 +117,7 @@ const CSS = `
 .qb .proj-sub{font-size:10.5px;color:#9298ac;margin-top:1px}
 .qb .who-bdg{font-size:10px;font-weight:700;color:#5a6078;background:#f1f3fa;border-radius:6px;padding:2px 6px;flex-shrink:0}
 .qb .who-bdg.outsrc{color:#0d9488;background:#ccfbf1}
-.qb .bdg{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:#eef0f7;color:#5a6078;flex-shrink:0}.qb .bdg.soon{background:#fde8eb;color:#e0364a}
+.qb .bdg{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:#eef0f7;color:#5a6078;flex-shrink:0}.qb .bdg.soon{background:#fde8eb;color:#e0364a}.qb .bdg.clear{background:#e8f5ee;color:#2e7d5b}
 .qb .row-item{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #e7e9f3;border-radius:11px;padding:8px 11px;margin-bottom:6px;cursor:pointer}
 .qb .row-item .it{font-size:13px;font-weight:600;color:var(--ink)}.qb .row-item .imeta{font-size:10.5px;color:#9298ac;margin-top:1px}.qb .row-item .ibody{flex:1;min-width:0}
 .qb .smalltk{display:flex;gap:7px;align-items:center;background:#fff;border:1px solid #e7e9f3;border-radius:12px;padding:8px 11px;margin-bottom:6px;cursor:pointer;font-size:12px;box-shadow:0 2px 8px -6px #1e225522}
@@ -262,6 +262,10 @@ function currentStep(t: { todos?: string[]; status?: string }) {
   const undone = effTodos(t).map(parseStep).filter((s) => !s.done);
   if (!undone.length) return null;
   return [...undone].sort((a, b) => (a.date ? (stepDday(a.date) ?? 99999) : 99999) - (b.date ? (stepDday(b.date) ?? 99999) : 99999))[0];
+}
+// 실제 할일 단계가 있는데 다 끝나 지금 할 게 없는 카드 = "할 일 없음". 내작업 칸에서 예정으로 자동으로 뺀다(새 단계 추가하면 되돌아옴).
+function noPending(t: { todos?: string[]; status?: string }): boolean {
+  return currentStep(t) == null && !!(t.todos && t.todos.length);
 }
 // 대기 카드가 누구 답을 기다리는지 — 지금 단계(없으면 카드) 담당이 외부인이면 그 이름, 내부·미지정이면 '고객'
 function waitOn(t: { todos?: string[]; status?: string; owner?: string }): string {
@@ -536,9 +540,10 @@ export default function OfficeBoardView() {
   const byDday = (a: Task, b: Task) => (cardDday(a) ?? 9999) - (cardDday(b) ?? 9999); // 카드가 보여주는 D-day(단계날짜 우선) 임박순
   const inbox = board.filter((t) => t.ball === 'inbox' || t.ball === 'unset').sort(byDday); // 빈 공위치(미정)도 받은일 바구니로(office.ts 규칙) — 빠른추가가 공위치 빈칸으로 저장하므로
   const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
-  const work = board.filter((t) => t.ball === 'mywork').sort(byDday);
+  const work = board.filter((t) => t.ball === 'mywork' && !noPending(t)).sort(byDday); // 내작업 = 지금 할 일 있는 것만
   const wait = board.filter((t) => t.ball === 'client').sort(byDday);
-  const todo = board.filter((t) => t.ball === 'start').sort(byDday); // 예정 = 시작전 전부(날짜 있는 것 먼저, 없는 건 뒤) — 언젠가 통합
+  // 예정 = 시작전 전부 + 내작업인데 할일 다 끝난('할 일 없음') 카드 자동 편입(날짜 있는 것 먼저, 없는 건 뒤)
+  const todo = board.filter((t) => t.ball === 'start' || (t.ball === 'mywork' && noPending(t))).sort(byDday);
   const hold = board.filter((t) => t.ball === 'hold').sort(byDday);
   const ACTIVE_SET = new Set(['inbox', 'mywork', 'myreply', 'client']); // 가동률=지금 움직이는 공만. 보류(hold)=멈춤이라 '진행 중' 계수에서 제외
   const SHOW_CATS = ['대행', '자체사업', '내부', '리서치'] as const;
@@ -583,10 +588,12 @@ export default function OfficeBoardView() {
         ? <span className="who-bdg">{WHO[t.owner]}</span>
         : <span className="who-bdg outsrc">🤝 외주 · {t.owner}</span>)}
       {t.ball === 'client' && <span className="waitfor">🟣 {waitOn(t)}</span>}
-      {(() => {
-        const dd = cardDday(t); // 단계날짜 우선, 없으면 과업기한
-        return dd != null ? <span className={`bdg${dd <= 7 ? ' soon' : ''}`}>{ddText(dd)}</span> : null;
-      })()}
+      {noPending(t)
+        ? <span className="bdg clear">할 일 없음</span>
+        : (() => {
+          const dd = cardDday(t); // 단계날짜 우선, 없으면 과업기한
+          return dd != null ? <span className={`bdg${dd <= 7 ? ' soon' : ''}`}>{ddText(dd)}</span> : null;
+        })()}
     </div>
     );
   };
