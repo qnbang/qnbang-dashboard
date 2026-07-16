@@ -251,7 +251,11 @@ function ymdToMd(ymd: string): string {
 function cardDday(t: { todos?: string[]; status?: string; due?: string; dday?: number | null }): number | null {
   const c = currentStep(t);
   const sd = c && c.date ? stepDday(c.date) : null;
-  return sd != null ? sd : (t.due && t.dday != null ? t.dday : null);
+  if (sd != null) return sd;
+  // 실제 할일 단계가 있는 카드는 단계 날짜만 뱃지로 씀 — 단계를 다 끝냈으면 빈칸(옛 과업 기한을 끌어와 '마감 지남' 표시하지 않음)
+  if (t.todos && t.todos.length) return null;
+  // 할일 단계가 아예 없는 잡일·단건 카드만 과업 기한으로 폴백(기한이 유일한 날짜)
+  return t.due && t.dday != null ? t.dday : null;
 }
 // 지금 단계 = 미완료 중 날짜 가장 이른 것(무날짜는 뒤). 패널 ▶·카드 큰글씨·D-day 모두 이걸로 일치.
 function currentStep(t: { todos?: string[]; status?: string }) {
