@@ -263,7 +263,7 @@ function currentStep(t: { todos?: string[]; status?: string }) {
   if (!undone.length) return null;
   return [...undone].sort((a, b) => (a.date ? (stepDday(a.date) ?? 99999) : 99999) - (b.date ? (stepDday(b.date) ?? 99999) : 99999))[0];
 }
-// 실제 할일 단계가 있는데 다 끝나 지금 할 게 없는 카드 = "할 일 없음". 내작업 칸에서 예정으로 자동으로 뺀다(새 단계 추가하면 되돌아옴).
+// 실제 할일 단계가 있는데 다 끝나 지금 할 게 없는 카드 = "할 일 없음". 내 손 칸(작업·처리)에서 예정으로 자동으로 뺀다(새 단계 추가하면 되돌아옴). 대기(client)는 해당 없음.
 function noPending(t: { todos?: string[]; status?: string }): boolean {
   return currentStep(t) == null && !!(t.todos && t.todos.length);
 }
@@ -539,11 +539,13 @@ export default function OfficeBoardView() {
   // (깃 자동 섹션 폐기 — 깃 프로젝트는 크론 git-sync가 시트에 직접 등록해 위 보드로 통일됨)
   const byDday = (a: Task, b: Task) => (cardDday(a) ?? 9999) - (cardDday(b) ?? 9999); // 카드가 보여주는 D-day(단계날짜 우선) 임박순
   const inbox = board.filter((t) => t.ball === 'inbox' || t.ball === 'unset').sort(byDday); // 빈 공위치(미정)도 받은일 바구니로(office.ts 규칙) — 빠른추가가 공위치 빈칸으로 저장하므로
-  const proc = board.filter((t) => t.ball === 'myreply').sort(byDday);
+  // 내 손 칸(작업·처리)만 '할 일 없음' 자동 이동 대상. 대기(client)=상대 답 기다림이 정상 상태, 받은일=접수함이라 제외.
+  const myHands = (t: Task) => t.ball === 'mywork' || t.ball === 'myreply';
+  const proc = board.filter((t) => t.ball === 'myreply' && !noPending(t)).sort(byDday);
   const work = board.filter((t) => t.ball === 'mywork' && !noPending(t)).sort(byDday); // 내작업 = 지금 할 일 있는 것만
   const wait = board.filter((t) => t.ball === 'client').sort(byDday);
-  // 예정 = 시작전 전부 + 내작업인데 할일 다 끝난('할 일 없음') 카드 자동 편입(날짜 있는 것 먼저, 없는 건 뒤)
-  const todo = board.filter((t) => t.ball === 'start' || (t.ball === 'mywork' && noPending(t))).sort(byDday);
+  // 예정 = 시작전 전부 + 내 손 칸인데 할일 다 끝난('할 일 없음') 카드 자동 편입. 공위치(시트)는 안 바꿔 새 단계 추가하면 원래 칸으로 복귀.
+  const todo = board.filter((t) => t.ball === 'start' || (myHands(t) && noPending(t))).sort(byDday);
   const hold = board.filter((t) => t.ball === 'hold').sort(byDday);
   const ACTIVE_SET = new Set(['inbox', 'mywork', 'myreply', 'client']); // 가동률=지금 움직이는 공만. 보류(hold)=멈춤이라 '진행 중' 계수에서 제외
   const SHOW_CATS = ['대행', '자체사업', '내부', '리서치'] as const;
@@ -588,12 +590,11 @@ export default function OfficeBoardView() {
         ? <span className="who-bdg">{WHO[t.owner]}</span>
         : <span className="who-bdg outsrc">🤝 외주 · {t.owner}</span>)}
       {t.ball === 'client' && <span className="waitfor">🟣 {waitOn(t)}</span>}
-      {noPending(t)
-        ? <span className="bdg clear">할 일 없음</span>
-        : (() => {
-          const dd = cardDday(t); // 단계날짜 우선, 없으면 과업기한
-          return dd != null ? <span className={`bdg${dd <= 7 ? ' soon' : ''}`}>{ddText(dd)}</span> : null;
-        })()}
+      {/* '할 일 없음' 뱃지는 예정 칸(넘어온 카드)에서만 — 대기(client)는 상대 답 기다림이 정상이라 안 붙임. 단계 다 끝난 카드는 cardDday=null이라 옛 기한 뱃지도 안 뜸. */}
+      {(() => {
+        const dd = cardDday(t); // 단계날짜 우선, 없으면 과업기한
+        return dd != null ? <span className={`bdg${dd <= 7 ? ' soon' : ''}`}>{ddText(dd)}</span> : null;
+      })()}
     </div>
     );
   };
@@ -737,7 +738,9 @@ export default function OfficeBoardView() {
 
       <div className="board">
         <section className="room todo" {...dropTo('시작전')}><div className="rh">📅 예정 <span className="cnt">{todo.length}</span><span className="hint">시작 전(날짜 있으면 임박순)</span></div>
-          {todo.length ? todo.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>📅</span><div><div className="task">{t.project}</div><div className="c">{t.dday != null ? ddText(t.dday) + ' · ' : ''}{t.task || t.client || '날짜 미정'}</div></div></div>) : <Empty />}</section>
+          {todo.length ? todo.map((t) => { const dd = cardDday(t); return ( // t.dday(옛 기한) 말고 cardDday — 단계 다 끝난 카드에 '마감 지남'이 안 뜨게
+            <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>📅</span><div style={{ flex: 1, minWidth: 0 }}><div className="task">{t.project}</div><div className="c">{dd != null ? ddText(dd) + ' · ' : ''}{t.task || t.client || '날짜 미정'}</div></div>{noPending(t) && <span className="bdg clear">할 일 없음</span>}</div>
+          ); }) : <Empty />}</section>
         <section className="room hold" {...dropTo('보류')}><div className="rh">⏸️ 보류 <span className="cnt">{hold.length}</span><span className="hint">멈춤</span></div>
           {hold.length ? hold.map((t) => <div key={t.id} draggable onDragStart={dragStart(t.id)} className="smalltk" onClick={() => setSel(t)}><span>⏸️</span><div><div className="task">{t.project}</div><div className="c">{t.status || t.task}</div></div></div>) : <Empty />}</section>
       </div>
