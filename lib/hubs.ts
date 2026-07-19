@@ -74,7 +74,8 @@ export const HUB: Record<string, HubCfg> = {
     statusRepo: 'qnbang-proj-good-movement',
     statusPath: '현황판.md',
     nav: [
-      { src: 'good-movement-survey', title: '사전 질문지', ic: '📝', t: '사전 질문지', d: '방향 잡기 위한 질문지 (대표님 회신용)', primary: true },
+      { src: 'survey:good-movement-survey', title: '사전 질문지 (작성)', ic: '📝', t: '사전 질문지', d: '작성해서 보내면 큐앤뱅으로 바로 전달', primary: true },
+      { src: 'good-movement-survey', title: '질문지 미리보기', ic: '👀', t: '질문지 미리보기', d: '읽기용 (작성 없이 훑어보기)' },
       { src: 'good-movement-plan', title: '업무 프로세스 플랜', ic: '🗺️', t: '업무 프로세스', d: '4단계 진행 흐름·일정·역할' },
       { src: 'good-movement-checklist', title: '세션 체크리스트', ic: '✅', t: '세션 체크리스트', d: '준비·현장·후속 실전 체크' },
       { src: 'good-movement', title: '첫 미팅 기록', ic: '📋', t: '미팅 기록', d: '2026-07-14 전략 미팅' },
