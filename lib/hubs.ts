@@ -62,6 +62,25 @@ export const HUB: Record<string, HubCfg> = {
       ['여름 사전이벤트(워터밤)·사전홍보', '사전홍보 프로그램 기획 초안', '큐앤뱅'],
     ],
   },
+  'good-movement': {
+    title: '좋은움직임연구소 — 러너 세션 기획',
+    sub: '망원 재활·운동 센터의 러너 타깃 세션을 기획합니다. 세션 컨셉·운영 가이드·홍보 문구·협업 크루 리스트까지. 45만원(VAT 별도) · 소요 1주.',
+    deadline: '2026-07-27',
+    role: '큐앤뱅(QN!) × 좋은움직임연구소',
+    footerText: '큐앤뱅(QN!) × 좋은움직임연구소 · 러너 세션 기획',
+    ddayLabel: '납품 목표',
+    ddayNote: '(러너 세션 기획 1주 · ~7/27)',
+    coLabel: '좋은움직임',
+    statusRepo: 'qnbang-proj-good-movement',
+    statusPath: '현황판.md',
+    nav: [
+      { src: 'good-movement-survey', title: '사전 질문지', ic: '📝', t: '사전 질문지', d: '방향 잡기 위한 질문지 (대표님 회신용)', primary: true },
+      { src: 'good-movement-plan', title: '업무 프로세스 플랜', ic: '🗺️', t: '업무 프로세스', d: '4단계 진행 흐름·일정·역할' },
+      { src: 'good-movement-checklist', title: '세션 체크리스트', ic: '✅', t: '세션 체크리스트', d: '준비·현장·후속 실전 체크' },
+      { src: 'good-movement', title: '첫 미팅 기록', ic: '📋', t: '미팅 기록', d: '2026-07-14 전략 미팅' },
+    ],
+    comments: [],
+  },
 };
 
 // 현황판.md 에서 특정 섹션(## …)의 특정 체크박스 항목을 찾아 [x] <-> [ ] 뒤집는다.
