@@ -58,13 +58,22 @@ const COLLAB_HUBS = [
     color: 'bg-indigo-50 text-indigo-600 border-indigo-200',
   },
   {
+    project: '좋은움직임연구소 러너 세션',
+    client: '좋은움직임연구소 · 오승식 대표',
+    desc: '러너 타깃 세션 기획 — 사전 질문지·프로세스·체크리스트를 한 곳에서. 질문지는 작성하면 큐앤뱅으로 바로 전달돼요.',
+    url: 'https://dashboard.qnbang.com/hub/good-movement',
+    emoji: '🏃',
+    color: 'bg-emerald-50 text-emerald-600 border-emerald-200',
+  },
+];
+
+// 완수한 협업 프로젝트 — 아래에 게시판(목록) 형태로 내려둔다. 끝난 건 위 활성에서 이리로 옮긴다.
+const COLLAB_HUBS_DONE = [
+  {
     project: 'M650 탄광문화축제',
     client: '강원랜드 · 씨투아 협업',
-    desc: '제안서 디벨롭 — 석탄이 스토리라인 정렬, 진행 체크리스트·공유 문서·디자인 시안을 한 곳에서.',
     url: 'https://dashboard.qnbang.com/hub/m650',
-    reviewKey: 'm650', // 내부 검토(장표별 개선안에 코멘트 달기) — 로그인 필요
     emoji: '⛏️',
-    color: 'bg-amber-50 text-amber-600 border-amber-200',
   },
 ];
 
@@ -895,14 +904,27 @@ function HubsView() {
                   {copied === h.url ? '복사됨 ✓' : '링크 복사'}
                 </button>
               </div>
-              {'reviewKey' in h && h.reviewKey && (
-                <a href={`/review/${h.reviewKey}`}
-                  className="mt-2 text-center text-xs font-semibold rounded-lg px-3 py-1.5 bg-slate-800 text-white hover:bg-slate-700 transition">
-                  📝 개선안 검토 (내부)
-                </a>
-              )}
             </div>
           ))}
+        </div>
+      )}
+      {COLLAB_HUBS_DONE.length > 0 && (
+        <div className="pt-2">
+          <p className="text-xs font-semibold text-slate-400 mb-2">완수한 프로젝트</p>
+          <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl bg-white overflow-hidden">
+            {COLLAB_HUBS_DONE.map((h) => (
+              <a key={h.url} href={h.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition">
+                <span className="text-lg opacity-50 shrink-0">{h.emoji}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-500 truncate">{h.project}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{h.client}</p>
+                </div>
+                <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 rounded px-2 py-0.5 shrink-0">완수</span>
+                <span className="text-xs text-slate-400 shrink-0">열기 →</span>
+              </a>
+            ))}
+          </div>
         </div>
       )}
     </div>
