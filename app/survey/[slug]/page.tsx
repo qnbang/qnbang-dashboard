@@ -31,6 +31,9 @@ function stripMd(s: string): string {
 // 마크다운 설문 → 블록 목록(섹션 제목 / 안내문 / 질문). 질문 = **로 시작하는 줄, 그 아래 안내는 힌트로 묶는다.
 function parseSurvey(md: string): { title: string; blocks: Block[] } {
   const lines = md.split('\n');
+  // 섹션(## …)이 있는 설문이면 질문은 섹션 '안'에만 있다고 본다. 머리말(받는 분·보내는 곳·안내문)이
+  // **굵게** 라도 입력칸으로 오인되지 않게 한다. 섹션이 아예 없는 설문이면 모든 **줄을 질문으로.
+  const hasSections = lines.some((l) => /^##\s/.test(l));
   let title = '설문';
   let i = 0;
   for (; i < lines.length; i++) {
@@ -40,9 +43,10 @@ function parseSurvey(md: string): { title: string; blocks: Block[] } {
 
   const blocks: Block[] = [];
   let qCount = 0;
+  let inSection = false;
   let textBuf: string[] = [];
   const flushText = () => {
-    const t = textBuf.join('\n').trim();
+    const t = textBuf.join('\n').replace(/\*\*/g, '').replace(/`/g, '').trim();
     if (t) blocks.push({ kind: 'text', text: t });
     textBuf = [];
   };
@@ -51,9 +55,9 @@ function parseSurvey(md: string): { title: string; blocks: Block[] } {
     const line = lines[i];
     if (/^#\s/.test(line)) continue;                 // 남은 H1 무시
     const h2 = line.match(/^##\s+(.+)/);
-    if (h2) { flushText(); blocks.push({ kind: 'h2', text: stripMd(h2[1]) }); continue; }
+    if (h2) { flushText(); inSection = true; blocks.push({ kind: 'h2', text: stripMd(h2[1]) }); continue; }
 
-    if (line.trim().startsWith('**')) {
+    if (line.trim().startsWith('**') && (!hasSections || inSection)) {
       flushText();
       const label = stripMd(line.trim());
       const hintLines: string[] = [];
