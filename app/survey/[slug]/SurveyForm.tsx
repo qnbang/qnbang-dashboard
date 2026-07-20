@@ -46,7 +46,7 @@ export default function SurveyForm({ slug, title, blocks }: { slug: string; titl
         <div className="sv-done">
           <div className="sv-check">✓</div>
           <h1>보내주셔서 감사합니다</h1>
-          <p>응답이 큐앤뱅에 잘 접수되었습니다. 정리해서 다음 단계로 이어가겠습니다.</p>
+          <p>응답이 큐앤뱅에 잘 전달되었습니다.<br />내용 확인 후 곧 연락드리겠습니다.</p>
         </div>
       </div>
     );
