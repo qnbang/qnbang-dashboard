@@ -25,6 +25,7 @@ export const BRANDS: WorkTool[] = [
     color: 'bg-orange-50 text-orange-600 border-orange-200',
     status: '콘텐츠 제작 중',
     bizKey: 'autoboy',
+    links: [{ label: '사례도감', href: 'https://jadong-cases.vercel.app' }],
   },
   {
     name: '읽는다',
