@@ -274,11 +274,11 @@ const HUB_CSS = `
   .wrap .footer { margin-top:48px; padding-top:22px; border-top:1px solid var(--hairline); display:flex; align-items:center; gap:12px; }
   .wrap .footer img { height:20px; opacity:.85; } .wrap .footer .meta { color:var(--ink-faint); font-size:12.5px; margin:0; }
   .modal { position:fixed; inset:0; background:rgba(20,22,26,.55); display:flex; z-index:50; align-items:center; justify-content:center; padding:24px; }
-  .modal .box { background:#fff; border-radius:14px; width:100%; max-width:920px; height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 18px 60px rgba(0,0,0,.3); }
+  .modal .box { background:#fff; border-radius:14px; width:100%; max-width:920px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 18px 60px rgba(0,0,0,.3); }
   .modal .bar { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #ececec; }
   .modal .bar .ti { font-weight:700; font-size:15px; }
   .modal .bar .x { font:inherit; cursor:pointer; border:none; background:#f1f1f1; border-radius:8px; width:32px; height:32px; font-size:18px; line-height:1; color:#555; }
   .modal .bar .x:hover { background:#e3e3e3; }
-  .modal iframe { border:0; width:100%; flex:1; }
+  .modal iframe { border:0; width:100%; height:82vh; display:block; flex:none; }
   @media (max-width:560px){ .wrap{ padding:22px 16px 64px; } .wrap .hd{ flex-direction:column; align-items:flex-start; gap:12px; } .wrap h1{ font-size:22px; } .wrap .nav, .wrap .nav.two{ grid-template-columns:repeat(2,1fr); } .modal{ padding:10px; } .modal .box{ height:92vh; } }
 `;
