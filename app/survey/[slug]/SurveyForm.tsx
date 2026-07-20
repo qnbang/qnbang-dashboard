@@ -18,9 +18,7 @@ export default function SurveyForm({ slug, title, blocks }: { slug: string; titl
     const answers = blocks
       .filter((b): b is Extract<Block, { kind: 'q' }> => b.kind === 'q')
       .map((b) => ({ label: b.label, value: String(fd.get(b.id) || '') }));
-    const name = String(fd.get('name') || '');
-    const replyTo = String(fd.get('replyTo') || '');
-    if (answers.every((a) => !a.value.trim()) && !name.trim()) {
+    if (answers.every((a) => !a.value.trim())) {
       setErrMsg('한 칸이라도 채워서 보내주세요.');
       return;
     }
@@ -30,7 +28,7 @@ export default function SurveyForm({ slug, title, blocks }: { slug: string; titl
       const res = await fetch('/api/survey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, title, name, replyTo, answers, botcheck: String(fd.get('botcheck') || '') }),
+        body: JSON.stringify({ slug, title, answers, botcheck: String(fd.get('botcheck') || '') }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || '전송 실패');
@@ -66,11 +64,6 @@ export default function SurveyForm({ slug, title, blocks }: { slug: string; titl
       <h1>{title}</h1>
 
       <form onSubmit={onSubmit} noValidate>
-        <label className="q">
-          <span className="q-label">성함 / 소속 <em>(선택)</em></span>
-          <input name="name" type="text" autoComplete="off" placeholder="예: 오승식 / 좋은움직임연구소" />
-        </label>
-
         {blocks.map((b, i) => {
           if (b.kind === 'h2') return <h2 key={i}>{b.text}</h2>;
           if (b.kind === 'text') return <p key={i} className="sv-text">{b.text}</p>;
@@ -82,11 +75,6 @@ export default function SurveyForm({ slug, title, blocks }: { slug: string; titl
             </label>
           );
         })}
-
-        <label className="q">
-          <span className="q-label">회신받을 이메일 <em>(선택 — 답장 필요할 때만)</em></span>
-          <input name="replyTo" type="email" autoComplete="off" placeholder="you@example.com" />
-        </label>
 
         {/* 스팸 봇 트랩(사람에겐 안 보임) */}
         <input name="botcheck" tabIndex={-1} autoComplete="off" aria-hidden="true"
