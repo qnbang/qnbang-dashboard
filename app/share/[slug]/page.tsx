@@ -49,7 +49,7 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
   const body = mdToHtml(md);
 
   return (
-    <div style={{ background: '#ffffff', minHeight: '100vh' }}>
+    <div style={{ background: '#ffffff' }}>
       <style>{CSS}</style>
       <div className="share-wrap">
         <div className="brandbar">
@@ -73,6 +73,8 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
 // 강조=검정, 인용박스=회색+검정 좌선, h2=검정 바, 각진(라운드 0).
 const CSS = `
   @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+  /* 공유 문서(iframe로도 열림) — 전역 회색 배경이 비치지 않게 흰색 고정, 상단부터 렌더 */
+  html, body { background:#ffffff !important; margin:0; padding:0; }
   .share-wrap { --ink:#111111; --sub:#6b6b6b; --line:#e3e3e3; --soft:#f6f6f6;
     max-width:760px; margin:0 auto; padding:0 24px 88px; color:var(--ink);
     font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
