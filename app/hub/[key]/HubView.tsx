@@ -1,19 +1,24 @@
 'use client';
 
-// 협업 허브 뷰 — 작업순서 체크리스트는 현황판.md(SSOT)에서 받아 표시(읽기전용),
-// 바로가기·코멘트표는 허브 콘텐츠. 문서는 모달(iframe)로 연다.
+// 협업 허브 뷰 — 5층 구조: 목표 → 산출물 → 지금 할 일(현황판 SSOT) → 코멘트 → 바로가기.
+// 지금 할 일은 현황판.md에서 받아 체크 토글(읽기+토글). 목표·산출물·바로가기·코멘트는 허브 config.
 import { useState, useEffect } from 'react';
 
-export type Item = { state: 'done' | 'wait' | 'todo'; who: string; text: string };
+export type Item = { state: 'done' | 'wait' | 'todo'; who: string; text: string; date?: string };
 export type Section = { name: string; items: Item[] };
-export type Nav = { src: string; title: string; ic: string; t: string; d: string; primary?: boolean };
+export type Nav = { src: string; title: string; ic?: string; t: string; d: string; primary?: boolean };
+export type Deliverable = { name: string; badge?: string; badgeType?: 'doing' | 'wait' | 'done'; src?: string };
+export type NavGroup = { label: string; items: Nav[] };
 export type Cfg = {
   title: string; sub: string; deadline: string; nav: Nav[]; comments: string[][];
-  role?: string;        // 상단 브랜드바 협업 표기 (기본: 씨투아)
-  footerText?: string;  // 하단 푸터 문구
-  ddayLabel?: string;   // D-day 박스 라벨 (기본: '제출 마감' / 행사면 '행사 시작' 등)
-  ddayNote?: string;    // D-day 박스 보조 설명 (기본: 나라장터 입찰 연동)
-  coLabel?: string;     // 담당 범례의 협력사 이름 (기본: 씨투아 / 사례별 '상인회' 등)
+  role?: string;        // 상단 표기
+  footerText?: string;  // 하단 푸터
+  ddayLabel?: string;   // D-day 박스 라벨 (기본 '납품 목표')
+  ddayNote?: string;
+  coLabel?: string;     // 협력사(고객) 담당 이름 — 담당 뱃지 매핑용
+  goal?: { title: string; meta?: string };          // ① 이 프로젝트
+  deliverables?: Deliverable[];                       // ② 필요 산출물
+  navGroups?: NavGroup[];                             // ④ 바로가기 그룹(없으면 nav 단일)
 };
 
 export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg: Cfg; sections: Section[]; done?: number; total?: number }) {
@@ -66,68 +71,125 @@ export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg
   const total = secs.reduce((a, s) => a + s.items.length, 0);
   const done = secs.reduce((a, s) => a + s.items.filter((i) => i.state === 'done').length, 0);
   const pct = total ? Math.round((done / total) * 100) : 0;
-  // 담당 색상: 큐앤뱅=qn, 협의=both, 그 외(협력사 이름 무엇이든)=co — 특정 회사명 하드코딩 제거
+
+  // 현재 단계 = 전체를 통틀어 첫 미완료 항목 (시안의 흰색 강조 대상)
+  let nowKey: string | null = null;
+  for (let si = 0; si < secs.length && !nowKey; si++)
+    for (let ii = 0; ii < secs[si].items.length; ii++)
+      if (secs[si].items[ii].state !== 'done') { nowKey = `${si}:${ii}`; break; }
+
+  // 담당 뱃지 색: 큐앤뱅=잉크(qn), 그 외(고객·협력사)=인디고(co), 협의=both
   const whoCls = (w: string) => (w === '큐앤뱅' ? 'qn' : w === '협의' ? 'both' : w ? 'co' : '');
+  const resolveSrc = (src: string) => src.startsWith('board:') ? `/board/${src.slice(6)}` : src.startsWith('survey:') ? `/survey/${src.slice(7)}` : `/share/${src}`;
+  const openDoc = (src: string, title: string) => setModal({ src: resolveSrc(src), title });
+
+  const groups: NavGroup[] = cfg.navGroups ?? (cfg.nav.length ? [{ label: '', items: cfg.nav }] : []);
 
   return (
     <div className="wrap">
       <style>{HUB_CSS}</style>
-      <div className="brandbar"><img src="/share/qn-logo.png" alt="큐앤뱅" /><span className="role">{cfg.role ?? '큐앤뱅(QN!) × 씨투아테크놀러지 협업'}</span></div>
 
-      <h1>{cfg.title}</h1>
-      <p className="sub">{cfg.sub}</p>
-
-      <div className="dday">
-        <div className="big">{dday}</div>
-        <div className="txt"><b>{cfg.ddayLabel ?? '제출 마감'} {cfg.deadline.replace(/-/g, '. ')}</b> {cfg.ddayNote ?? '(나라장터 입찰 제출과 연동)'}</div>
+      {/* 헤더 */}
+      <div className="hd">
+        <div className="hdl">
+          <div className="t1">{cfg.role ?? '큐앤뱅(QN!)'}</div>
+          <h1>{cfg.title}</h1>
+        </div>
+        <div className="dday">
+          <div className="lab">{cfg.ddayLabel ?? '납품 목표'}</div>
+          <div className="d">{dday}</div>
+          <div className="dsub">~ {cfg.deadline.slice(5).replace('-', '/')}</div>
+        </div>
       </div>
-
-      <h2>바로가기</h2>
-      <div className="nav">
-        {cfg.nav.map((n) => (
-          <button key={n.src} className={n.primary ? 'primary' : ''} onClick={() => setModal({ src: n.src.startsWith('board:') ? `/board/${n.src.slice(6)}` : n.src.startsWith('survey:') ? `/survey/${n.src.slice(7)}` : `/share/${n.src}`, title: n.title })}>
-            <div className="ic">{n.ic}</div><div className="t">{n.t}</div><div className="d">{n.d}</div>
-          </button>
-        ))}
-      </div>
-
       {total > 0 && (
-        <>
-          <h2>작업 순서 <small style={{ color: '#999', fontWeight: 400, fontSize: 14 }}>— 현황판과 자동 동기화</small></h2>
-          <div className="prog"><i style={{ width: `${pct}%` }} /></div>
-          <p className="progtxt">진행률 {pct}% ({done}/{total} 완료)</p>
-          <p className="legend">담당: <span className="who qn">큐앤뱅</span> · <span className="who co">{cfg.coLabel ?? '씨투아'}</span> · <span className="who both">협의</span> <span style={{ color: '#aaa' }}>· 항목을 누르면 체크/해제</span></p>
+        <div className="progrow"><span>진행률 <b>{pct}%</b></span><div className="bar"><i style={{ width: `${pct}%` }} /></div><span><b>{done}</b> / {total} 완료</span></div>
+      )}
 
+      {/* ① 이 프로젝트 */}
+      {cfg.goal && (
+        <section>
+          <div className="sh"><h2>이 프로젝트</h2><span className="hint">뭘 왜 만드는지</span></div>
+          <div className="goal"><div className="g">{cfg.goal.title}</div>{cfg.goal.meta && <div className="m">{cfg.goal.meta}</div>}</div>
+        </section>
+      )}
+
+      {/* ② 필요 산출물 */}
+      {cfg.deliverables && cfg.deliverables.length > 0 && (
+        <section>
+          <div className="sh"><h2>필요 산출물</h2><span className="hint">완성되면 체크 · 누르면 그 문서로</span></div>
+          <div className="deliv">
+            {cfg.deliverables.map((d, i) => (
+              <div key={i} className="drow" style={{ cursor: d.src ? 'pointer' : 'default' }} onClick={() => d.src && openDoc(d.src, d.name)}>
+                <div className="ck" /><div className="nm">{d.name}</div>{d.badge && <span className={`bdg ${d.badgeType || ''}`}>{d.badge}</span>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ③ 지금 할 일 (현황판 SSOT) */}
+      {total > 0 && (
+        <section>
+          <div className="sh"><h2>지금 할 일</h2><span className="hint">현황판과 자동 동기화 · 항목을 누르면 체크</span></div>
           {secs.map((s, si) => (
-            <div className="step" key={s.name}>
-              <h3>{s.name}</h3>
-              <ul className="todo">
-                {s.items.map((it, i) => (
-                  <li key={i} className={`${it.state === 'done' ? 'checked' : ''}${busy === `${si}:${i}` ? ' busy' : ''}`}
-                    role="button" tabIndex={0}
-                    onClick={() => toggle(si, i)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(si, i); } }}>
-                    <span className="mark">{it.state === 'done' ? '✅' : it.state === 'wait' ? '⏳' : '⬜'}</span>
-                    <span>{it.who && <span className={`who ${whoCls(it.who)}`}>{it.who}</span>}{it.text}</span>
-                  </li>
-                ))}
-              </ul>
+            <div key={s.name} className="stepgrp">
+              {secs.length > 1 && <div className="secname">{s.name}</div>}
+              <div className="steps">
+                {s.items.map((it, ii) => {
+                  const k = `${si}:${ii}`;
+                  const isNow = k === nowKey;
+                  return (
+                    <div key={ii} className={`st${it.state === 'done' ? ' done' : ''}${it.state === 'wait' ? ' wait' : ''}${isNow ? ' now' : ''}${busy === k ? ' busy' : ''}`}
+                      role="button" tabIndex={0}
+                      onClick={() => toggle(si, ii)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(si, ii); } }}>
+                      <span className="mk" /><span className="tx">{it.text}</span>
+                      {it.date && <span className="dt">{it.date}</span>}
+                      {it.who && <span className={`who ${whoCls(it.who)}`}>{it.who}</span>}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
-        </>
+        </section>
       )}
 
+      {/* ④ 코멘트·피드백 */}
       {cfg.comments.length > 0 && (
-        <>
-          <h2>코멘트별 수정 방법</h2>
-          <table>
-            <thead><tr><th>코멘트</th><th>어떻게 고칠까</th><th>담당</th></tr></thead>
-            <tbody>{cfg.comments.map((r, i) => <tr key={i}><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td></tr>)}</tbody>
-          </table>
-        </>
+        <section>
+          <div className="sh"><h2>코멘트·피드백</h2><span className="hint">남긴 말 → 우리 수정 방법</span></div>
+          <div className="cmts">
+            {cfg.comments.map((r, i) => (
+              <div key={i} className="cmt">
+                {r[2] && <span className={`who ${whoCls(r[2])}`}>{r[2]}</span>}
+                <div className="cbody"><div className="q">{r[0]}</div>{r[1] && <div className="a">→ {r[1]}</div>}</div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
-      <div className="footer"><img src="/share/qn-logo.png" alt="큐앤뱅" /><p className="meta">{cfg.footerText ?? '큐앤뱅(QN!) × 씨투아테크놀러지 · M650 탄광문화축제 프로젝트 관리'}</p></div>
+      {/* ⑤ 바로가기 */}
+      {groups.length > 0 && (
+        <section>
+          <div className="sh"><h2>바로가기</h2><span className="hint">공통 슬롯으로 고정</span></div>
+          {groups.map((g, gi) => (
+            <div key={gi} className="navgrp">
+              {g.label && <div className="gl">{g.label}</div>}
+              <div className={`nav${g.items.length <= 2 ? ' two' : ''}`}>
+                {g.items.map((n) => (
+                  <button key={n.src} onClick={() => openDoc(n.src, n.title)}>
+                    <div className="nt">{n.t}</div><div className="nd">{n.d}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      <div className="footer"><img src="/share/qn-logo.png" alt="큐앤뱅" /><p className="meta">{cfg.footerText ?? '큐앤뱅(QN!) 협업 허브'}</p></div>
 
       {modal && (
         <div className="modal open" onClick={(e) => { if (e.target === e.currentTarget) setModal(null); }}>
@@ -142,43 +204,75 @@ export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg
 }
 
 const HUB_CSS = `
-  .wrap { --ink:#1f2328; --muted:#8a8a8a; --accent:#b8430f; --line:#ececec; --done:#1a8a4a;
-    max-width:880px; margin:0 auto; padding:0 24px 88px; color:var(--ink);
-    font-family:"Apple SD Gothic Neo","Pretendard","Malgun Gothic",sans-serif; line-height:1.7; font-size:16px; }
-  .wrap .brandbar { display:flex; align-items:center; justify-content:space-between; padding:26px 0 22px; margin-bottom:24px; border-bottom:1px solid var(--line); }
-  .wrap .brandbar img { height:30px; width:auto; display:block; }
-  .wrap .role { font-size:12.5px; color:var(--muted); }
-  .wrap h1 { font-size:29px; line-height:1.3; letter-spacing:-0.5px; margin:0 0 4px; }
-  .wrap .sub { color:var(--muted); font-size:14.5px; margin:0 0 20px; }
-  .wrap h2 { font-size:20px; letter-spacing:-0.3px; margin:40px 0 14px; padding-bottom:8px; border-bottom:2px solid var(--ink); }
-  .wrap .dday { display:flex; align-items:center; gap:16px; flex-wrap:wrap; background:#1f2328; color:#fff; border-radius:14px; padding:18px 22px; margin-bottom:8px; }
-  .wrap .dday .big { font-size:34px; font-weight:800; letter-spacing:-1px; color:#ffd9a8; }
-  .wrap .dday .txt { font-size:14px; line-height:1.5; opacity:0.92; } .wrap .dday .txt b { color:#fff; }
-  .wrap .nav { display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:10px; margin:6px 0 8px; }
-  .wrap .nav button { text-align:left; font:inherit; cursor:pointer; border:1px solid var(--line); border-radius:11px; padding:14px 15px; color:var(--ink); background:#fff; transition:.15s; width:100%; }
-  .wrap .nav button:hover { border-color:var(--accent); box-shadow:0 3px 12px rgba(0,0,0,.06); transform:translateY(-1px); }
-  .wrap .nav .ic { font-size:18px; } .wrap .nav .t { font-weight:700; font-size:15px; margin:5px 0 2px; } .wrap .nav .d { font-size:12px; color:var(--muted); line-height:1.4; }
-  .wrap .nav button.primary { background:#b8430f; border-color:#b8430f; color:#fff; } .wrap .nav button.primary .d { color:#ffe3d3; }
-  .wrap .step { border:1px solid var(--line); border-radius:13px; padding:16px 18px; margin:12px 0; background:#fff; }
-  .wrap .step h3 { margin:0 0 8px; font-size:16.5px; }
-  .wrap ul.todo { list-style:none; padding:0; margin:6px 0 0; }
-  .wrap ul.todo li { display:flex; align-items:flex-start; gap:9px; padding:6px 6px; border-top:1px dashed #eee; font-size:14.5px; cursor:pointer; border-radius:7px; transition:background .12s; }
-  .wrap ul.todo li:hover { background:#faf9f7; }
-  .wrap ul.todo li.busy { opacity:.5; pointer-events:none; }
-  .wrap ul.todo li:first-child { border-top:none; }
-  .wrap ul.todo .mark { flex:none; }
-  .wrap ul.todo li.checked span:last-child { color:#aaa; text-decoration:line-through; }
-  .wrap ul.todo li.checked .who { text-decoration:none; }
-  .wrap .who { font-weight:700; font-size:11.5px; padding:1px 7px; border-radius:5px; margin-right:6px; white-space:nowrap; display:inline-block; }
-  .wrap .who.qn { background:#fdeee7; color:#b8430f; } .wrap .who.co { background:#e7f0fb; color:#0a66c2; } .wrap .who.both { background:#eef4ea; color:#1a8a4a; }
-  .wrap .prog { height:7px; background:#eee; border-radius:5px; overflow:hidden; margin:10px 0 2px; }
-  .wrap .prog > i { display:block; height:100%; background:var(--done); transition:.3s; }
-  .wrap .progtxt { font-size:12px; color:var(--muted); margin:2px 0; }
-  .wrap .legend { font-size:12.5px; color:#666; margin:4px 0 0; }
-  .wrap table { border-collapse:collapse; width:100%; margin:14px 0; font-size:13.5px; }
-  .wrap th,.wrap td { border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; } .wrap th { background:#f7f7f7; font-weight:700; }
-  .wrap .footer { margin-top:54px; padding-top:22px; border-top:1px solid var(--line); display:flex; align-items:center; gap:12px; }
-  .wrap .footer img { height:20px; opacity:.85; } .wrap .footer .meta { color:var(--muted); font-size:12.5px; margin:0; }
+  .wrap { --canvas:#fff; --card:#fff; --card-hover:#f7f8fa; --sunken:#eef0f4;
+    --ink:#1d2138; --ink-muted:#4a5060; --ink-faint:#9aa0b4; --accent:#4545da; --hairline:#e6e9ee;
+    --r:8px; --shadow:0 1px 3px rgba(29,33,56,.08), 0 1px 2px rgba(29,33,56,.05);
+    max-width:880px; margin:0 auto; padding:28px 22px 88px; color:var(--ink);
+    font-family:"Helvetica Neue",Pretendard,"Apple SD Gothic Neo",sans-serif; line-height:1.6; font-size:16px;
+    word-break:keep-all; overflow-wrap:break-word; letter-spacing:-0.01em; }
+  .wrap .hd { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid var(--ink); padding-bottom:15px; gap:16px; }
+  .wrap .hdl { min-width:0; }
+  .wrap .t1 { font-size:12.5px; color:var(--ink-muted); font-weight:500; }
+  .wrap h1 { font-size:26px; font-weight:800; line-height:1.25; margin:4px 0 0; letter-spacing:-0.025em; }
+  .wrap .dday { flex:none; background:var(--accent); color:#fff; border-radius:var(--r); padding:11px 18px; text-align:center; box-shadow:0 2px 8px rgba(69,69,218,.25); }
+  .wrap .dday .lab, .wrap .dday .dsub { font-size:11px; color:rgba(255,255,255,.85); font-weight:500; }
+  .wrap .dday .d { font-size:27px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.1; margin:1px 0; }
+  .wrap .progrow { display:flex; align-items:center; gap:11px; margin:16px 0 30px; font-size:12.5px; color:var(--ink-muted); font-weight:500; }
+  .wrap .progrow b { color:var(--ink); font-weight:700; }
+  .wrap .bar { flex:1; height:7px; background:var(--sunken); border-radius:4px; overflow:hidden; }
+  .wrap .bar > i { display:block; height:100%; background:var(--accent); transition:.3s; }
+  .wrap section { margin-bottom:30px; }
+  .wrap .sh { display:flex; align-items:baseline; gap:9px; margin-bottom:13px; }
+  .wrap .sh h2 { font-size:16px; font-weight:800; letter-spacing:-0.02em; margin:0; }
+  .wrap .sh .hint { font-size:12px; color:var(--ink-faint); font-weight:500; }
+  .wrap .goal { background:var(--card); border:1px solid var(--hairline); border-left:3px solid var(--accent); box-shadow:var(--shadow); border-radius:var(--r); padding:18px 20px; }
+  .wrap .goal .g { font-size:16.5px; font-weight:700; line-height:1.55; }
+  .wrap .goal .m { font-size:13px; color:var(--ink-muted); line-height:1.65; margin-top:8px; font-weight:500; }
+  .wrap .deliv { display:flex; flex-direction:column; gap:7px; }
+  .wrap .drow { display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--hairline); box-shadow:var(--shadow); border-radius:var(--r); padding:11px 15px; transition:background .12s, border-color .12s; }
+  .wrap .drow:hover { background:var(--card-hover); border-color:var(--accent); }
+  .wrap .drow .ck { width:18px; height:18px; border:2px solid var(--ink-faint); border-radius:5px; flex:none; }
+  .wrap .drow .nm { font-weight:700; font-size:14.5px; flex:1; line-height:1.4; }
+  .wrap .bdg { font-size:11px; padding:3px 10px; border-radius:5px; font-weight:700; white-space:nowrap; background:var(--sunken); color:var(--ink-muted); }
+  .wrap .bdg.doing { background:var(--accent); color:#fff; }
+  .wrap .stepgrp { margin-bottom:10px; }
+  .wrap .secname { font-size:12px; font-weight:700; color:var(--ink-faint); margin:0 0 6px 2px; }
+  .wrap .steps { background:var(--sunken); border:1px solid var(--hairline); border-radius:var(--r); padding:6px; display:flex; flex-direction:column; gap:3px; }
+  .wrap .st { display:flex; align-items:center; gap:12px; padding:12px 13px; font-size:14.5px; line-height:1.45; border-radius:6px; cursor:pointer; transition:background .12s; }
+  .wrap .st:hover { background:rgba(255,255,255,.55); }
+  .wrap .st.busy { opacity:.5; pointer-events:none; }
+  .wrap .st .mk { width:18px; height:18px; border:2px solid var(--ink-faint); border-radius:4px; flex:none; position:relative; }
+  .wrap .st.done .mk { background:var(--ink-faint); border-color:var(--ink-faint); }
+  .wrap .st.done .mk::after { content:""; position:absolute; left:4px; top:1px; width:5px; height:9px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .wrap .st.wait .mk { border-style:dashed; }
+  .wrap .st .tx { flex:1; font-weight:600; }
+  .wrap .st.done .tx { color:var(--ink-faint); font-weight:500; text-decoration:line-through; text-decoration-color:#c8ccd6; }
+  .wrap .st.now { background:var(--card); box-shadow:var(--shadow); }
+  .wrap .st.now .mk { border-color:var(--accent); border-width:3px; }
+  .wrap .st.now .tx { font-weight:800; color:var(--accent); }
+  .wrap .st .dt { font-size:11.5px; color:var(--ink-faint); font-variant-numeric:tabular-nums; flex:none; font-weight:600; margin-left:auto; }
+  .wrap .st.now .dt { color:var(--accent); }
+  .wrap .who { font-size:11px; color:#fff; background:var(--ink); border-radius:4px; padding:2px 8px; flex:none; font-weight:700; white-space:nowrap; margin-left:10px; }
+  .wrap .who.co { background:var(--accent); }
+  .wrap .who.qn { background:var(--ink); }
+  .wrap .who.both { background:#1a8a4a; }
+  .wrap .cmts { display:flex; flex-direction:column; gap:8px; }
+  .wrap .cmt { display:flex; align-items:flex-start; gap:13px; background:var(--card); border:1px solid var(--hairline); box-shadow:var(--shadow); border-radius:var(--r); padding:14px 16px; }
+  .wrap .cmt .who { margin-left:0; margin-top:1px; }
+  .wrap .cmt .cbody { flex:1; }
+  .wrap .cmt .q { font-size:14px; font-weight:700; line-height:1.5; }
+  .wrap .cmt .a { font-size:12.5px; color:var(--ink-muted); line-height:1.55; margin-top:5px; font-weight:500; }
+  .wrap .navgrp { margin-bottom:16px; }
+  .wrap .navgrp:last-child { margin-bottom:0; }
+  .wrap .navgrp .gl { font-size:11.5px; color:var(--ink-faint); font-weight:700; margin-bottom:8px; }
+  .wrap .nav { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .wrap .nav.two { grid-template-columns:repeat(2,1fr); }
+  .wrap .nav button { font:inherit; cursor:pointer; background:var(--card); border:1px solid var(--hairline); box-shadow:var(--shadow); border-radius:var(--r); padding:18px 16px; text-align:center; color:var(--ink); transition:background .12s, border-color .12s; }
+  .wrap .nav button:hover { background:var(--card-hover); border-color:var(--accent); }
+  .wrap .nav .nt { font-size:15px; font-weight:800; }
+  .wrap .nav .nd { font-size:12px; color:var(--ink-muted); margin-top:5px; line-height:1.5; font-weight:500; }
+  .wrap .footer { margin-top:48px; padding-top:22px; border-top:1px solid var(--hairline); display:flex; align-items:center; gap:12px; }
+  .wrap .footer img { height:20px; opacity:.85; } .wrap .footer .meta { color:var(--ink-faint); font-size:12.5px; margin:0; }
   .modal { position:fixed; inset:0; background:rgba(20,22,26,.55); display:flex; z-index:50; align-items:center; justify-content:center; padding:24px; }
   .modal .box { background:#fff; border-radius:14px; width:100%; max-width:920px; height:88vh; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 18px 60px rgba(0,0,0,.3); }
   .modal .bar { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #ececec; }
@@ -186,5 +280,5 @@ const HUB_CSS = `
   .modal .bar .x { font:inherit; cursor:pointer; border:none; background:#f1f1f1; border-radius:8px; width:32px; height:32px; font-size:18px; line-height:1; color:#555; }
   .modal .bar .x:hover { background:#e3e3e3; }
   .modal iframe { border:0; width:100%; flex:1; }
-  @media (max-width:520px){ .wrap{padding:0 16px 64px;} .wrap h1{font-size:23px;} .wrap .dday .big{font-size:28px;} .modal{padding:10px;} .modal .box{height:92vh;} }
+  @media (max-width:560px){ .wrap{ padding:22px 16px 64px; } .wrap .hd{ flex-direction:column; align-items:flex-start; gap:12px; } .wrap h1{ font-size:22px; } .wrap .nav, .wrap .nav.two{ grid-template-columns:repeat(2,1fr); } .modal{ padding:10px; } .modal .box{ height:92vh; } }
 `;

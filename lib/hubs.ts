@@ -64,25 +64,46 @@ export const HUB: Record<string, HubCfg> = {
   },
   'good-movement': {
     title: '좋은움직임연구소 — 러너 세션 기획',
-    sub: '망원 재활·운동 센터의 러너 타깃 세션을 기획합니다. 세션 컨셉·운영 가이드·홍보 문구·협업 크루 리스트까지. 45만원(VAT 별도) · 소요 1주.',
+    sub: '망원 재활·운동 센터의 러너 타깃 세션 기획. 45만원(VAT 별도) · 소요 1주.',
     deadline: '2026-07-27',
-    role: '큐앤뱅(QN!) × 좋은움직임연구소',
+    role: '큐앤뱅(QN!) × 좋은움직임연구소 · 러너 세션 기획',
     footerText: '큐앤뱅(QN!) × 좋은움직임연구소 · 러너 세션 기획',
     ddayLabel: '납품 목표',
-    ddayNote: '(러너 세션 기획 1주 · ~7/27)',
     coLabel: '좋은움직임',
     statusRepo: 'qnbang-proj-good-movement',
     statusPath: '현황판.md',
-    nav: [
-      { src: 'survey:good-movement-survey', title: '사전 질문지 (작성)', ic: '📝', t: '사전 질문지', d: '작성해서 보내면 큐앤뱅으로 바로 전달', primary: true },
-      { src: 'good-movement-survey', title: '질문지 미리보기', ic: '👀', t: '질문지 미리보기', d: '읽기용 (작성 없이 훑어보기)' },
-      { src: 'good-movement-plan', title: '업무 프로세스 플랜', ic: '🗺️', t: '업무 프로세스', d: '4단계 진행 흐름·일정·역할' },
-      { src: 'good-movement-checklist', title: '세션 체크리스트', ic: '✅', t: '세션 체크리스트', d: '준비·현장·후속 실전 체크' },
-      { src: 'good-movement', title: '첫 미팅 기록', ic: '📋', t: '미팅 기록', d: '2026-07-14 전략 미팅' },
+    goal: {
+      title: '러너가 “건강하자고 운동하는데 더 아픈” 상태를 벗어나게 — 대표님이 반복해서 열 수 있는 러너 세션 한 세트',
+      meta: '45만원(VAT 별도) · 소요 1주 · 컨셉·운영·홍보·협업 크루까지 한 세트로 납품. 세션은 러너 회원 유입의 첫 마중물.',
+    },
+    deliverables: [
+      { name: '세션 기획서', badge: '작성 중 · 초안 v1', badgeType: 'doing' },
+      { name: '운영 매뉴얼 + 체크리스트', badge: '체크리스트만 있음' },
+      { name: '홍보 문구 세트 (크루 제안·SNS·플레이스)', badge: '대기 · 7/24 관찰 후' },
+      { name: '협업 크루·코치 후보 리스트', badge: '대기' },
+    ],
+    nav: [],
+    navGroups: [
+      { label: '모든 허브 공통', items: [
+        { src: 'good-movement-plan', title: '진행 플랜', t: '진행 플랜', d: '4단계 흐름·일정·역할' },
+        { src: 'good-movement', title: '회의록', t: '회의록', d: '미팅 기록' },
+      ] },
+      { label: '이 프로젝트 문서', items: [
+        { src: 'survey:good-movement-survey', title: '사전 질문지', t: '사전 질문지', d: '방향 설문 (작성·전달)' },
+        { src: 'good-movement-survey', title: '질문지 미리보기', t: '질문지 미리보기', d: '읽기용' },
+      ] },
     ],
     comments: [],
   },
 };
+
+// statusRepo → HUB key 역인덱스. HUB가 이미 SSOT이므로 하드코딩이 아니라 자동 파생.
+// 사무실 과업의 '저장소' 칸이 이 맵에 걸리면 그 과업은 해당 허브와 연결된다(카드가 현황판 단계를 우선 표시).
+export const hubKeyForRepo: Record<string, string> = Object.fromEntries(
+  Object.entries(HUB)
+    .filter(([, c]) => c.statusRepo)
+    .map(([k, c]) => [c.statusRepo as string, k])
+);
 
 // 현황판.md 에서 특정 섹션(## …)의 특정 체크박스 항목을 찾아 [x] <-> [ ] 뒤집는다.
 // text = 화면에 보이는 항목 텍스트(담당 [태그] 제거·trim된 상태). page.tsx parseStatus 와 같은 규칙.

@@ -14,6 +14,7 @@ type Task = {
   category?: string;
   memo?: string;
   repo?: string;
+  hubKey?: string; hubStep?: string; hubDone?: number; hubTotal?: number; // 협업 허브 연결(저장소=허브 매칭 시)
   history?: { when: string; what: string }[];
 };
 // 깃 자동 프로젝트(읽기 전용) — /api/git-projects. 진행 중인 것만 사무실에 자동 표출(시트 안 씀=좀비 없음).
@@ -562,6 +563,7 @@ export default function OfficeBoardView() {
   // "진행 중" 류 빈 껍데기 상태 — 단계·대표글로 쓰지 않음(카드가 "진행 중"만 뜨는 것 방지)
   const NOISE = new Set(['진행 중', '진행중', '착수 예정', '(프로젝트 등록)', '진행', '']);
   const bigTask = (t: Task) => {
+    if (t.hubStep && !NOISE.has(t.hubStep.trim())) return t.hubStep; // 허브 연결 과업 = 현황판 '현재 단계' 우선
     const cur = currentStep(t); // 가장 이른 미완료 = 지금 할 일
     if (cur && !NOISE.has(cur.text.trim())) return cur.text; // 진짜 단계/상태면 그걸로
     // 빈 껍데기 → '마지막으로 한 일' → 과업명 → 프로젝트명. 고객대기면 "→ 대기중" 꼬리.
@@ -892,6 +894,7 @@ export default function OfficeBoardView() {
           <div className="ph"><button className="pclose" onClick={() => setSel(null)}>✕</button>
             <div className="pcli">{cur.client && cur.client !== cur.project ? `${cur.client} · ` : ''}{cur.project}</div><div className="pproj">{bigTask(cur)}</div>
             <div className="pmeta">{WHO[cur.owner] || cur.owner}{cur.due && cur.dday != null ? ` · ${ddText(cur.dday)}` : ''}</div>
+            {cur.hubKey && <a href={`/hub/${cur.hubKey}`} target="_blank" rel="noopener" style={{ display: 'inline-block', marginTop: 6, fontSize: 13, color: '#2563eb', textDecoration: 'underline' }}>🔗 프로젝트 허브 열기{cur.hubTotal ? ` · ${cur.hubDone}/${cur.hubTotal}` : ''}</a>}
             <div className="statebtns">{POS_BTN.map((p) => (
               <button key={p} className={BALL2KO[cur.ball] === p ? 'cur' : ''} disabled={busy} onClick={() => p === '완수' ? complete(cur.id) : patch(cur.id, { patch: { 공위치: p } })}>{p}</button>
             ))}</div>

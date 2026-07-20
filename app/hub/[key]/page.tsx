@@ -15,20 +15,24 @@ function parseStatus(md: string): { sections: Section[]; done: number; total: nu
   let done = 0, total = 0;
   for (const line of lines) {
     const h = line.match(/^##\s+(.+?)\s*$/);
-    if (h) { if (cur) sections.push(cur); cur = { name: h[1], items: [] }; continue; }
+    // 체크박스 항목이 없는 섹션(예: '## 한 줄' 요약)은 지금 할 일에서 제외
+    if (h) { if (cur && cur.items.length) sections.push(cur); cur = { name: h[1], items: [] }; continue; }
     const m = line.match(/^\s*[-*]\s*\[([ xX~-])\]\s*(.+)$/);
     if (m && cur) {
       const mark = m[1].toLowerCase();
       const state: Section['items'][number]['state'] = mark === 'x' ? 'done' : (mark === '~' || mark === '-') ? 'wait' : 'todo';
-      let text = m[2].trim(); let who = '';
-      // 담당 태그 = 줄 앞 [한글/영문 2~6자] — 특정 회사명 하드코딩 없이 사례별 담당(큐앤뱅·상인회·협의 등) 인식
+      let text = m[2].trim(); let who = ''; let date = '';
+      // 담당 태그 = 줄 앞 [한글/영문 2~6자] — 특정 회사명 하드코딩 없이 사례별 담당(큐앤뱅·오승식·협의 등) 인식
       const w = text.match(/^\[([가-힣A-Za-z]{2,6})\]\s*/);
       if (w) { who = w[1]; text = text.slice(w[0].length); }
-      cur.items.push({ state, who, text });
+      // 날짜 = 줄 끝 @M/D (예 @7/21) — 지금 할 일 항목의 목표일. 있으면 뽑아 우측 표시.
+      const dm = text.match(/\s*@\s*(\d{1,2}\/\d{1,2})\s*$/);
+      if (dm) { date = dm[1]; text = text.slice(0, text.length - dm[0].length).trim(); }
+      cur.items.push({ state, who, text, date });
       total++; if (state === 'done') done++;
     }
   }
-  if (cur) sections.push(cur);
+  if (cur && cur.items.length) sections.push(cur);
   return { sections, done, total };
 }
 

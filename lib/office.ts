@@ -4,6 +4,8 @@
 // 공위치: start🌱 시작전 / mywork🛠️ 내작업 / myreply📤 내회신 / client📥 고객대기 / hold⏸️ 보류 / done✅ 완수
 
 import { getSheets } from './sheetCache';
+import { getDoc } from './github';
+import { hubKeyForRepo } from './hubs';
 
 const SHEET_URL = process.env.SHEET_URL;
 const SHEET_KEY = process.env.SHEET_KEY;
@@ -30,6 +32,10 @@ export interface OfficeTask {
   staleDays: number | null; // 마지막 갱신 후 며칠(노화)
   stale: boolean;          // 공위치별 임계 넘겨 "썩는 공"인가
   repo: string;            // 저장소(깃 repo slug) — 시트 칸. 깃 프로젝트와 연결·중복제거 키.
+  // 협업 허브 연결(저장소=허브 statusRepo 매칭 시에만 채워짐) — 있으면 카드가 시트 할일 대신 현황판 단계를 우선 표시.
+  hubKey?: string;         // 연결된 허브 key (예: 'good-movement') — 패널 '허브 열기' 링크에 사용.
+  hubStep?: string;        // 현황판.md 첫 미완료 항목(현재 단계).
+  hubDone?: number; hubTotal?: number; // 현황판 진행률.
   history: { when: string; what: string }[]; // 🕘 이력(이력 탭에서, 최신순) — 여정 타임라인
 }
 export interface OfficeRoom { key: string; name: string; hint: string; tasks: OfficeTask[]; }
@@ -78,6 +84,28 @@ function daysSince(d?: string): number | null {
 }
 // 공위치별 "이만큼 안 움직이면 썩는 공" 임계(일). 로비/내회신=빨리, 작업=느긋, 미정=즉시. hold/done은 노화 안 봄.
 const STALE_DAYS: Record<string, number> = { client: 7, myreply: 7, mywork: 14, unset: 3, start: 30 };
+
+// 현황판.md에서 '현재 단계'(첫 미완료 항목) + 완료/전체 집계. app/hub/[key]/page.tsx parseStatus와 같은 규칙.
+// ## 섹션 안의 - [ ]/[x]/[~] 만 항목으로 인정, 항목 앞 [담당] 태그는 떼고 텍스트만.
+function firstOpenStep(md: string): { step: string; done: number; total: number } | null {
+  let done = 0, total = 0, step = '', inSection = false;
+  for (const ln of md.split('\n')) {
+    if (/^##\s+/.test(ln)) { inSection = true; continue; }
+    if (!inSection) continue;
+    const m = ln.match(/^\s*[-*]\s*\[([ xX~-])\]\s*(.+)$/);
+    if (!m) continue;
+    total++;
+    if (m[1].toLowerCase() === 'x') { done++; continue; }
+    if (!step) {
+      let t = m[2].trim();
+      const w = t.match(/^\[([가-힣A-Za-z]{2,6})\]\s*/);
+      t = w ? t.slice(w[0].length).trim() : t;
+      t = t.replace(/\s*@\s*\d{1,2}\/\d{1,2}\s*$/, '').trim(); // 줄 끝 @M/D(목표일)는 카드 큰글씨에서 뺀다
+      step = t;
+    }
+  }
+  return total ? { step, done, total } : null;
+}
 
 function roomOf(t: OfficeTask): string {
   // 공위치 우선 배치(담당자는 카드 태그로만). 팀원 일도 공위치대로 — 김지영 고객대기면 로비에 '김지영' 태그.
@@ -198,6 +226,19 @@ export async function buildOffice(): Promise<OfficeData> {
       history: s.history || [],
     };
   });
+
+  // 허브 연결 과업: 저장소 칸이 허브 statusRepo와 일치하면 현황판.md의 '현재 단계'를 카드에 실어준다(시트 할일 대신).
+  // 실패(못 읽음·매칭 없음)는 조용히 통과 → 카드는 기존 todos 표시로 폴백(회귀 없음).
+  // ponytail: 활성 허브 3~5개 병렬 fetch는 무시 가능. 20개+ 되면 getDoc에 60초 캐시 한 줄. 지금은 천장만 표기.
+  await Promise.all(tasks.map(async (t) => {
+    const key = t.repo && hubKeyForRepo[t.repo];
+    if (!key) return;
+    const md = await getDoc(t.repo, '현황판.md');
+    if (!md) return;
+    const s = firstOpenStep(md);
+    if (!s) return;
+    t.hubKey = key; t.hubStep = s.step; t.hubDone = s.done; t.hubTotal = s.total;
+  }));
 
   // 방 안 정렬: 급함 > 썩는 공(노화) > 기한 가까움. (기한 없으면 뒤로) — "뭐 먼저?"에 답.
   tasks.sort((a, b) => {
