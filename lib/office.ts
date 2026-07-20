@@ -36,6 +36,7 @@ export interface OfficeTask {
   hubKey?: string;         // 연결된 허브 key (예: 'good-movement') — 패널 '허브 열기' 링크에 사용.
   hubStep?: string;        // 현황판.md 첫 미완료 항목(현재 단계).
   hubDone?: number; hubTotal?: number; // 현황판 진행률.
+  hubSteps?: { section: string; text: string; state: 'done' | 'wait' | 'todo'; who: string; date: string }[]; // 현황판 전체 항목 — 패널 할일 흐름을 현황판으로 통일(단일 원장).
   history: { when: string; what: string }[]; // 🕘 이력(이력 탭에서, 최신순) — 여정 타임라인
 }
 export interface OfficeRoom { key: string; name: string; hint: string; tasks: OfficeTask[]; }
@@ -105,6 +106,27 @@ function firstOpenStep(md: string): { step: string; done: number; total: number 
     }
   }
   return total ? { step, done, total } : null;
+}
+
+// 현황판.md 전체 항목 파싱 — 패널 할일 흐름을 현황판으로 통일할 때 사용. page.tsx parseStatus와 같은 규칙.
+function parseHubSteps(md: string): NonNullable<OfficeTask['hubSteps']> {
+  const out: NonNullable<OfficeTask['hubSteps']> = [];
+  let section = '', inSection = false;
+  for (const ln of md.split('\n')) {
+    const h = ln.match(/^##\s+(.+?)\s*$/);
+    if (h) { section = h[1].trim(); inSection = true; continue; }
+    if (!inSection) continue;
+    const m = ln.match(/^\s*[-*]\s*\[([ xX~-])\]\s*(.+)$/);
+    if (!m) continue;
+    let t = m[2].trim(); let who = ''; let date = '';
+    const w = t.match(/^\[([가-힣A-Za-z]{2,6})\]\s*/);
+    if (w) { who = w[1]; t = t.slice(w[0].length).trim(); }
+    const dm = t.match(/\s*@\s*(\d{1,2}\/\d{1,2})\s*$/);
+    if (dm) { date = dm[1]; t = t.slice(0, t.length - dm[0].length).trim(); }
+    const mark = m[1].toLowerCase();
+    out.push({ section, text: t, state: mark === 'x' ? 'done' : (mark === '~' || mark === '-') ? 'wait' : 'todo', who, date });
+  }
+  return out;
 }
 
 function roomOf(t: OfficeTask): string {
@@ -235,9 +257,11 @@ export async function buildOffice(): Promise<OfficeData> {
     if (!key) return;
     const md = await getDoc(t.repo, '현황판.md');
     if (!md) return;
+    const steps = parseHubSteps(md);
+    if (!steps.length) return;
+    t.hubKey = key; t.hubSteps = steps;
     const s = firstOpenStep(md);
-    if (!s) return;
-    t.hubKey = key; t.hubStep = s.step; t.hubDone = s.done; t.hubTotal = s.total;
+    if (s) { t.hubStep = s.step; t.hubDone = s.done; t.hubTotal = s.total; }
   }));
 
   // 방 안 정렬: 급함 > 썩는 공(노화) > 기한 가까움. (기한 없으면 뒤로) — "뭐 먼저?"에 답.

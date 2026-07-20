@@ -15,6 +15,7 @@ type Task = {
   memo?: string;
   repo?: string;
   hubKey?: string; hubStep?: string; hubDone?: number; hubTotal?: number; // 협업 허브 연결(저장소=허브 매칭 시)
+  hubSteps?: { section: string; text: string; state: 'done' | 'wait' | 'todo'; who: string; date: string }[]; // 허브 연결 시 현황판 전체 단계(단일 원장)
   history?: { when: string; what: string }[];
 };
 // 깃 자동 프로젝트(읽기 전용) — /api/git-projects. 진행 중인 것만 사무실에 자동 표출(시트 안 씀=좀비 없음).
@@ -438,6 +439,13 @@ export default function OfficeBoardView() {
     todos[i] = st.done ? st.raw.replace(/^✓\s*/, '') : '✓' + todos[i];
     const 내용 = st.done ? `↩ "${st.text}" 되돌림` : `✓ "${st.text}" 완료`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
+  };
+  // 허브 연결 과업 — 할일 흐름은 현황판이 원장. 체크 시 허브 토글 API로 현황판.md를 직접 뒤집고 다시 로드.
+  const toggleHubStep = (t: Task, i: number) => {
+    if (!t.hubKey || !t.hubSteps) return;
+    const it = t.hubSteps[i];
+    fetch('/api/hub-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: t.hubKey, sectionName: it.section, text: it.text }) })
+      .then(() => load(true)).catch(() => load(true));
   };
   const addStep = (t: Task) => {
     const txt = newStep.trim(); if (!txt) return;
@@ -943,6 +951,22 @@ export default function OfficeBoardView() {
               </>)}
               <button className="esave" disabled={busy} onClick={saveContract}>{mForm.종류 === '정기매출' ? '정기매출' : '매출'} 원장에 기록</button>
             </div>)}
+            {cur.hubKey && cur.hubSteps && cur.hubSteps.length > 0 && (<>
+              <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">현황판과 통일(단일 원장) · 편집·추가는 허브에서</span>
+                <a className="docbtn" href={`/hub/${cur.hubKey}`} target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>🔗 허브 열기</a></div>
+              {cur.hubSteps.map((st, i) => {
+                const fu = cur.hubSteps!.findIndex((x) => x.state !== 'done');
+                return (
+                  <div key={i} className={`jstep${st.state === 'done' ? ' done' : i === fu ? ' cur' : ''}`}>
+                    <span className="jmark" onClick={() => toggleHubStep(cur, i)}>{st.state === 'done' ? '✓' : i === fu ? '▶' : '○'}</span>
+                    <span className="jtext" onClick={() => toggleHubStep(cur, i)}>{st.text}</span>
+                    {st.date && <span className="jdate">📅 {st.date}</span>}
+                    {st.who && <span className="jwho set" style={{ marginLeft: 6 }}>{st.who}</span>}
+                  </div>
+                );
+              })}
+            </>)}
+            {!cur.hubKey && (<>
             <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">✓완료 · ▶지금 · 클릭=넘기기</span>
               {DOC_LABEL[cur.category || ''] && (() => { const dn = effTodos(cur).map(parseStep).filter((s) => s.done).length; return dn > 0 ? <button className="docbtn" onClick={() => setShowDone((v) => !v)}>✓ 완료 {dn}개 {showDone ? '숨기기' : '보기'}</button> : null; })()}</div>
             {(() => {
@@ -996,6 +1020,7 @@ export default function OfficeBoardView() {
               <input value={newStep} onChange={(e) => setNewStep(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) addStep(cur); }} placeholder="+ 단계 추가 (날짜 @6/25)" />
               <button disabled={busy || !newStep.trim()} onClick={() => addStep(cur)}>추가</button>
             </div>
+            </>)}
             {!DOC_LABEL[cur.category || ''] && (<>
               <div className="psec" style={{ marginTop: 16 }}>📝 메모 <span className="hint2">현재 정리·문서 링크 (살아있는 기록)</span></div>
               <textarea className="memoarea" value={memoVal} onChange={(e) => setMemoVal(e.target.value)} placeholder="진행 정리, 문서 링크, 메모를 자유롭게…" />
