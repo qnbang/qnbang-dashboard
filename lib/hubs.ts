@@ -77,10 +77,10 @@ export const HUB: Record<string, HubCfg> = {
       meta: '45만원(VAT 별도) · 소요 1주 · 컨셉·운영·홍보·협업 크루까지 한 세트로 납품. 세션은 러너 회원 유입의 첫 마중물.',
     },
     deliverables: [
-      { name: '세션 기획서', badge: '작성 중 · 초안 v1', badgeType: 'doing' },
-      { name: '운영 매뉴얼 + 체크리스트', badge: '체크리스트만 있음' },
-      { name: '홍보 문구 세트 (크루 제안·SNS·플레이스)', badge: '대기 · 7/24 관찰 후' },
-      { name: '협업 크루·코치 후보 리스트', badge: '대기' },
+      { name: '세션 기획서', badge: '작성 중 · 초안 v1', badgeType: 'doing', src: 'good-movement-session-plan' },
+      { name: '운영 매뉴얼 + 체크리스트', badge: '체크리스트만 있음', src: 'good-movement-ops' },
+      { name: '홍보 문구 세트 (크루 제안·SNS·플레이스)', badge: '대기 · 7/24 관찰 후', src: 'good-movement-promo' },
+      { name: '협업 크루·코치 후보 리스트', badge: '대기', src: 'good-movement-crew' },
     ],
     nav: [],
     navGroups: [
