@@ -42,5 +42,16 @@ export default async function HubPage({ params }: { params: Promise<{ key: strin
   if (!cfg) notFound();
   const md = cfg.statusRepo ? await getDoc(cfg.statusRepo, cfg.statusPath || '현황판.md') : '';
   const { sections, done, total } = parseStatus(md || '');
-  return <HubView hubKey={key} cfg={cfg} sections={sections} done={done} total={total} />;
+  // 코멘트는 저장소 코멘트.json(있으면)에서 — 최신순. 형식 [코멘트, 수정방법, 담당]으로 변환(HubView 렌더 재사용).
+  let comments = cfg.comments;
+  if (cfg.statusRepo) {
+    const cj = await getDoc(cfg.statusRepo, '코멘트.json');
+    if (cj) {
+      try {
+        const arr = JSON.parse(cj);
+        if (Array.isArray(arr)) comments = arr.slice().reverse().map((c) => [c.text || '', c.reply || '', c.who || '']);
+      } catch { /* 파일 깨짐 → config 유지 */ }
+    }
+  }
+  return <HubView hubKey={key} cfg={{ ...cfg, comments }} sections={sections} done={done} total={total} />;
 }

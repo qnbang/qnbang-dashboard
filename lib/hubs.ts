@@ -134,3 +134,64 @@ export function toggleChecklistItem(
   }
   return null;
 }
+
+// 항목 텍스트만 비교하기 위해 담당 태그·날짜를 벗겨낸다(화면 표시 텍스트와 같은 규칙).
+function bareText(itemText: string): string {
+  let t = itemText.trim();
+  const w = t.match(/^\[([가-힣A-Za-z]{2,6})\]\s*/);
+  if (w) t = t.slice(w[0].length).trim();
+  t = t.replace(/\s*@\s*\d{1,2}\/\d{1,2}\s*$/, '').trim();
+  return t;
+}
+
+// 섹션 끝(다음 ## 직전)에 `- [ ] text` 추가. 섹션 못 찾으면 null.
+export function addChecklistItem(md: string, sectionName: string, text: string): string | null {
+  const lines = md.split('\n');
+  const want = sectionName.trim();
+  let inSec = false, lastItem = -1, secStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const h = lines[i].match(/^##\s+(.+?)\s*$/);
+    if (h) { if (inSec) break; inSec = h[1].trim() === want; if (inSec) secStart = i; continue; }
+    if (inSec && /^\s*[-*]\s*\[[ xX~-]\]/.test(lines[i])) lastItem = i;
+  }
+  if (secStart < 0) return null;
+  const at = lastItem >= 0 ? lastItem + 1 : secStart + 1;
+  lines.splice(at, 0, `- [ ] ${text.trim()}`);
+  return lines.join('\n');
+}
+
+// 섹션 내 해당 항목 줄 삭제. 못 찾으면 null.
+export function removeChecklistItem(md: string, sectionName: string, text: string): string | null {
+  const lines = md.split('\n');
+  const want = sectionName.trim(), wt = text.trim();
+  let inSec = false;
+  for (let i = 0; i < lines.length; i++) {
+    const h = lines[i].match(/^##\s+(.+?)\s*$/);
+    if (h) { inSec = h[1].trim() === want; continue; }
+    if (!inSec) continue;
+    const m = lines[i].match(/^\s*[-*]\s*\[[ xX~-]\]\s*(.+)$/);
+    if (m && bareText(m[1]) === wt) { lines.splice(i, 1); return lines.join('\n'); }
+  }
+  return null;
+}
+
+// 섹션 내 항목의 텍스트만 교체(체크 상태·담당 태그·날짜는 유지). 못 찾으면 null.
+export function editChecklistItem(md: string, sectionName: string, oldText: string, newText: string): string | null {
+  const lines = md.split('\n');
+  const want = sectionName.trim(), wt = oldText.trim();
+  let inSec = false;
+  for (let i = 0; i < lines.length; i++) {
+    const h = lines[i].match(/^##\s+(.+?)\s*$/);
+    if (h) { inSec = h[1].trim() === want; continue; }
+    if (!inSec) continue;
+    const m = lines[i].match(/^(\s*[-*]\s*\[[ xX~-]\]\s*)(.+)$/);
+    if (!m) continue;
+    let rest = m[2], tag = '', date = '';
+    const w = rest.match(/^\[[가-힣A-Za-z]{2,6}\]\s*/);
+    if (w) { tag = w[0]; rest = rest.slice(w[0].length); }
+    const dm = rest.match(/(\s*@\s*\d{1,2}\/\d{1,2}\s*)$/);
+    if (dm) { date = dm[1]; rest = rest.slice(0, rest.length - dm[1].length); }
+    if (rest.trim() === wt) { lines[i] = m[1] + tag + newText.trim() + date; return lines.join('\n'); }
+  }
+  return null;
+}

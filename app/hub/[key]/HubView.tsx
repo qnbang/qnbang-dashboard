@@ -3,6 +3,7 @@
 // 협업 허브 뷰 — 5층 구조: 목표 → 산출물 → 지금 할 일(현황판 SSOT) → 코멘트 → 바로가기.
 // 지금 할 일은 현황판.md에서 받아 체크 토글(읽기+토글). 목표·산출물·바로가기·코멘트는 허브 config.
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export type Item = { state: 'done' | 'wait' | 'todo'; who: string; text: string; date?: string };
 export type Section = { name: string; items: Item[] };
@@ -26,6 +27,31 @@ export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg
   const [dday, setDday] = useState('D-—');
   const [secs, setSecs] = useState<Section[]>(sections);
   const [busy, setBusy] = useState<string | null>(null);
+  const router = useRouter();
+  // 코멘트 입력
+  const [cWho, setCWho] = useState(cfg.coLabel || '큐앤뱅');
+  const [cText, setCText] = useState('');
+  const [cBusy, setCBusy] = useState(false);
+
+  async function submitComment() {
+    if (!cText.trim() || cBusy) return;
+    setCBusy(true);
+    try {
+      const r = await fetch('/api/hub-comment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: hubKey, who: cWho, text: cText }) });
+      if (r.ok) { setCText(''); router.refresh(); } else alert('코멘트를 남기지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } catch { alert('네트워크 오류로 남기지 못했어요.'); } finally { setCBusy(false); }
+  }
+
+  // 지금 할 일 편집(추가/수정/삭제) — 현황판.md 를 서버에서 고치고 다시 불러온다.
+  async function stepOp(section: string, op: 'add' | 'edit' | 'del', text: string, newText?: string) {
+    try {
+      const r = await fetch('/api/hub-step', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: hubKey, section, op, text, newText }) });
+      if (r.ok) router.refresh(); else if (r.status === 409) { alert('다른 곳에서 먼저 바뀌었어요. 새로고침합니다.'); location.reload(); } else alert('변경하지 못했어요.');
+    } catch { alert('네트워크 오류.'); }
+  }
+  const addStep = (section: string) => { const t = prompt('추가할 할 일\n(담당은 앞에 [큐앤뱅], 날짜는 뒤에 @7/25 처럼 붙일 수 있어요)'); if (t && t.trim()) stepOp(section, 'add', t.trim()); };
+  const editStep = (section: string, text: string) => { const t = prompt('할 일 수정:', text); if (t != null && t.trim() && t.trim() !== text) stepOp(section, 'edit', text, t.trim()); };
+  const delStep = (section: string, text: string) => { if (confirm(`"${text}" 삭제할까요?`)) stepOp(section, 'del', text); };
 
   // 체크박스 토글 — 낙관적 반영 후 서버 저장(현황판.md). 실패 시 롤백, 충돌이면 새로고침.
   async function toggle(si: number, ii: number) {
@@ -144,21 +170,34 @@ export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg
                       onClick={() => toggle(si, ii)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(si, ii); } }}>
                       <span className="mk" /><span className="tx">{it.text}</span>
+                      <span className="stedit" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => editStep(s.name, it.text)}>수정</button>
+                        <button onClick={() => delStep(s.name, it.text)}>삭제</button>
+                      </span>
                       {it.date && <span className="dt">{it.date}</span>}
                       {it.who && <span className={`who ${whoCls(it.who)}`}>{it.who}</span>}
                     </div>
                   );
                 })}
               </div>
+              <button className="addstep-btn" onClick={() => addStep(s.name)}>+ 할 일 추가</button>
             </div>
           ))}
         </section>
       )}
 
       {/* ④ 코멘트·피드백 */}
-      {cfg.comments.length > 0 && (
-        <section>
-          <div className="sh"><h2>코멘트·피드백</h2><span className="hint">남긴 말 → 우리 수정 방법</span></div>
+      <section>
+        <div className="sh"><h2>코멘트·피드백</h2><span className="hint">여기서 바로 남기기 · 남긴 말 → 우리 수정 방법</span></div>
+        <div className="cadd">
+          <select value={cWho} onChange={(e) => setCWho(e.target.value)} aria-label="담당">
+            <option>{cfg.coLabel ?? '고객'}</option>
+            <option>큐앤뱅</option>
+          </select>
+          <input value={cText} onChange={(e) => setCText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitComment(); }} placeholder="코멘트를 남기면 여기 쌓입니다…" disabled={cBusy} />
+          <button onClick={submitComment} disabled={cBusy || !cText.trim()}>{cBusy ? '…' : '남기기'}</button>
+        </div>
+        {cfg.comments.length > 0 && (
           <div className="cmts">
             {cfg.comments.map((r, i) => (
               <div key={i} className="cmt">
@@ -167,8 +206,8 @@ export default function HubView({ hubKey, cfg, sections }: { hubKey: string; cfg
               </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* ⑤ 바로가기 */}
       {groups.length > 0 && (
@@ -251,6 +290,12 @@ const HUB_CSS = `
   .wrap .st.now .mk { border-color:var(--accent); border-width:3px; }
   .wrap .st.now .tx { font-weight:800; color:var(--accent); }
   .wrap .st .dt { font-size:11.5px; color:var(--ink-faint); font-variant-numeric:tabular-nums; flex:none; font-weight:600; margin-left:auto; }
+  .wrap .stedit { display:none; gap:6px; margin-left:8px; flex:none; }
+  .wrap .st:hover .stedit { display:inline-flex; }
+  .wrap .stedit button { border:0; background:transparent; color:var(--ink-faint); font:inherit; font-size:11px; font-weight:700; cursor:pointer; padding:2px 4px; }
+  .wrap .stedit button:hover { color:var(--accent); }
+  .wrap .addstep-btn { margin-top:6px; width:100%; border:1px dashed var(--hairline); background:transparent; color:var(--ink-muted); border-radius:var(--r); padding:9px 12px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
+  .wrap .addstep-btn:hover { border-color:var(--accent); color:var(--accent); }
   .wrap .st.now .dt { color:var(--accent); }
   .wrap .who { font-size:11px; color:#fff; background:var(--ink); border-radius:4px; padding:2px 8px; flex:none; font-weight:700; white-space:nowrap; margin-left:10px; }
   .wrap .who.co { background:var(--accent); }
@@ -262,6 +307,12 @@ const HUB_CSS = `
   .wrap .cmt .cbody { flex:1; }
   .wrap .cmt .q { font-size:14px; font-weight:700; line-height:1.5; }
   .wrap .cmt .a { font-size:12.5px; color:var(--ink-muted); line-height:1.55; margin-top:5px; font-weight:500; }
+  .wrap .cadd { display:flex; gap:8px; margin-bottom:10px; }
+  .wrap .cadd select { border:1px solid var(--hairline); border-radius:var(--r); padding:0 12px; font:inherit; font-weight:700; font-size:13px; color:var(--ink); background:var(--card); cursor:pointer; box-shadow:var(--shadow); flex:none; }
+  .wrap .cadd input { flex:1; min-width:0; border:1px solid var(--hairline); border-radius:var(--r); padding:11px 14px; font:inherit; font-size:14px; color:var(--ink); background:var(--card); box-shadow:var(--shadow); }
+  .wrap .cadd input::placeholder { color:var(--ink-faint); }
+  .wrap .cadd button { border:0; background:var(--accent); color:#fff; font-weight:700; font-size:13.5px; border-radius:var(--r); padding:0 20px; cursor:pointer; font:inherit; white-space:nowrap; }
+  .wrap .cadd button:disabled { opacity:.5; cursor:default; }
   .wrap .navgrp { margin-bottom:16px; }
   .wrap .navgrp:last-child { margin-bottom:0; }
   .wrap .navgrp .gl { font-size:11.5px; color:var(--ink-faint); font-weight:700; margin-bottom:8px; }
