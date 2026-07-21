@@ -5,7 +5,7 @@
 
 import { getSheets } from './sheetCache';
 import { getDoc } from './github';
-import { hubKeyForRepo } from './hubs';
+import { hubKeyForRepo, HUB } from './hubs';
 
 const SHEET_URL = process.env.SHEET_URL;
 const SHEET_KEY = process.env.SHEET_KEY;
@@ -37,6 +37,8 @@ export interface OfficeTask {
   hubStep?: string;        // 현황판.md 첫 미완료 항목(현재 단계).
   hubDone?: number; hubTotal?: number; // 현황판 진행률.
   hubSteps?: { section: string; text: string; state: 'done' | 'wait' | 'todo'; who: string; date: string }[]; // 현황판 전체 항목 — 패널 할일 흐름을 현황판으로 통일(단일 원장).
+  hubRepo?: string;        // 허브 statusRepo — 산출물 문서 편집 시 저장 대상 repo.
+  hubDeliverables?: { name: string; badge?: string; src?: string }[]; // 허브 산출물 목록 — 사무실(내부)에서 편집.
   history: { when: string; what: string }[]; // 🕘 이력(이력 탭에서, 최신순) — 여정 타임라인
 }
 export interface OfficeRoom { key: string; name: string; hint: string; tasks: OfficeTask[]; }
@@ -259,7 +261,9 @@ export async function buildOffice(): Promise<OfficeData> {
     if (!md) return;
     const steps = parseHubSteps(md);
     if (!steps.length) return;
-    t.hubKey = key; t.hubSteps = steps;
+    t.hubKey = key; t.hubSteps = steps; t.hubRepo = t.repo;
+    const cfg = HUB[key];
+    if (cfg?.deliverables) t.hubDeliverables = cfg.deliverables.map((d) => ({ name: d.name, badge: d.badge, src: d.src }));
     const s = firstOpenStep(md);
     if (s) { t.hubStep = s.step; t.hubDone = s.done; t.hubTotal = s.total; }
   }));

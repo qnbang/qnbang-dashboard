@@ -16,6 +16,8 @@ type Task = {
   repo?: string;
   hubKey?: string; hubStep?: string; hubDone?: number; hubTotal?: number; // 협업 허브 연결(저장소=허브 매칭 시)
   hubSteps?: { section: string; text: string; state: 'done' | 'wait' | 'todo'; who: string; date: string }[]; // 허브 연결 시 현황판 전체 단계(단일 원장)
+  hubRepo?: string;
+  hubDeliverables?: { name: string; badge?: string; src?: string }[]; // 허브 산출물 — 사무실에서 편집
   history?: { when: string; what: string }[];
 };
 // 깃 자동 프로젝트(읽기 전용) — /api/git-projects. 진행 중인 것만 사무실에 자동 표출(시트 안 씀=좀비 없음).
@@ -279,6 +281,11 @@ export default function OfficeBoardView() {
   const [office, setOffice] = useState<Office | null>(null);
   const [money, setMoney] = useState<Money | null>(null);
   const [err, setErr] = useState('');
+  // 산출물 문서 편집(내부 전용) — slug 선택 시 오버레이 편집기
+  const [docSlug, setDocSlug] = useState<string | null>(null);
+  const [docName, setDocName] = useState('');
+  const [docContent, setDocContent] = useState('');
+  const [docBusy, setDocBusy] = useState(false);
   const [filter, setFilter] = useState<'all' | 'jh' | 'jy' | 'out'>('all');
   const [cat, setCat] = useState<'all' | '대행' | '도구' | '리서치' | '자체사업' | '내부'>('all');
   const [view, setView] = useState<'board' | 'cal'>('board'); // 칸반 ↔ 캘린더 뷰
@@ -446,6 +453,16 @@ export default function OfficeBoardView() {
     const it = t.hubSteps[i];
     fetch('/api/hub-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: t.hubKey, sectionName: it.section, text: it.text }) })
       .then(() => load(true)).catch(() => load(true));
+  };
+  // 산출물 문서 편집(내부) — 열기=불러오기, 저장=덮어쓰기(공유 등록된 문서만).
+  const openDeliv = (slug: string, name: string) => {
+    setDocSlug(slug); setDocName(name); setDocContent(''); setDocBusy(true);
+    fetch(`/api/hub-doc?slug=${encodeURIComponent(slug)}`).then((r) => r.json()).then((j) => { if (j.ok) setDocContent(j.content); }).finally(() => setDocBusy(false));
+  };
+  const saveDeliv = () => {
+    if (!docSlug) return; setDocBusy(true);
+    fetch('/api/hub-doc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: docSlug, content: docContent }) })
+      .then((r) => r.json()).then((j) => { if (j.ok) setDocSlug(null); else alert(j.conflict ? '다른 곳에서 먼저 저장됐어요. 새로고침 후 다시 시도해 주세요.' : '저장하지 못했어요.'); }).finally(() => setDocBusy(false));
   };
   const addStep = (t: Task) => {
     const txt = newStep.trim(); if (!txt) return;
@@ -951,6 +968,25 @@ export default function OfficeBoardView() {
               </>)}
               <button className="esave" disabled={busy} onClick={saveContract}>{mForm.종류 === '정기매출' ? '정기매출' : '매출'} 원장에 기록</button>
             </div>)}
+            {cur.hubKey && cur.hubDeliverables && cur.hubDeliverables.length > 0 && (<>
+              <div className="psec" style={{ marginTop: 16 }}>📦 산출물 <span className="hint2">눌러서 편집 · 여기 저장(내부 전용) → 허브엔 열람으로 뜸</span></div>
+              {cur.hubDeliverables.map((d, i) => (
+                <div key={i} className="jstep" style={{ cursor: d.src ? 'pointer' : 'default' }} onClick={() => d.src && openDeliv(d.src, d.name)}>
+                  <span className="jmark">✎</span>
+                  <span className="jtext">{d.name}</span>
+                  {d.badge && <span className="jwho set" style={{ marginLeft: 'auto' }}>{d.badge}</span>}
+                </div>
+              ))}
+              {docSlug && (
+                <div onClick={(e) => { if (e.target === e.currentTarget) setDocSlug(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(20,22,26,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 24 }}>
+                  <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 720, height: '86vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #eee' }}><b style={{ fontSize: 14 }}>{docName} · 편집</b><button onClick={() => setDocSlug(null)} style={{ border: 0, background: '#f1f1f1', borderRadius: 8, width: 30, height: 30, cursor: 'pointer' }}>✕</button></div>
+                    <textarea value={docContent} onChange={(e) => setDocContent(e.target.value)} disabled={docBusy} style={{ flex: 1, border: 0, padding: 16, fontFamily: 'ui-monospace, monospace', fontSize: 13, lineHeight: 1.6, resize: 'none', outline: 'none' }} placeholder="마크다운으로 작성…" />
+                    <div style={{ padding: '10px 16px', borderTop: '1px solid #eee', textAlign: 'right' }}><button disabled={docBusy} onClick={saveDeliv} style={{ background: '#4545da', color: '#fff', border: 0, borderRadius: 8, padding: '9px 20px', fontWeight: 700, cursor: 'pointer' }}>{docBusy ? '저장 중…' : '저장'}</button></div>
+                  </div>
+                </div>
+              )}
+            </>)}
             {cur.hubKey && cur.hubSteps && cur.hubSteps.length > 0 && (<>
               <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">현황판과 통일(단일 원장) · 편집·추가는 허브에서</span>
                 <a className="docbtn" href={`/hub/${cur.hubKey}`} target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>🔗 허브 열기</a></div>
