@@ -3,8 +3,12 @@
 // 관제탑 보드 — 시안 I 그대로(리퀴드 글라스). 받은일·처리·작업·대기·예정·언젠가·보류 + 제품.
 // 시트의 flat 공위치(ball)를 시안 I 칸으로 매핑해 실데이터로 그린다. 카드 클릭=슬라이드 패널.
 import { useEffect, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { renderMarkdown } from '@/lib/markdown';
 import { Loading, ErrorBox } from './ui';
+
+// 노션식 리치 에디터 — 브라우저에서만(ssr:false). 산출물 문서 편집에 사용.
+const RichEditor = dynamic(() => import('./RichEditor'), { ssr: false, loading: () => <div style={{ flex: 1, padding: 16, color: '#999' }}>편집기 불러오는 중…</div> });
 
 type Task = {
   id: string; project: string; task: string; owner: string;
@@ -981,7 +985,7 @@ export default function OfficeBoardView() {
                 <div onClick={(e) => { if (e.target === e.currentTarget) setDocSlug(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(20,22,26,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 24 }}>
                   <div style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: 720, height: '86vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #eee' }}><b style={{ fontSize: 14 }}>{docName} · 편집</b><button onClick={() => setDocSlug(null)} style={{ border: 0, background: '#f1f1f1', borderRadius: 8, width: 30, height: 30, cursor: 'pointer' }}>✕</button></div>
-                    <textarea value={docContent} onChange={(e) => setDocContent(e.target.value)} disabled={docBusy} style={{ flex: 1, border: 0, padding: 16, fontFamily: 'ui-monospace, monospace', fontSize: 13, lineHeight: 1.6, resize: 'none', outline: 'none' }} placeholder="마크다운으로 작성…" />
+                    {docBusy && !docContent ? <div style={{ flex: 1, padding: 16, color: '#999' }}>불러오는 중…</div> : <RichEditor value={docContent} onChange={setDocContent} />}
                     <div style={{ padding: '10px 16px', borderTop: '1px solid #eee', textAlign: 'right' }}><button disabled={docBusy} onClick={saveDeliv} style={{ background: '#4545da', color: '#fff', border: 0, borderRadius: 8, padding: '9px 20px', fontWeight: 700, cursor: 'pointer' }}>{docBusy ? '저장 중…' : '저장'}</button></div>
                   </div>
                 </div>
