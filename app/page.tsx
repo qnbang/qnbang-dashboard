@@ -1049,7 +1049,7 @@ function BizView() {
 type Post = {
   tag: string; title: string; desc: string; body?: string; date: string;
   href?: string; project?: string; source: 'post' | 'hub' | 'sheet'; idx?: number;
-  hubKey?: string; sheetId?: string;
+  hubKey?: string; sheetId?: string; repo?: string; path?: string;
 };
 const POST_BADGE: Record<string, string> = {
   회의록: 'bg-blue-600', 아이디어: 'bg-purple-600', 리서치: 'bg-teal-600', 실험실: 'bg-amber-600',
@@ -1067,11 +1067,16 @@ function PostsView() {
   const [frame, setFrame] = useState<Post | null>(null); // 링크 글(회의록 등) 모달
   // 링크 글의 본문 문서(공유 마크다운) — 슬러그를 repo/path로 풀어 sha와 함께 불러오면 폼에서 같이 수정
   const [editDoc, setEditDoc] = useState<null | 'loading' | 'unavailable' | { repo: string; path: string; sha: string; orig: string; draft: string }>(null);
+  // 지금 공유 켜진 문서들: "repo\npath" → 공유 URL. 회의록 글이 여기 있으면 게시판에서 바로 열리고 공유중 표시.
+  const [shareMap, setShareMap] = useState<Record<string, string>>({});
+  const skey = (p: Post) => (p.repo && p.path ? `${p.repo}\n${p.path}` : '');
+  // 글의 실제 열림 주소 — 저장된 href가 없어도 공유가 켜져 있으면 그 공유 URL로 연다(로컬 상태 파생, posts.json 안 건드림).
+  const effHref = (p: Post) => p.href || (skey(p) ? shareMap[skey(p)]?.replace(/^https?:\/\/[^/]+/, '') || '' : '');
 
   const openEdit = async (p: Post, i: number) => {
     setEditForm({ tag: p.tag, title: p.title, body: p.source === 'hub' ? (p.desc || '') : (p.body || p.desc || '') });
     setEditIdx(i); setOpenIdx(null); setEditDoc(null);
-    const m = (p.href || '').match(/^\/share\/([a-z0-9-]+)$/i); // 정적 .html·외부 링크는 제외
+    const m = effHref(p).match(/^\/share\/([a-z0-9-]+)$/i); // 정적 .html·외부 링크는 제외
     if (!m) { if (p.source === 'hub' && p.href) setEditDoc('unavailable'); return; }
     setEditDoc('loading');
     try {
@@ -1088,8 +1093,33 @@ function PostsView() {
     fetch('/api/posts').then((r) => r.json()).then((j) => {
       if (j.ok) setPosts(j.posts); else setErr(j.error || '불러오기 실패');
     }).catch((e) => setErr(String(e)));
+    // 공유 켜진 문서 목록 — 회의록 글의 공유 상태·열림 주소를 여기서 파악
+    fetch('/api/share?all=1').then((r) => r.json()).then((j) => {
+      if (j.ok) setShareMap(Object.fromEntries((j.shares || []).map((s: { repo: string; path: string; url: string }) => [`${s.repo}\n${s.path}`, s.url])));
+    }).catch(() => {});
   };
   useEffect(load, []);
+
+  // 게시판에서 공유 켜기/끄기 — 기존 /api/share 그대로. 원본은 프로젝트 저장소 파일(repo+path).
+  const toggleShare = async (p: Post) => {
+    if (!p.repo || !p.path || busy) return;
+    const on = !!shareMap[skey(p)];
+    setBusy(true);
+    try {
+      const r = await fetch('/api/share', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo: p.repo, path: p.path, title: p.title, action: on ? 'off' : 'on' }),
+      });
+      const j = await r.json();
+      if (!r.ok || j.ok === false) { alert(j.error || '공유 변경 실패'); return; }
+      setShareMap((m) => {
+        const next = { ...m };
+        if (j.url) next[skey(p)] = j.url; else delete next[skey(p)];
+        return next;
+      });
+      if (j.url) { try { await navigator.clipboard.writeText(j.url); } catch { /* 클립보드 실패 무시 */ } }
+    } catch (e) { alert(String(e)); } finally { setBusy(false); }
+  };
 
   const add = async () => {
     const title = form.title.trim();
@@ -1253,7 +1283,7 @@ function PostsView() {
           return (
             <div key={`${p.source}-${p.idx ?? ''}-${p.title}-${i}`} className="border-b border-slate-100">
               <div className="flex items-start gap-3 px-1.5 py-3.5 hover:bg-slate-50 transition cursor-pointer"
-                onClick={() => hasBody ? setOpenIdx(isOpen ? null : i) : (p.href && setFrame(p))}>
+                onClick={() => hasBody ? setOpenIdx(isOpen ? null : i) : (effHref(p) && setFrame({ ...p, href: effHref(p) }))}>
                 <span className={`shrink-0 mt-0.5 text-[11px] font-bold text-white rounded px-2 py-0.5 ${POST_BADGE[p.tag] || 'bg-slate-500'}`}>{p.tag}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-bold text-slate-800 leading-snug">
@@ -1264,6 +1294,13 @@ function PostsView() {
                 </div>
                 <span className="shrink-0 text-xs text-slate-400 whitespace-nowrap mt-0.5">{fmtD(p.date)}</span>
                 <span className="shrink-0 flex gap-0.5">
+                  {p.repo && p.path && (
+                    <button onClick={(e) => { e.stopPropagation(); toggleShare(p); }} disabled={busy}
+                      title={shareMap[skey(p)] ? '공유 중 — 눌러서 끄기 (링크 복사됨)' : '공유 켜기 (외부 링크 만들기)'}
+                      className={`text-sm px-1 ${shareMap[skey(p)] ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-500'}`}>
+                      {shareMap[skey(p)] ? '🔗' : '🔒'}
+                    </button>
+                  )}
                   <button onClick={(e) => { e.stopPropagation(); openEdit(p, i); }}
                     disabled={busy} className="text-slate-300 hover:text-indigo-500 text-sm px-1">✏️</button>
                   {p.source === 'post' && (

@@ -26,6 +26,8 @@ export type Post = {
   idx?: number;
   hubKey?: string;       // source=hub — 어느 허브 게시판인지
   sheetId?: string;      // source=sheet — 과업 시트 행 id (수정은 /api/office/update로)
+  repo?: string;         // 원본 문서 저장소 — 있으면 게시판에서 공유 토글 가능(기존 /api/share 재사용)
+  path?: string;         // repo 내 문서 경로
 };
 
 // 시트 2차원 배열 → 헤더 기반 객체 배열 (lib/sheetUtil.ts 공용 헬퍼)
@@ -46,6 +48,7 @@ export async function GET() {
     global.entries.forEach((e, i) => posts.push({
       tag: e.tag || '아이디어', title: e.title, desc: e.desc, body: e.body,
       date: e.date, href: e.href, source: 'post', idx: i,
+      repo: e.repo, path: e.path,
     }));
 
     // ② 허브 회의 게시판 — nav에 board:<key> 있는 허브 전부(외부 공유 원본은 그대로, 여기선 합쳐 보기)

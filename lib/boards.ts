@@ -23,6 +23,10 @@ export interface BoardEntry {
   href?: string;
   tag?: string;
   body?: string;
+  // 회의록·문서 글의 원본 = 프로젝트 저장소 파일. 이 둘이 있으면 게시판에서 공유 토글을 켜고
+  // (기존 공유 시스템 재사용), 공유가 켜진 글은 클릭·보기·수정이 자동으로 연결된다. body 인라인 대신 이 참조를 쓴다.
+  repo?: string;
+  path?: string;
 }
 
 // key = 게시판 식별자(허브 키, 예 'm650'). 영숫자·하이픈만(경로 안전).
