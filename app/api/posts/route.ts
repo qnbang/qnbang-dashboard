@@ -3,6 +3,7 @@
 // POST: 전역 글만 추가/삭제(로그인 필요). 허브 회의는 /board/<key>에서, 시트 리서치는 시트/사무실뷰 칩에서 관리.
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { randomUUID } from 'node:crypto';
 import { HUB } from '@/lib/hubs';
 import { getBoard, saveBoard, type BoardEntry } from '@/lib/boards';
 import { getSheets } from '@/lib/sheetCache';
@@ -48,7 +49,9 @@ export async function GET() {
     global.entries.forEach((e, i) => posts.push({
       tag: e.tag || '아이디어', title: e.title, desc: e.desc, body: e.body,
       date: e.date, href: e.href, source: 'post', idx: i,
-      repo: e.repo, path: e.path,
+      // 회의록은 실제 저장소 파일(repo+path) 공유, 그 외 직접 쓴 글은 가상 좌표 @post/<id> 공유.
+      repo: e.repo || (e.id ? '@post' : undefined),
+      path: e.path || e.id,
     }));
 
     // ② 허브 회의 게시판 — nav에 board:<key> 있는 허브 전부(외부 공유 원본은 그대로, 여기선 합쳐 보기)
@@ -61,6 +64,7 @@ export async function GET() {
       entries.forEach((e, i) => posts.push({
         tag: '회의록', title: e.title, desc: e.desc, date: e.date,
         href: e.href || `/board/${k}`, project, source: 'hub', hubKey: k, idx: i,
+        repo: '@hub', path: `${k}/${i}`,
       }));
     }
 
@@ -74,6 +78,7 @@ export async function GET() {
           tag: '리서치', title: t['프로젝트'] || t['과업명'] || '(이름 없음)',
           desc: memo.split('\n')[0] || t['현재상태'] || '', body: memo || undefined,
           date: ymd(t['갱신일'] || ''), source: 'sheet', sheetId: t['id'] || undefined,
+          repo: t['id'] ? '@sheet' : undefined, path: t['id'] || undefined,
         });
       }
     } catch { /* 시트 실패해도 게시판 자체는 뜨게 */ }
@@ -124,6 +129,7 @@ export async function POST(req: Request) {
         date: (e?.date || '').trim() || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }),
         href: (e?.href || '').trim() || undefined,
         tag: (e?.tag || '아이디어').trim(),
+        id: randomUUID(), // 공유 좌표(@post/<id>)로 쓸 안정 식별자
       });
     } else if (body.action === 'edit') {
       const i = body.index;

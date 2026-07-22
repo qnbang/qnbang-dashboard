@@ -5,6 +5,7 @@
 import { notFound } from 'next/navigation';
 import { getShareBySlug, healSharePath } from '@/lib/share';
 import { getDoc, findDocByName } from '@/lib/github';
+import { isVirtualRepo, resolveVirtualDoc } from '@/lib/virtualDoc';
 import { mdToHtml } from '@/lib/md';
 import type { Metadata } from 'next';
 
@@ -32,16 +33,22 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
   const entry = await getShareBySlug(slug);
   if (!entry) notFound();
 
-  // 저장된 경로로 먼저 시도. 폴더 이동 등으로 못 찾으면(=null) 파일명으로 새 위치를 찾아 복구하고,
-  // 기록의 경로도 새 위치로 고쳐둔다(slug=링크는 그대로라 이미 보낸 링크가 안 깨진다).
-  let md = await getDoc(entry.repo, entry.path);
-  if (md == null) {
-    const base = entry.path.split('/').pop() || '';
-    const newPath = await findDocByName(entry.repo, base);
-    if (newPath) {
-      md = await getDoc(entry.repo, newPath);
-      // 서버리스에선 응답 후 함수가 멈출 수 있어 fire-and-forget이 누락된다 → await로 확실히 저장.
-      if (md != null) await healSharePath(entry.repo, entry.path, newPath).catch(() => {});
+  // 가상 좌표(@post/@sheet/@hub) = 저장소 파일이 아닌 게시판 글 → 현재 본문을 즉석에서 가져온다.
+  let md: string | null;
+  if (isVirtualRepo(entry.repo)) {
+    md = await resolveVirtualDoc(entry.repo, entry.path);
+  } else {
+    // 저장된 경로로 먼저 시도. 폴더 이동 등으로 못 찾으면(=null) 파일명으로 새 위치를 찾아 복구하고,
+    // 기록의 경로도 새 위치로 고쳐둔다(slug=링크는 그대로라 이미 보낸 링크가 안 깨진다).
+    md = await getDoc(entry.repo, entry.path);
+    if (md == null) {
+      const base = entry.path.split('/').pop() || '';
+      const newPath = await findDocByName(entry.repo, base);
+      if (newPath) {
+        md = await getDoc(entry.repo, newPath);
+        // 서버리스에선 응답 후 함수가 멈출 수 있어 fire-and-forget이 누락된다 → await로 확실히 저장.
+        if (md != null) await healSharePath(entry.repo, entry.path, newPath).catch(() => {});
+      }
     }
   }
   if (md == null) notFound();

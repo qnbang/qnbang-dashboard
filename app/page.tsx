@@ -1076,13 +1076,15 @@ function PostsView() {
   const openEdit = async (p: Post, i: number) => {
     setEditForm({ tag: p.tag, title: p.title, body: p.source === 'hub' ? (p.desc || '') : (p.body || p.desc || '') });
     setEditIdx(i); setOpenIdx(null); setEditDoc(null);
+    // 직접 쓴 글·시트 리서치(가상 좌표 @post/@sheet/@hub)는 본문을 아래 편집칸에서 바로 고쳐 저장한다 → 문서 에디터 불필요.
+    if (p.repo?.startsWith('@')) { setEditDoc(null); return; }
     const m = effHref(p).match(/^\/share\/([a-z0-9-]+)$/i); // 정적 .html·외부 링크는 제외
     if (!m) { if (p.source === 'hub' && p.href) setEditDoc('unavailable'); return; }
     setEditDoc('loading');
     try {
       const sj = await fetch('/api/share?all=1').then((r) => r.json());
       const s = (sj.shares || []).find((x: { slug: string }) => x.slug === m[1]);
-      if (!s) { setEditDoc('unavailable'); return; }
+      if (!s || s.repo.startsWith('@')) { setEditDoc('unavailable'); return; }
       const dj = await fetch(`/api/git-projects/${s.repo}/doc?path=${encodeURIComponent(s.path)}`).then((r) => r.json());
       if (dj?.sha) setEditDoc({ repo: s.repo, path: s.path, sha: dj.sha, orig: dj.content || '', draft: dj.content || '' });
       else setEditDoc('unavailable');

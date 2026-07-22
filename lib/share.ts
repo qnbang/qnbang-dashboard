@@ -54,6 +54,11 @@ export async function findShare(repo: string, path: string): Promise<ShareEntry 
 // 결정적이라 공유를 껐다 켜도 같은 주소가 유지된다. 같은 base가 다른 문서에 이미
 // 쓰였을 때만 경로 해시 4자리를 붙여 충돌을 막는다.
 function deriveSlug(repo: string, path: string, entries: ShareEntry[]): string {
+  // 가상 좌표(@post/@sheet/@hub) = 저장소 파일 아닌 게시판 글. repo·path가 영문 이름을 안 주므로
+  // (한글 제목뿐) 좌표 해시로 짧고 안 겹치는 주소를 만든다. 껐다 켜도 같은 주소 유지.
+  if (repo.startsWith('@')) {
+    return `p-${createHash('sha1').update(`${repo}/${path}`).digest('hex').slice(0, 8)}`;
+  }
   let base = repo.toLowerCase()
     .replace(/^qnbang-proj-/, '')
     .replace(/^qnbang-/, '')
