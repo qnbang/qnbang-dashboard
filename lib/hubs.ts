@@ -123,10 +123,8 @@ export function toggleChecklistItem(
     if (!inSection) continue;
     const m = lines[i].match(/^(\s*[-*]\s*\[)([ xX~-])(\]\s*)(.+)$/);
     if (!m) continue;
-    let itemText = m[4].trim();
-    const w = itemText.match(/^\[([가-힣A-Za-z]{2,6})\]\s*/);
-    if (w) itemText = itemText.slice(w[0].length).trim();
-    if (itemText !== wantText) continue;
+    // 담당 태그·날짜를 모두 떼고 비교(화면 표시 텍스트와 같은 규칙) — 날짜 붙은 항목도 토글되게
+    if (bareText(m[4]) !== wantText) continue;
     const isDone = m[2].toLowerCase() === 'x';
     const nextMark = isDone ? ' ' : 'x';
     lines[i] = m[1] + nextMark + m[3] + m[4];

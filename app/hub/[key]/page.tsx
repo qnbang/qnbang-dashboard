@@ -33,6 +33,10 @@ function parseStatus(md: string): { sections: Section[]; done: number; total: nu
     }
   }
   if (cur && cur.items.length) sections.push(cur);
+  // 날짜(@M/D) 오름차순 정렬 — 날짜 없는 항목은 뒤로. sort는 안정정렬이라 같은 날짜/무날짜는 원래 순서 유지.
+  // ponytail: 연말·연초(12월↔1월)는 무시 — 몇 주 내 근접 할 일만 다룸.
+  const dateKey = (d?: string) => { const m = d?.match(/^(\d{1,2})\/(\d{1,2})$/); return m ? +m[1] * 100 + +m[2] : Infinity; };
+  for (const s of sections) s.items.sort((a, b) => dateKey(a.date) - dateKey(b.date));
   return { sections, done, total };
 }
 
