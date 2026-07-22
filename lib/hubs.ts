@@ -95,6 +95,23 @@ export const HUB: Record<string, HubCfg> = {
     ],
     comments: [],
   },
+  dabigyo: {
+    title: '다비교랩 — JV 공동운영',
+    sub: '유튜브 채널 “다비교”(구독 13.3만) × 큐앤뱅. 제품 비교 플랫폼 다비교랩(dabigyo-lab.vercel.app)을 공동 운영하고 쿠팡 제휴로 자동 수익화. 수익배분·역할·정산을 함께 관리한다.',
+    deadline: '2026-08-05',
+    role: '큐앤뱅(QN!) × 다비교',
+    footerText: '큐앤뱅(QN!) × 다비교 · 다비교랩 공동운영',
+    ddayLabel: '정식 런칭',
+    coLabel: '다비교',
+    statusRepo: 'qnbang-proj-dabigyo',
+    statusPath: '현황판.md',
+    nav: [
+      { src: 'dabigyo-contract', title: '수익배분 협약서(초안)', ic: '📜', t: '수익배분 협약서', d: '제휴 65:35 · 커머스 50:50 · 정산 · 브랜드 귀속 (다비교 협의 전)', primary: true },
+      { src: 'dabigyo-decisions', title: '논의·결정 사항', ic: '🧩', t: '논의·결정 사항', d: '킥오프부터 지금까지 정한 것·미결 과제' },
+      { src: 'dabigyo-meeting', title: '킥오프 회의록', ic: '📝', t: '회의록', d: '2026-07-14 킥오프' },
+    ],
+    comments: [],
+  },
 };
 
 // statusRepo → HUB key 역인덱스. HUB가 이미 SSOT이므로 하드코딩이 아니라 자동 파생.
