@@ -11,6 +11,7 @@ export type WorkTool = {
   href?: string;
   links?: { label: string; href: string }[];
   status?: string;   // 배포됨·진행 중 등 (없으면 표시 안 함)
+  hubUrl?: string;   // 있으면 카드 클릭 = 이 협업 허브로 이동(문서 모달 대신). JV·협업 프로젝트용.
   owner?: string;    // 담당 뱃지 (예: 김지영)
   bizKey?: 'banbo' | 'ikneunda' | 'autoboy'; // 브랜드 운영 뷰 식별자(모달 슬롯)
   sheetId?: string;  // 과업 시트 행 id (시트 도구 카드 — 메모 편집용)
@@ -53,6 +54,7 @@ export const BRANDS: WorkTool[] = [
     icon: '⚖️',
     color: 'bg-rose-50 text-rose-600 border-rose-200',
     status: '진행 중',
+    hubUrl: 'https://dashboard.qnbang.com/hub/dabigyo',  // 카드 클릭 = 협업 허브(계약서·논의·현황판)
     links: [{ label: '사이트', href: 'https://dabigyo-lab.vercel.app' }],
   },
 ];

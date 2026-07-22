@@ -935,7 +935,7 @@ function HubsView() {
 function BizCard({ t, onOpen }: { t: WorkTool; onOpen: (t: WorkTool) => void }) {
   const links = t.links || (t.href ? [{ label: '열기', href: t.href }] : []);
   return (
-    <div onClick={() => onOpen(t)}
+    <div onClick={() => { if (t.hubUrl) window.location.href = t.hubUrl; else onOpen(t); }}
       className="group rounded-2xl border border-slate-200 bg-white p-5 flex flex-col items-center text-center transition hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
       <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center overflow-hidden bg-white ${t.color}`}>
         {t.logo ? (
