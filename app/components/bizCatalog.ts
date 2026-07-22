@@ -47,6 +47,14 @@ export const BRANDS: WorkTool[] = [
       { label: '어드민', href: 'https://banbo-preview.vercel.app/admin.html' },
     ],
   },
+  {
+    name: '다비교',
+    desc: '제품·서비스를 나란히 비교해 고르게 돕는 JV 플랫폼 — 쿠팡 제휴 링크로 자동 수익화. 전략실(대시보드) + 판매채널(프론트) 2층 구조.',
+    icon: '⚖️',
+    color: 'bg-rose-50 text-rose-600 border-rose-200',
+    status: '진행 중',
+    links: [{ label: '사이트', href: 'https://dabigyo-lab.vercel.app' }],
+  },
 ];
 // 2. 큐앤뱅 서비스 — 사면·쓰면 작동하는 도구 (시트 분류=도구 행이 뒤에 자동 합류)
 export const WORK_TOOLS: WorkTool[] = [
