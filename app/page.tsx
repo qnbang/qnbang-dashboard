@@ -1298,9 +1298,11 @@ function PostsView() {
                 <span className="shrink-0 flex gap-0.5">
                   {p.repo && p.path && (
                     <button onClick={(e) => { e.stopPropagation(); toggleShare(p); }} disabled={busy}
-                      title={shareMap[skey(p)] ? '공유 중 — 눌러서 끄기 (링크 복사됨)' : '공유 켜기 (외부 링크 만들기)'}
-                      className={`text-sm px-1 ${shareMap[skey(p)] ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-500'}`}>
-                      {shareMap[skey(p)] ? '🔗' : '🔒'}
+                      title={shareMap[skey(p)] ? '공유 중 — 눌러서 끄기 (링크가 복사됩니다)' : '공유 켜기 (외부 링크 만들기)'}
+                      className={`shrink-0 text-[11px] font-bold rounded-full border px-2 py-0.5 transition ${shareMap[skey(p)]
+                        ? 'bg-indigo-500 text-white border-indigo-500 hover:bg-indigo-600'
+                        : 'bg-white text-slate-400 border-slate-200 hover:border-indigo-300 hover:text-indigo-500'}`}>
+                      {shareMap[skey(p)] ? '공유중' : '공유'}
                     </button>
                   )}
                   <button onClick={(e) => { e.stopPropagation(); openEdit(p, i); }}
