@@ -12,6 +12,11 @@ export function isVirtualRepo(repo: string): boolean {
   return repo === '@post' || repo === '@sheet' || repo === '@hub';
 }
 
+// 본문 앞에 제목을 붙인다 — 단, 본문이 이미 # 제목으로 시작하면 그대로(제목 중복 방지).
+function withTitle(title: string, body: string): string {
+  return /^\s*#/.test(body) ? body : (title ? `# ${title}\n\n${body}` : body);
+}
+
 // 가상 좌표(repo,path) → 마크다운. 못 찾으면 null(공유 페이지가 404 처리).
 export async function resolveVirtualDoc(repo: string, path: string): Promise<string | null> {
   if (repo === '@post') {
@@ -19,8 +24,7 @@ export async function resolveVirtualDoc(repo: string, path: string): Promise<str
     const { entries } = await getBoard('posts');
     const e = entries.find((x) => x.id === path);
     if (!e) return null;
-    const heading = e.title ? `# ${e.title}\n\n` : '';
-    return heading + (e.body || e.desc || '');
+    return withTitle(e.title, e.body || e.desc || '');
   }
   if (repo === '@sheet') {
     // path = 과업 시트 행 id — 리서치 글의 본문 = 메모
@@ -28,7 +32,7 @@ export async function resolveVirtualDoc(repo: string, path: string): Promise<str
     const row = sheetToObjects(sh['과업']).find((t) => (t['id'] || '') === path);
     if (!row) return null;
     const title = row['프로젝트'] || row['과업명'] || '';
-    return (title ? `# ${title}\n\n` : '') + (row['메모'] || row['현재상태'] || '');
+    return withTitle(title, row['메모'] || row['현재상태'] || '');
   }
   if (repo === '@hub') {
     // path = `${hubKey}/${idx}` — 허브 회의 게시판의 한 항목
@@ -39,7 +43,7 @@ export async function resolveVirtualDoc(repo: string, path: string): Promise<str
     const { entries } = await getBoard(key);
     const e = entries[idx];
     if (!e) return null;
-    return (e.title ? `# ${e.title}\n\n` : '') + (e.body || e.desc || '');
+    return withTitle(e.title, e.body || e.desc || '');
   }
   return null;
 }

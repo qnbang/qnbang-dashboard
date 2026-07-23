@@ -8,7 +8,8 @@ import OfficeBoardView from './components/OfficeBoardView';
 import ProjectArchiveView from './components/ProjectArchiveView';
 import ProjectDocs from './components/ProjectDocs';
 import BizOps from './components/BizOps';
-import { renderMarkdown } from '@/lib/markdown';
+import { mdToHtml } from '@/lib/md';
+import { SHARE_DOC_CSS } from '@/lib/shareDocCss';
 import { Loading, ErrorBox } from './components/ui';
 import { type WorkTool, BRANDS, WORK_TOOLS } from './components/bizCatalog';
 
@@ -1055,16 +1056,27 @@ const POST_BADGE: Record<string, string> = {
   회의록: 'bg-blue-600', 아이디어: 'bg-purple-600', 리서치: 'bg-teal-600', 실험실: 'bg-amber-600',
 };
 
+// 공유 문서 뷰 — 게시판·공유탭·외부 /share 가 모두 이 한 가지 모습으로 문서를 보여준다(마크다운→흑백 큐앤뱅 표준).
+// 렌더러(mdToHtml)·CSS(SHARE_DOC_CSS)를 한 곳으로 모아, "게시판에서 보는 모습 = 공유받는 사람이 보는 모습"으로 통일.
+function ShareDocView({ md }: { md: string }) {
+  return (
+    <div className="share-wrap" style={{ background: '#fff' }}>
+      <style>{SHARE_DOC_CSS}</style>
+      <article dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} />
+    </div>
+  );
+}
+
 function PostsView() {
   const [posts, setPosts] = useState<Post[] | null>(null);
   const [err, setErr] = useState('');
   const [tagFilter, setTagFilter] = useState<'all' | string>('all');
   const [form, setForm] = useState({ tag: '아이디어', title: '', body: '' });
   const [busy, setBusy] = useState(false);
-  const [openIdx, setOpenIdx] = useState<number | null>(null); // 본문 펼친 글(목록 인덱스)
   const [editIdx, setEditIdx] = useState<number | null>(null); // 편집 중인 글(목록 인덱스)
   const [editForm, setEditForm] = useState({ tag: '아이디어', title: '', body: '' });
-  const [frame, setFrame] = useState<Post | null>(null); // 링크 글(회의록 등) 모달
+  const [frame, setFrame] = useState<Post | null>(null); // 문서 모달로 연 글
+  const [frameMd, setFrameMd] = useState<string | null>(null); // 그 글의 마크다운(null=불러오는 중)
   // 링크 글의 본문 문서(공유 마크다운) — 슬러그를 repo/path로 풀어 sha와 함께 불러오면 폼에서 같이 수정
   const [editDoc, setEditDoc] = useState<null | 'loading' | 'unavailable' | { repo: string; path: string; sha: string; orig: string; draft: string }>(null);
   // 지금 공유 켜진 문서들: "repo\npath" → 공유 URL. 회의록 글이 여기 있으면 게시판에서 바로 열리고 공유중 표시.
@@ -1075,7 +1087,7 @@ function PostsView() {
 
   const openEdit = async (p: Post, i: number) => {
     setEditForm({ tag: p.tag, title: p.title, body: p.source === 'hub' ? (p.desc || '') : (p.body || p.desc || '') });
-    setEditIdx(i); setOpenIdx(null); setEditDoc(null);
+    setEditIdx(i); setEditDoc(null);
     // 직접 쓴 글·시트 리서치(가상 좌표 @post/@sheet/@hub)는 본문을 아래 편집칸에서 바로 고쳐 저장한다 → 문서 에디터 불필요.
     if (p.repo?.startsWith('@')) { setEditDoc(null); return; }
     const m = effHref(p).match(/^\/share\/([a-z0-9-]+)$/i); // 정적 .html·외부 링크는 제외
@@ -1122,6 +1134,23 @@ function PostsView() {
       if (j.url) { try { await navigator.clipboard.writeText(j.url); } catch { /* 클립보드 실패 무시 */ } }
     } catch (e) { alert(String(e)); } finally { setBusy(false); }
   };
+
+  // 글 클릭 → 공유 문서 뷰(모달)로 연다. 어떤 글이든 같은 모습. 본문은 글에 있으면 그대로,
+  // 저장소 파일 글이면 불러온다(공유받는 사람이 보는 /share 화면과 동일한 마크다운).
+  const openDoc = async (p: Post) => {
+    setFrame(p); setFrameMd(null);
+    const inline = (p.body || '').trim();
+    if (inline) { setFrameMd(/^\s*#/.test(inline) ? inline : `# ${p.title}\n\n${inline}`); return; }
+    if (p.repo && p.path && !p.repo.startsWith('@')) {
+      try {
+        const dj = await fetch(`/api/git-projects/${p.repo}/doc?path=${encodeURIComponent(p.path)}`).then((r) => r.json());
+        setFrameMd(dj?.content || `# ${p.title}\n\n${p.desc || '문서를 불러오지 못했어요.'}`);
+      } catch { setFrameMd(`# ${p.title}\n\n${p.desc || '문서를 불러오지 못했어요.'}`); }
+      return;
+    }
+    setFrameMd(`# ${p.title}\n\n${p.desc || ''}`);
+  };
+  const closeDoc = () => { setFrame(null); setFrameMd(null); };
 
   const add = async () => {
     const title = form.title.trim();
@@ -1240,8 +1269,6 @@ function PostsView() {
       <div className="border-t-2 border-slate-800">
         {shown.length === 0 && <p className="text-slate-400 text-sm py-8 text-center">글이 없어요. 위에서 첫 글을 올려보세요.</p>}
         {shown.map((p, i) => {
-          const hasBody = !!(p.body && p.body.trim() && p.body.trim() !== p.desc.trim());
-          const isOpen = openIdx === i;
           if (editIdx === i) {
             return (
               <div key={`edit-${i}`} className="border-b border-slate-100 px-1.5 py-3 flex flex-col gap-2 bg-slate-50/60">
@@ -1285,7 +1312,7 @@ function PostsView() {
           return (
             <div key={`${p.source}-${p.idx ?? ''}-${p.title}-${i}`} className="border-b border-slate-100">
               <div className="flex items-start gap-3 px-1.5 py-3.5 hover:bg-slate-50 transition cursor-pointer"
-                onClick={() => hasBody ? setOpenIdx(isOpen ? null : i) : (effHref(p) && setFrame({ ...p, href: effHref(p) }))}>
+                onClick={() => openDoc(p)}>
                 <span className={`shrink-0 mt-0.5 text-[11px] font-bold text-white rounded px-2 py-0.5 ${POST_BADGE[p.tag] || 'bg-slate-500'}`}>{p.tag}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-bold text-slate-800 leading-snug">
@@ -1313,19 +1340,14 @@ function PostsView() {
                   )}
                 </span>
               </div>
-              {isOpen && hasBody && (
-                <div className="mx-1.5 mb-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm text-slate-700">
-                  {renderMarkdown(p.body!)}
-                </div>
-              )}
             </div>
           );
         })}
       </div>
 
-      {/* 링크 글(회의록 등) — 사이트 이동 대신 모달로 띄움 */}
+      {/* 문서 모달 — 어떤 글이든 공유 문서 뷰(흑백 표준) 한 가지 모습으로 연다 */}
       {frame && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setFrame(null)}>
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={closeDoc}>
           <div className="bg-white rounded-2xl w-full max-w-3xl h-[85vh] flex flex-col shadow-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0">
               <h3 className="text-sm font-bold text-slate-800 truncate pr-3">
@@ -1333,12 +1355,18 @@ function PostsView() {
                 {frame.title}
               </h3>
               <div className="flex items-center gap-2 shrink-0">
-                <a href={frame.href} target="_blank" rel="noopener noreferrer"
-                  className="text-xs font-semibold rounded-full px-3 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">새 창에서 열기</a>
-                <button onClick={() => setFrame(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+                {effHref(frame) && (
+                  <a href={effHref(frame)} target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-semibold rounded-full px-3 py-1 bg-slate-100 text-slate-500 hover:bg-slate-200 transition">새 창에서 열기</a>
+                )}
+                <button onClick={closeDoc} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
               </div>
             </div>
-            <iframe src={frame.href} title={frame.title} className="flex-1 w-full border-0" />
+            <div className="flex-1 overflow-auto bg-white">
+              {frameMd === null
+                ? <div className="p-8 text-slate-400 text-sm">불러오는 중…</div>
+                : <ShareDocView md={frameMd} />}
+            </div>
           </div>
         </div>
       )}
@@ -1570,7 +1598,7 @@ function SharesView() {
                 <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false}
                   className="w-full h-[60vh] resize-none rounded-lg border border-slate-200 p-3 font-mono text-[13px] leading-relaxed text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200" />
               ) : (
-                renderMarkdown(content)
+                <ShareDocView md={content} />
               )}
             </div>
           </div>
