@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { MonthlyBar, CategoryPie } from './components/charts';
 import OfficeBoardView from './components/OfficeBoardView';
@@ -1056,6 +1057,9 @@ const POST_BADGE: Record<string, string> = {
   회의록: 'bg-blue-600', 아이디어: 'bg-purple-600', 리서치: 'bg-teal-600', 실험실: 'bg-amber-600',
 };
 
+// 노션식 리치 에디터(보이는 대로 편집→마크다운 저장) — 게시판 글 본문 편집에 사용. ssr:false 로 로드.
+const RichEditor = dynamic(() => import('./components/RichEditor'), { ssr: false, loading: () => <div className="p-4 text-sm text-slate-400">편집기 불러오는 중…</div> });
+
 // 공유 문서 뷰 — 게시판·공유탭·외부 /share 가 모두 이 한 가지 모습으로 문서를 보여준다(마크다운→흑백 큐앤뱅 표준).
 // 렌더러(mdToHtml)·CSS(SHARE_DOC_CSS)를 한 곳으로 모아, "게시판에서 보는 모습 = 공유받는 사람이 보는 모습"으로 통일.
 function ShareDocView({ md }: { md: string }) {
@@ -1284,9 +1288,17 @@ function PostsView() {
                   <input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
                     className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500" />
                 </div>
-                <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })} rows={p.source === 'hub' ? 2 : 4}
-                  placeholder={p.source === 'hub' ? '한 줄 설명' : '내용'}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-y" />
+                {/* 직접 쓴 글·리서치 본문 = 보이는 대로 편집(위지윅, 색 없음, 저장은 마크다운).
+                    허브 한 줄 설명·회의록(저장소 파일 글=요약만 편집, 실제 본문은 아래 문서칸)은 짧아서 일반 입력칸 유지. */}
+                {(p.source === 'hub' || (p.repo && p.path && !p.repo.startsWith('@'))) ? (
+                  <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })} rows={p.source === 'hub' ? 2 : 3}
+                    placeholder={p.source === 'hub' ? '한 줄 설명' : '요약(목록에 보이는 줄)'}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 resize-y" />
+                ) : (
+                  <div className="rounded-lg border border-slate-300 overflow-hidden bg-white" style={{ height: 300, display: 'flex' }}>
+                    <RichEditor value={editForm.body} onChange={(md) => setEditForm({ ...editForm, body: md })} />
+                  </div>
+                )}
                 {p.source === 'hub' && <p className="text-[11px] text-slate-400">제목·설명은 허브 회의 게시판에도 같이 반영됩니다.</p>}
                 {p.source === 'sheet' && <p className="text-[11px] text-slate-400">과업 시트(프로젝트명·메모)에 저장됩니다. 첫 줄이 목록 요약이 돼요.</p>}
                 {editDoc === 'loading' && <p className="text-[11px] text-slate-400">📄 본문 문서 불러오는 중…</p>}
