@@ -451,12 +451,16 @@ export default function OfficeBoardView() {
     const 내용 = st.done ? `↩ "${st.text}" 되돌림` : `✓ "${st.text}" 완료`;
     optimistic(t, todos, 내용); stepPost(t.id, todos, 내용);
   };
-  // 허브 연결 과업 — 할일 흐름은 현황판이 원장. 체크 시 허브 토글 API로 현황판.md를 직접 뒤집고 다시 로드.
+  // 허브 연결 과업 — 할일 흐름은 현황판이 원장. 화면 먼저 뒤집고(낙관적), 현황판.md 저장(깃 커밋)은 뒤에서.
   const toggleHubStep = (t: Task, i: number) => {
     if (!t.hubKey || !t.hubSteps) return;
     const it = t.hubSteps[i];
+    const nowDone = it.state === 'done';
+    const steps = t.hubSteps.map((s, j) => (j === i ? { ...s, state: (nowDone ? 'todo' : 'done') as 'done' | 'wait' | 'todo' } : s));
+    setSel({ ...t, hubSteps: steps, hubDone: (t.hubDone || 0) + (nowDone ? -1 : 1) }); // 클릭 즉시 ✓ 반영 — 느린 깃 저장을 기다리지 않음
     fetch('/api/hub-toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: t.hubKey, sectionName: it.section, text: it.text }) })
-      .then(() => load(true)).catch(() => load(true));
+      .then((r) => r.json()).catch(() => ({ ok: false }))
+      .then((j) => { if (!j || !j.ok) { alert(`체크 저장이 안 됐어요 — ${(j && j.error) || '다시 눌러주세요'}`); load(true); } }); // 실패 시에만 되돌리기
   };
   // 산출물 문서 편집(내부) — 열기=불러오기, 저장=덮어쓰기(공유 등록된 문서만).
   const openDeliv = (slug: string, name: string) => {
