@@ -141,6 +141,17 @@ const CSS = `
 .qb .qa-btns button:hover{background:#eef2ff;border-color:#a5b4fc}
 .qb .ovl{position:fixed;inset:0;background:#1e225566;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:40}
 .qb .panel{position:fixed;top:0;right:0;width:400px;max-width:92vw;height:100%;background:#ffffffe8;backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);border-left:1px solid #ffffffcc;box-shadow:-14px 0 50px #1e225528;z-index:50;display:flex;flex-direction:column}
+/* 프로젝트 상세만 중앙 모달(2단) — 나머지 패널은 기존 사이드 서랍 유지 */
+.qb .panel.pmodal{top:50%;left:50%;right:auto;transform:translate(-50%,-50%);width:1060px;max-width:94vw;height:auto;max-height:88vh;border-left:0;border-radius:8px;box-shadow:0 24px 70px #1e225540}
+.qb .pmodal .pbody{display:flex;gap:24px;align-items:flex-start}
+.qb .pmodal .pcol{min-width:0}
+.qb .pmodal .pcol-l{flex:0 0 40%}
+.qb .pmodal .pcol-r{flex:1}
+/* 왼쪽에 볼 게 없는 단순 과업은 좁은 한 단 — 빈 칸 안 생기게 */
+.qb .panel.pmodal1{width:720px}
+.qb .pmodal1 .pbody{display:block}
+.qb .pmodal1 .pcol-l:empty{display:none}
+@media(max-width:900px){.qb .panel.pmodal{width:94vw;max-height:92vh}.qb .pmodal .pbody{display:block}.qb .pmodal .pcol-l{margin-bottom:20px}}
 .qb .ph{padding:18px 20px 12px;border-bottom:1px solid #eef0f7;position:relative}.qb .pcli{font-size:11.5px;font-weight:700;color:#3a3d44}.qb .pproj{font-size:18px;font-weight:800;margin:3px 0 2px;color:#15182a}.qb .pmeta{font-size:11.5px;color:#6b7088}
 .qb .pclose{position:absolute;top:14px;right:16px;border:none;background:#f1f3fa;width:30px;height:30px;border-radius:9px;font-size:16px;cursor:pointer;color:#5a6078}
 .qb .statebtns{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}.qb .statebtns button{font-size:11px;font-weight:700;border:1px solid #e0e3ee;background:#f7f8fc;border-radius:8px;padding:5px 10px;cursor:pointer;color:#5a6078}.qb .statebtns button:hover{background:#fff;border-color:#3a3d44}.qb .statebtns button.cur{background:#3a3d44;color:#fff;border-color:#3a3d44}
@@ -923,7 +934,7 @@ export default function OfficeBoardView() {
 
       {cur && (<>
         <div className="ovl" onClick={() => setSel(null)} />
-        <aside className="panel" style={DOC_LABEL[cur.category || ''] ? { width: 600 } : undefined}>
+        <aside className={`panel pmodal${(DOC_LABEL[cur.category || ''] || cur.hubDeliverables?.length) ? '' : ' pmodal1'}`}>
           <div className="ph"><button className="pclose" onClick={() => setSel(null)}>✕</button>
             <div className="pcli">{cur.client && cur.client !== cur.project ? `${cur.client} · ` : ''}{cur.project}</div><div className="pproj">{bigTask(cur)}</div>
             <div className="pmeta">{WHO[cur.owner] || cur.owner}{cur.due && cur.dday != null ? ` · ${ddText(cur.dday)}` : ''}</div>
@@ -934,6 +945,8 @@ export default function OfficeBoardView() {
             <div className="statebtns"><button disabled={busy} onClick={() => patch(cur.id, { patch: { 담당자: cur.owner === '김지영' ? '신종호' : '김지영' } })}>담당 → {cur.owner === '김지영' ? '종호' : '지영'}</button><button className="discard" disabled={busy} onClick={() => discard(cur.id, cur.project || cur.task || '이 프로젝트')}>🗑 폐기(접기)</button></div>
           </div>
           <div className="pbody">
+            {/* 왼쪽 = 정보·돈·산출물(참고용) / 오른쪽 = 할일·메모(손대는 곳) */}
+            <div className="pcol pcol-l">
             {DOC_LABEL[cur.category || ''] && (<>
               <div className="psec">{DOC_LABEL[cur.category!].t} <span className="hint2">{DOC_LABEL[cur.category!].h}</span>
                 <button className="docbtn" onClick={() => setDocEdit((v) => !v)}>{docEdit ? '✓ 보기' : '✏️ 편집'}</button></div>
@@ -995,6 +1008,8 @@ export default function OfficeBoardView() {
                 </div>
               )}
             </>)}
+            </div>
+            <div className="pcol pcol-r">
             {cur.hubKey && cur.hubSteps && cur.hubSteps.length > 0 && (<>
               <div className="psec" style={{ marginTop: 16 }}>🧭 할일 흐름 <span className="hint2">현황판과 통일(단일 원장) · 편집·추가는 허브에서</span>
                 <a className="docbtn" href={`/hub/${cur.hubKey}`} target="_blank" rel="noopener" style={{ textDecoration: 'none' }}>🔗 허브 열기</a></div>
@@ -1078,6 +1093,7 @@ export default function OfficeBoardView() {
                 ))}</div>
               ) : <div className="note">아직 이력 없음. 단계를 완료하면 여기 쌓입니다.</div>)}
             </>)}
+            </div>
           </div>
         </aside>
       </>)}

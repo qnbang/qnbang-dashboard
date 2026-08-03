@@ -4,12 +4,14 @@
 // 산출물 문서 편집(사무실 패널)에서 사용. dynamic import(ssr:false)로 로드.
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { TableKit } from '@tiptap/extension-table';
 import { Markdown } from 'tiptap-markdown';
 import { useEffect } from 'react';
 
 export default function RichEditor({ value, onChange }: { value: string; onChange: (md: string) => void }) {
   const editor = useEditor({
-    extensions: [StarterKit, Markdown.configure({ html: false, transformPastedText: true })],
+    // TableKit 없으면 마크다운 표가 글자로 풀려 저장 시 원본이 깨진다.
+    extensions: [StarterKit, TableKit.configure({ table: { resizable: false } }), Markdown.configure({ html: false, transformPastedText: true })],
     content: value,
     immediatelyRender: false,
     onUpdate: ({ editor }) => onChange((editor.storage as unknown as { markdown: { getMarkdown(): string } }).markdown.getMarkdown()),
@@ -38,6 +40,12 @@ export default function RichEditor({ value, onChange }: { value: string; onChang
         <B on={editor.isActive('orderedList')} act={() => editor.chain().focus().toggleOrderedList().run()} label="1. 목록" />
         <B on={editor.isActive('blockquote')} act={() => editor.chain().focus().toggleBlockquote().run()} label="인용" />
         <B on={editor.isActive('codeBlock')} act={() => editor.chain().focus().toggleCodeBlock().run()} label="코드" />
+        <B on={editor.isActive('table')} act={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} label="표" />
+        {editor.isActive('table') && (<>
+          <B on={false} act={() => editor.chain().focus().addRowAfter().run()} label="행+" />
+          <B on={false} act={() => editor.chain().focus().addColumnAfter().run()} label="열+" />
+          <B on={false} act={() => editor.chain().focus().deleteTable().run()} label="표 삭제" />
+        </>)}
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         <EditorContent editor={editor} className="rich-body" />
@@ -53,8 +61,11 @@ export default function RichEditor({ value, onChange }: { value: string; onChang
         .rich-body .ProseMirror blockquote { border-left:3px solid #ddd; padding-left:12px; color:#666; margin:10px 0; }
         .rich-body .ProseMirror pre { background:#f4f4f6; border-radius:8px; padding:12px 14px; font-size:13px; overflow:auto; }
         .rich-body .ProseMirror code { background:#f0f0f4; padding:1px 5px; border-radius:4px; font-size:.9em; }
-        .rich-body .ProseMirror table { border-collapse:collapse; }
-        .rich-body .ProseMirror th, .rich-body .ProseMirror td { border:1px solid #ddd; padding:6px 10px; }
+        .rich-body .ProseMirror table { border-collapse:collapse; width:100%; margin:12px 0; table-layout:fixed; }
+        .rich-body .ProseMirror th, .rich-body .ProseMirror td { border:1px solid #dcdce4; padding:7px 10px; vertical-align:top; }
+        .rich-body .ProseMirror th { background:#f5f5f9; font-weight:700; text-align:left; }
+        .rich-body .ProseMirror .selectedCell:after { content:''; position:absolute; inset:0; background:#4545da1a; pointer-events:none; }
+        .rich-body .ProseMirror td, .rich-body .ProseMirror th { position:relative; }
       `}</style>
     </div>
   );

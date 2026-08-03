@@ -3,8 +3,12 @@
 // CRM(고객 관리)·프로젝트 아카이브 양쪽에서 같은 모달을 재사용한다.
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { renderMarkdown } from '@/lib/markdown';
 import { Loading } from './ui';
+
+// 노션식 편집기 — 브라우저에서만. 산출물 편집(사무실 패널)과 같은 것을 재사용.
+const RichEditor = dynamic(() => import('./RichEditor'), { ssr: false });
 
 type ProjectRepo = { repo: string; title: string; manager?: string };
 type DocItem = { path: string; title: string; group: string };
@@ -88,7 +92,11 @@ export default function ProjectDocs({ name, onClose, slot, fallbackDesc }: {
   const [statusBoard, setStatusBoard] = useState<string | null>(null);
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [openLog, setOpenLog] = useState<number | null>(null);
-  const [openD, setOpenD] = useState<{ title: string; content: string } | null>(null);
+  // 문서 열람 + 편집. sha = 열었을 때 버전 — 저장 시 그 사이 남이 고쳤으면 거절된다.
+  const [openD, setOpenD] = useState<{ title: string; path: string; content: string; sha: string | null } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
   const [outsrc, setOutsrc] = useState(false); // 외주(담당자가 내부팀 아님) — 작업로그 대신 메모 관리
   useEffect(() => {
     (async () => {
@@ -105,9 +113,21 @@ export default function ProjectDocs({ name, onClose, slot, fallbackDesc }: {
   }, [name]);
   const readDoc = async (doc: DocItem) => {
     if (!repo) return;
-    setOpenD({ title: doc.title, content: '불러오는 중…' });
+    setEditing(false);
+    setOpenD({ title: doc.title, path: doc.path, content: '불러오는 중…', sha: null });
     const j = await fetch(`/api/git-projects/${repo}/doc?path=${encodeURIComponent(doc.path)}`).then((r) => r.json()).catch(() => null);
-    setOpenD({ title: doc.title, content: j?.content || '내용을 불러오지 못했어요.' });
+    setOpenD({ title: doc.title, path: doc.path, content: j?.content ?? '내용을 불러오지 못했어요.', sha: j?.sha ?? null });
+  };
+  const saveDocEdit = async () => {
+    if (!repo || !openD?.sha) return;
+    setSaving(true);
+    const r = await fetch(`/api/git-projects/${repo}/doc`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: openD.path, content: draft, sha: openD.sha }),
+    }).then((x) => x.json()).catch(() => null);
+    setSaving(false);
+    if (r?.ok) { setOpenD({ ...openD, content: draft, sha: r.sha }); setEditing(false); }
+    else alert(r?.error || '저장하지 못했어요.');
   };
   const entries = workLog ? parseWorkLog(workLog) : [];
   const intro = statusBoard ? projectOneLiner(statusBoard) : '';
@@ -182,12 +202,22 @@ export default function ProjectDocs({ name, onClose, slot, fallbackDesc }: {
       </div>
       {openD && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" onClick={() => setOpenD(null)}>
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 sticky top-0 bg-white">
-              <h3 className="text-sm font-bold text-slate-800">{openD.title}</h3>
-              <button onClick={() => setOpenD(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white">
+              <h3 className="text-sm font-bold text-slate-800">{openD.title}{editing && <span className="ml-1.5 text-[11px] font-normal text-indigo-500">편집 중</span>}</h3>
+              <div className="flex items-center gap-2">
+                {editing ? (<>
+                  <button onClick={() => setEditing(false)} className="text-xs text-slate-400 hover:text-slate-600">취소</button>
+                  <button onClick={saveDocEdit} disabled={saving} className="text-xs font-bold text-white bg-indigo-600 rounded-md px-3 py-1.5 disabled:opacity-50">{saving ? '저장 중…' : '저장'}</button>
+                </>) : openD.sha && (
+                  <button onClick={() => { setDraft(openD.content); setEditing(true); }} className="text-xs text-slate-500 hover:text-indigo-600 border border-slate-200 rounded-md px-2.5 py-1.5">✏️ 편집</button>
+                )}
+                <button onClick={() => setOpenD(null)} className="text-slate-400 hover:text-slate-600 text-sm">닫기 ✕</button>
+              </div>
             </div>
-            <div className="p-5">{renderMarkdown(openD.content)}</div>
+            {editing
+              ? <div className="flex-1 flex flex-col overflow-hidden"><RichEditor value={draft} onChange={setDraft} /></div>
+              : <div className="p-5 overflow-y-auto">{renderMarkdown(openD.content)}</div>}
           </div>
         </div>
       )}
