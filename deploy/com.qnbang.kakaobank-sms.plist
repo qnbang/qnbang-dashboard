@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.qnbang.kakaobank-sms</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>/Users/charlie/Documents/claude-workspace/큐앤뱅-사내시스템/큐앤뱅-사내웹대시보드/scripts/kakaobank-sms-sync.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>30</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/charlie/Library/Application Support/Qnbang/kakaobank-sms-launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/charlie/Library/Application Support/Qnbang/kakaobank-sms-launchd-error.log</string>
+</dict>
+</plist>
