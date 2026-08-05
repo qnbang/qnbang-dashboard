@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 # 메시지 앱에 전달된 카카오뱅크 SMS를 대시보드로 보낸다.
 # 설정 파일: ~/Library/Application Support/Qnbang/kakaobank-sms.env
 
