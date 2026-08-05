@@ -27,7 +27,7 @@ rows=$(/usr/bin/sqlite3 -separator $'\037' "$DB" "$sql") || exit 0
 
 while IFS=$'\037' read -r rowid guid text; do
   [[ -z "$rowid" || -z "$guid" ]] && continue
-  json=$(python3 -c 'import json,sys; print(json.dumps({"id":sys.argv[1],"text":sys.argv[2].replace("\\\\n", "\\n")}, ensure_ascii=False))' "$guid" "$text")
+  json=$(python3 -c 'import json,sys; print(json.dumps({"id":sys.argv[1],"text":sys.argv[2].replace(r"\n", "\n")}, ensure_ascii=False))' "$guid" "$text")
   result=$(curl --silent --show-error --max-time 20 --retry 2 -X POST "$BANK_SMS_URL" -H "Authorization: Bearer $BANK_SMS_TOKEN" -H 'Content-Type: application/json' --data "$json") || exit 0
   echo "$rowid" > "$STATE"
   echo "$(date '+%Y-%m-%d %H:%M:%S') $result" >> "$HOME/Library/Application Support/Qnbang/kakaobank-sms.log"
