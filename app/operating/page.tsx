@@ -8,21 +8,23 @@ type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '�
 
 const menu: View[] = ['홈', '수신함', '할 일', '캘린더', '고객 관리', '프로젝트', '재무·정산', '공용 도구', '운영 설정'];
 const tasks = [
-  { title: '수정 시안 최종 정리', project: '모호스 브랜드 웹사이트 개편', due: '오늘 14:00', owner: '신종호', state: '진행 중' },
-  { title: '고객에게 시안 전달', project: '모호스 브랜드 웹사이트 개편', due: '오늘 16:00', owner: '신종호', state: '대기' },
-  { title: '오르 입금 상태 확인', project: '내부 운영', due: '오늘 17:30', owner: '신종호', state: '확인 필요' },
-  { title: '패키지 수정안 검토', project: '금문도 패키지 리뉴얼', due: '내일 11:00', owner: '김유진', state: '대기' },
-  { title: '요구사항 정리 후 견적', project: '루모스랩 자동화 도입', due: '8월 12일', owner: '신종호', state: '진행 중' },
+  { title: '시그니처 종목과 예산 구조 확정', project: '다리마티 운동회', due: '이번 주', owner: '신종호', state: '진행 중' },
+  { title: '제안 문서와 체크리스트 현황 확인', project: '브이큐 업무자동화', due: '이번 주', owner: '신종호', state: '진행 중' },
+  { title: '전자서명 발송 전 계약서 최종 확인', project: '좋은움직임연구소 러너 세션', due: '확인 필요', owner: '신종호', state: '대기' },
+  { title: '라이브 서비스와 어드민 최종 검수', project: '다비교랩', due: '다음 순서', owner: '신종호', state: '검수' },
+  { title: '행사 개발·현장테스트 일정 재확인', project: '망원 야간보물찾기', due: '확인 필요', owner: '신종호', state: '진행 중' },
 ];
 const projects = [
-  { name: '모호스 브랜드 웹사이트 개편', client: '모호스 스튜디오', progress: 72, next: '수정 시안 최종 정리', status: '진행 중', owner: '신종호' },
-  { name: '금문도 패키지 리뉴얼', client: '금문도', progress: 48, next: '패키지 수정안 검토', status: '진행 중', owner: '김유진' },
-  { name: '루모스랩 자동화 도입', client: '루모스랩', progress: 34, next: '요구사항 정리 후 견적', status: '견적 중', owner: '신종호' },
+  { name: '다리마티 운동회', client: '다리마티', progress: 18, next: '시그니처 종목과 예산 구조 확정', status: '기획 중', owner: '신종호' },
+  { name: '브이큐 업무자동화', client: '브이큐스튜디오', progress: 42, next: '제안 문서와 체크리스트 현황 확인', status: '진행 중', owner: '신종호' },
+  { name: '좋은움직임연구소 러너 세션', client: '좋은움직임연구소', progress: 64, next: '전자서명 발송 전 계약서 최종 확인', status: '계약 진행', owner: '신종호' },
+  { name: '다비교랩', client: '큐앤뱅 자체사업', progress: 92, next: '라이브 서비스와 어드민 최종 검수', status: '검수 중', owner: '신종호' },
+  { name: '망원 야간보물찾기', client: '망리단길골목형상점가 상인회', progress: 58, next: '행사 개발·현장테스트 일정 재확인', status: '진행 중', owner: '신종호' },
 ];
 const messages = [
-  { channel: '카카오톡', sender: '모호스 김도윤', time: '10:18', body: '수정 시안은 오늘 오후에 확인할 수 있을까요?', project: '모호스 브랜드 웹사이트 개편', customer: '모호스 스튜디오', action: '고객 답변 및 시안 전달' },
-  { channel: '라크', sender: '김유진', time: '09:31', body: '금문도 패키지 수정안 검토 일정 잡아야 합니다.', project: '금문도 패키지 리뉴얼', customer: '금문도', action: '검토 일정 잡기' },
-  { channel: '메일', sender: '루모스랩 최민수', time: '08:42', body: '자동화 범위와 견적안을 먼저 받아보고 싶습니다.', project: '루모스랩 자동화 도입', customer: '루모스랩', action: '요구사항 확인 후 견적' },
+  { channel: '라크', sender: '다리마티 프로젝트', time: '최신', body: '첫 행사는 10월 18일로 확정. 시그니처 종목 개발 원칙을 정리했습니다.', project: '다리마티 운동회', customer: '다리마티', action: '종목·공간·예산 우선순위 확정' },
+  { channel: '메일', sender: '좋은움직임연구소', time: '최신', body: '계약서 전자서명 발송 전 최종 확인이 필요합니다.', project: '좋은움직임연구소 러너 세션', customer: '좋은움직임연구소', action: '계약서 확인 후 전자서명 발송' },
+  { channel: '라크', sender: '망원 야간보물찾기', time: '최신', body: '개발·현장 테스트 일정과 참여 매장 명단 일정을 다시 확인해야 합니다.', project: '망원 야간보물찾기', customer: '망리단길골목형상점가 상인회', action: '크리티컬 패스 일정 점검' },
 ];
 
 const Badge = ({ children }: { children: string }) => <span className={styles.badge}>{children}</span>;
@@ -71,9 +73,9 @@ function Inbox({ selected, onSelect }: { selected: typeof messages[number]; onSe
 
 function TaskList() { return <section className={styles.panel}><div className={styles.filterBar}><div><Badge>오늘 5</Badge><Badge>이번 주 12</Badge><Badge>대기 3</Badge></div><select aria-label="프로젝트 필터"><option>프로젝트 전체</option><option>모호스 브랜드 웹사이트 개편</option><option>금문도 패키지 리뉴얼</option></select></div><Header title="오늘 우선 처리" action="마감·고객 응답·정산 확인 순"/>{tasks.map((t) => <div className={styles.taskListRow} key={t.title}><span className={styles.check}></span><div><b>{t.title}</b><small>{t.owner} · {t.state}</small></div><Badge>{t.project}</Badge><time>{t.due}</time></div>)}<div className={styles.waiting}><b>대기 중 3건</b><span>고객 연결·거래 분류·일정 시간 확인이 필요한 항목입니다.</span></div></section> }
 
-function Calendar() { return <section className={styles.panel}><div className={styles.calendarHead}><div><Header title="2026년 8월 둘째 주" action="구글 캘린더 + 라크 일정"/></div><button>오늘</button></div><div className={styles.week}><div className={styles.timeCol}>시간</div>{['월 10','화 11','수 12','목 13','금 14'].map((d) => <b key={d}>{d}</b>)}<div>10:00</div><Event title="수정안 정리" project="모호스"/><div></div><Event title="요구사항 미팅" project="루모스랩"/><div></div><div>14:00</div><div></div><Event title="금문도 담당자 미팅" project="금문도"/><div></div><div></div><div></div><div>16:30</div><Event title="시안 전달" project="모호스"/><div></div><Event title="라크 자동 생성 일정" project="내부 운영"/><div></div><div></div></div><p className={styles.calendarNote}>미팅은 구글 캘린더 일정으로, 실행해야 할 일은 프로젝트·고객과 연결된 할 일 원장으로 분리합니다.</p></section> }
+function Calendar() { return <section className={styles.panel}><div className={styles.calendarHead}><div><Header title="2026년 8월 둘째 주" action="구글 캘린더 + 라크 일정"/></div><button>오늘</button></div><div className={styles.week}><div className={styles.timeCol}>시간</div>{['월 10','화 11','수 12','목 13','금 14'].map((d) => <b key={d}>{d}</b>)}<div>10:00</div><Event title="운동회 기획 정리" project="다리마티"/><div></div><Event title="계약서 최종 확인" project="좋은움직임"/><div></div><div>14:00</div><div></div><Event title="자동화 문서 점검" project="브이큐"/><div></div><div></div><div></div><div>16:30</div><Event title="행사 일정 점검" project="망원"/><div></div><Event title="서비스 최종 검수" project="다비교랩"/><div></div><div></div></div><p className={styles.calendarNote}>미팅은 구글 캘린더 일정으로, 실행해야 할 일은 프로젝트·고객과 연결된 할 일 원장으로 분리합니다.</p></section> }
 
-function Customers({ query }: { query: string }) { const rows = [{name:'모호스 스튜디오',person:'김도윤',state:'진행 중',project:'브랜드 웹사이트 개편',last:'오늘 10:18'}, {name:'금문도',person:'정다은',state:'진행 중',project:'패키지 리뉴얼',last:'어제'}, {name:'루모스랩',person:'최민수',state:'견적 중',project:'자동화 도입',last:'오늘 08:42'}].filter((r) => `${r.name} ${r.person}`.includes(query)); return <section className={styles.customerGrid}><div className={styles.panel}><Header title="고객사" action={`${rows.length}곳`} /><table><thead><tr><th>고객사</th><th>담당자</th><th>진행 상태</th><th>연결 프로젝트</th><th>최근 대화</th></tr></thead><tbody>{rows.map((r) => <tr key={r.name}><td><b>{r.name}</b></td><td>{r.person}</td><td><Badge>{r.state}</Badge></td><td>{r.project}</td><td>{r.last}</td></tr>)}</tbody></table></div><div className={styles.panel}><Header title="선택한 고객" action="모호스 스튜디오"/><h3>모호스 스튜디오</h3><p>담당자 김도윤 · 카카오톡 중심</p><div className={styles.detailInfo}><p><b>진행 프로젝트</b>브랜드 웹사이트 개편</p><p><b>최근 대화</b>수정 시안은 오늘 오후에 확인 가능할까요?</p><p><b>다음 행동</b>오늘 16:00 시안 전달</p></div></div></section> }
+function Customers({ query }: { query: string }) { const rows = [{name:'다리마티',person:'황현욱',state:'진행 중',project:'다리마티 운동회',last:'8월 7일'}, {name:'브이큐스튜디오',person:'손정현',state:'진행 중',project:'브이큐 업무자동화',last:'8월 5일'}, {name:'좋은움직임연구소',person:'오승식',state:'계약 진행',project:'러너 세션 기획',last:'7월 31일'}, {name:'망리단길골목형상점가 상인회',person:'상인회 담당자',state:'진행 중',project:'망원 야간보물찾기',last:'최신 기록 확인 필요'}].filter((r) => `${r.name} ${r.person}`.includes(query)); return <section className={styles.customerGrid}><div className={styles.panel}><Header title="고객사" action={`${rows.length}곳`} /><table><thead><tr><th>고객사</th><th>담당자</th><th>진행 상태</th><th>연결 프로젝트</th><th>최근 대화</th></tr></thead><tbody>{rows.map((r) => <tr key={r.name}><td><b>{r.name}</b></td><td>{r.person}</td><td><Badge>{r.state}</Badge></td><td>{r.project}</td><td>{r.last}</td></tr>)}</tbody></table></div><div className={styles.panel}><Header title="선택한 고객" action="다리마티"/><h3>다리마티</h3><p>운동회 신규 기획 · 최신 프로젝트</p><div className={styles.detailInfo}><p><b>진행 프로젝트</b>다리마티 운동회</p><p><b>최근 결정</b>첫 행사는 10월 18일로 확정</p><p><b>다음 행동</b>시그니처 종목·후보 공간·예산 구조 우선순위 확정</p></div></div></section> }
 
 function Projects({ projects: rows, selected, onSelect }: { projects: typeof projects; selected: typeof projects[number]; onSelect: (p: typeof projects[number]) => void }) { return <div className={styles.projectLayout}><section className={styles.panel}><Header title="프로젝트 목록" action={`${rows.length}건`} />{rows.map((p) => <button className={`${styles.projectSelect} ${selected.name === p.name ? styles.selected : ''}`} onClick={() => onSelect(p)} key={p.name}><span><b>{p.name}</b><small>{p.client} · {p.owner}</small></span><Badge>{p.status}</Badge><strong>{p.progress}%</strong></button>)}</section><section className={`${styles.panel} ${styles.projectDetail}`}><Header title={selected.name} action={selected.status}/><p className={styles.meta}>{selected.client} · 담당 {selected.owner} · 진행률 {selected.progress}%</p><div className={styles.doc}><h3>프로젝트 개요</h3><p>고객과 합의한 목표, 작업 범위, 결정 사항을 이 공간에서 누적합니다. 구글 드라이브 폴더의 문서·파일을 바로 연결해 팀이 같은 맥락에서 이어서 작업합니다.</p><h3>다음 행동</h3><p>{selected.next}</p><h3>연결 자료</h3><ul><li>구글 드라이브 · 프로젝트 폴더</li><li>제안서 및 계약 관련 문서</li><li>시안 및 전달 파일</li></ul></div><button className={styles.primary}>프로젝트 열기</button></section></div> }
 
