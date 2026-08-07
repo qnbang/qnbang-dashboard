@@ -37,6 +37,7 @@ type DashboardData = {
 const won = (n: number) => `${n.toLocaleString('ko-KR')}원`;
 
 const TABS = [
+  { key: 'operating', label: '운영OS 실험', ready: true },
   { key: 'office', label: '🏢 사무실', ready: true },
   { key: 'tools', label: '🚀 자체사업', ready: true },
   { key: 'archive', label: '📋 프로젝트', ready: true },
@@ -133,7 +134,7 @@ export default function Home() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => goTab(t.key)}
+              onClick={() => t.key === 'operating' ? router.push('/operating') : goTab(t.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition ${
                 tab === t.key
                   ? 'border-indigo-600 text-indigo-600'
@@ -1739,4 +1740,3 @@ function ProgressBar({ done, total }: { done: number; total: number }) {
     </div>
   );
 }
-
