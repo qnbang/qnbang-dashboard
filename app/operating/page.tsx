@@ -5,25 +5,26 @@ import Link from 'next/link';
 import styles from './operating.module.css';
 
 type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '운영 설정';
+type Project = { name: string; client: string; progress: number; next: string; status: string; owner: string; summary?: string; documents?: string[]; hubUrl?: string };
 
 const menu: View[] = ['홈', '수신함', '할 일', '캘린더', '고객 관리', '프로젝트', '재무·정산', '공용 도구', '운영 설정'];
 const tasks = [
   { title: '시그니처 종목과 예산 구조 확정', project: '다리마티 운동회', due: '이번 주', owner: '신종호', state: '진행 중' },
   { title: '제안 문서와 체크리스트 현황 확인', project: '브이큐 업무자동화', due: '이번 주', owner: '신종호', state: '진행 중' },
-  { title: '전자서명 발송 전 계약서 최종 확인', project: '좋은움직임연구소 러너 세션', due: '확인 필요', owner: '신종호', state: '대기' },
+  { title: '러너 세션 납품 문서 4종 대표님 검토', project: '좋은움직임연구소 러너 세션', due: '검토 대기', owner: '신종호', state: '진행 중' },
   { title: '라이브 서비스와 어드민 최종 검수', project: '다비교랩', due: '다음 순서', owner: '신종호', state: '검수' },
   { title: '행사 개발·현장테스트 일정 재확인', project: '망원 야간보물찾기', due: '확인 필요', owner: '신종호', state: '진행 중' },
 ];
-const projects = [
+const projects: Project[] = [
   { name: '다리마티 운동회', client: '다리마티', progress: 18, next: '시그니처 종목과 예산 구조 확정', status: '기획 중', owner: '신종호' },
   { name: '브이큐 업무자동화', client: '브이큐스튜디오', progress: 42, next: '제안 문서와 체크리스트 현황 확인', status: '진행 중', owner: '신종호' },
-  { name: '좋은움직임연구소 러너 세션', client: '좋은움직임연구소', progress: 64, next: '전자서명 발송 전 계약서 최종 확인', status: '계약 진행', owner: '신종호' },
+  { name: '좋은움직임연구소 러너 세션', client: '좋은움직임연구소', progress: 72, next: '60분 프로그램 반영 납품 문서 4종을 대표님과 검토', status: '문서 초안 검토', owner: '신종호', summary: '통증·재발이 있는 일반 러너를 위한 60분 세션을, 프로그램 표현·홍보·고객 관리·크루 컨택까지 한 세트로 정리합니다. 기존 OS의 계약·금액·일정은 그대로 두고, 운영OS에서는 문서와 다음 행동만 병행 확인합니다.', documents: ['프로그램 다듬기 + 세션 네이밍', '홍보 문구 세트', '고객 관리 세트', '크루·모임 컨택'], hubUrl: '/hub/good-movement' },
   { name: '다비교랩', client: '큐앤뱅 자체사업', progress: 92, next: '라이브 서비스와 어드민 최종 검수', status: '검수 중', owner: '신종호' },
   { name: '망원 야간보물찾기', client: '망리단길골목형상점가 상인회', progress: 58, next: '행사 개발·현장테스트 일정 재확인', status: '진행 중', owner: '신종호' },
 ];
 const messages = [
   { channel: '라크', sender: '다리마티 프로젝트', time: '최신', body: '첫 행사는 10월 18일로 확정. 시그니처 종목 개발 원칙을 정리했습니다.', project: '다리마티 운동회', customer: '다리마티', action: '종목·공간·예산 우선순위 확정' },
-  { channel: '메일', sender: '좋은움직임연구소', time: '최신', body: '계약서 전자서명 발송 전 최종 확인이 필요합니다.', project: '좋은움직임연구소 러너 세션', customer: '좋은움직임연구소', action: '계약서 확인 후 전자서명 발송' },
+  { channel: '문서', sender: '좋은움직임연구소', time: '오늘', body: '대표님 제공 60분 프로그램을 반영한 납품 문서 4종 초안이 준비되었습니다.', project: '좋은움직임연구소 러너 세션', customer: '좋은움직임연구소', action: '세션명·전문 동작·후속 안내 범위를 대표님과 검토' },
   { channel: '라크', sender: '망원 야간보물찾기', time: '최신', body: '개발·현장 테스트 일정과 참여 매장 명단 일정을 다시 확인해야 합니다.', project: '망원 야간보물찾기', customer: '망리단길골목형상점가 상인회', action: '크리티컬 패스 일정 점검' },
 ];
 
@@ -77,7 +78,7 @@ function Calendar() { return <section className={styles.panel}><div className={s
 
 function Customers({ query }: { query: string }) { const rows = [{name:'다리마티',person:'황현욱',state:'진행 중',project:'다리마티 운동회',last:'8월 7일'}, {name:'브이큐스튜디오',person:'손정현',state:'진행 중',project:'브이큐 업무자동화',last:'8월 5일'}, {name:'좋은움직임연구소',person:'오승식',state:'계약 진행',project:'러너 세션 기획',last:'7월 31일'}, {name:'망리단길골목형상점가 상인회',person:'상인회 담당자',state:'진행 중',project:'망원 야간보물찾기',last:'최신 기록 확인 필요'}].filter((r) => `${r.name} ${r.person}`.includes(query)); return <section className={styles.customerGrid}><div className={styles.panel}><Header title="고객사" action={`${rows.length}곳`} /><table><thead><tr><th>고객사</th><th>담당자</th><th>진행 상태</th><th>연결 프로젝트</th><th>최근 대화</th></tr></thead><tbody>{rows.map((r) => <tr key={r.name}><td><b>{r.name}</b></td><td>{r.person}</td><td><Badge>{r.state}</Badge></td><td>{r.project}</td><td>{r.last}</td></tr>)}</tbody></table></div><div className={styles.panel}><Header title="선택한 고객" action="다리마티"/><h3>다리마티</h3><p>운동회 신규 기획 · 최신 프로젝트</p><div className={styles.detailInfo}><p><b>진행 프로젝트</b>다리마티 운동회</p><p><b>최근 결정</b>첫 행사는 10월 18일로 확정</p><p><b>다음 행동</b>시그니처 종목·후보 공간·예산 구조 우선순위 확정</p></div></div></section> }
 
-function Projects({ projects: rows, selected, onSelect }: { projects: typeof projects; selected: typeof projects[number]; onSelect: (p: typeof projects[number]) => void }) { return <div className={styles.projectLayout}><section className={styles.panel}><Header title="프로젝트 목록" action={`${rows.length}건`} />{rows.map((p) => <button className={`${styles.projectSelect} ${selected.name === p.name ? styles.selected : ''}`} onClick={() => onSelect(p)} key={p.name}><span><b>{p.name}</b><small>{p.client} · {p.owner}</small></span><Badge>{p.status}</Badge><strong>{p.progress}%</strong></button>)}</section><section className={`${styles.panel} ${styles.projectDetail}`}><Header title={selected.name} action={selected.status}/><p className={styles.meta}>{selected.client} · 담당 {selected.owner} · 진행률 {selected.progress}%</p><div className={styles.doc}><h3>프로젝트 개요</h3><p>고객과 합의한 목표, 작업 범위, 결정 사항을 이 공간에서 누적합니다. 구글 드라이브 폴더의 문서·파일을 바로 연결해 팀이 같은 맥락에서 이어서 작업합니다.</p><h3>다음 행동</h3><p>{selected.next}</p><h3>연결 자료</h3><ul><li>구글 드라이브 · 프로젝트 폴더</li><li>제안서 및 계약 관련 문서</li><li>시안 및 전달 파일</li></ul></div><button className={styles.primary}>프로젝트 열기</button></section></div> }
+function Projects({ projects: rows, selected, onSelect }: { projects: Project[]; selected: Project; onSelect: (p: Project) => void }) { return <div className={styles.projectLayout}><section className={styles.panel}><Header title="프로젝트 목록" action={`${rows.length}건`} />{rows.map((p) => <button className={`${styles.projectSelect} ${selected.name === p.name ? styles.selected : ''}`} onClick={() => onSelect(p)} key={p.name}><span><b>{p.name}</b><small>{p.client} · {p.owner}</small></span><Badge>{p.status}</Badge><strong>{p.progress}%</strong></button>)}</section><section className={`${styles.panel} ${styles.projectDetail}`}><Header title={selected.name} action={selected.status}/><p className={styles.meta}>{selected.client} · 담당 {selected.owner} · 진행률 {selected.progress}%</p><div className={styles.doc}><h3>프로젝트 개요</h3><p>{selected.summary ?? '고객과 합의한 목표, 작업 범위, 결정 사항을 이 공간에서 누적합니다. 구글 드라이브 폴더의 문서·파일을 바로 연결해 팀이 같은 맥락에서 이어서 작업합니다.'}</p><h3>다음 행동</h3><p>{selected.next}</p><h3>납품 문서</h3>{selected.documents ? <ul>{selected.documents.map((document) => <li key={document}>{document} · 초안 완료</li>)}</ul> : <ul><li>구글 드라이브 · 프로젝트 폴더</li><li>제안서 및 계약 관련 문서</li><li>시안 및 전달 파일</li></ul>}</div>{selected.hubUrl ? <Link className={styles.primary} href={selected.hubUrl}>협업 허브 열기</Link> : <button className={styles.primary}>프로젝트 열기</button>}</section></div> }
 
 function Finance() { const rows = [{time:'오늘 09:12', who:'주식회사 오르', amount:'1,100,000원', type:'입금', category:'프로젝트 매출', confidence:'72%', state:'확인 필요'}, {time:'어제 16:44', who:'어도비', amount:'33,000원', type:'출금', category:'프로그램 사용료', confidence:'98%', state:'자동 분류'}, {time:'어제 13:28', who:'모호스 스튜디오', amount:'2,200,000원', type:'입금', category:'프로젝트 매출', confidence:'99%', state:'자동 분류'}]; return <><section className={styles.metrics}><Metric label="이번 달 입금" value="8,420,000" detail="확정 매출 기준"/><Metric label="이번 달 지출" value="1,264,000" detail="통장 기록 기준"/><Metric label="확인 대기" value="1" detail="사람 확인 필요"/><Metric label="미수금" value="3,300,000" detail="기존 원장 연동"/></section><section className={styles.panel}><Header title="통장 기록" action="자동 분류 · 확인 후 확정"/><table><thead><tr><th>시각</th><th>상대</th><th>금액</th><th>자동 분류</th><th>신뢰도</th><th>상태</th></tr></thead><tbody>{rows.map((r) => <tr key={r.time}><td>{r.time}</td><td><b>{r.who}</b></td><td>{r.amount}<small>{r.type}</small></td><td>{r.category}</td><td>{r.confidence}</td><td><Badge>{r.state}</Badge></td></tr>)}</tbody></table></section><section className={styles.notice}><div><b>사람 확인이 필요한 거래</b><p>‘주식회사 오르’ 입금은 고객·프로젝트 후보를 찾아두었습니다. 확인하면 기존 정산 원장에 기록합니다.</p></div><button>거래 확인</button></section></> }
 

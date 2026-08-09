@@ -77,10 +77,10 @@ export const HUB: Record<string, HubCfg> = {
       meta: '60만원(VAT 별도) · 크롤링 제외 약 1주 / 포함 약 2주 · 프로그램 다듬기·홍보 문구·고객 관리·크루 컨택까지 한 세트로 납품.',
     },
     deliverables: [
-      { name: '프로그램 다듬기 + 세션 네이밍', badge: '예정', src: 'good-movement-session-plan' },
-      { name: '홍보 문구 세트 (네이버·인스타)', badge: '예정', src: 'good-movement-promo' },
-      { name: '고객 관리 세트 (체크리스트·후기·관리대장)', badge: '예정', src: 'good-movement-ops' },
-      { name: '크루·모임 컨택 (리스트·템플릿·간단 크롤링)', badge: '예정', src: 'good-movement-crew' },
+      { name: '프로그램 다듬기 + 세션 네이밍', badge: '초안 완료', badgeType: 'doing' },
+      { name: '홍보 문구 세트 (네이버·인스타)', badge: '초안 완료', badgeType: 'doing' },
+      { name: '고객 관리 세트 (체크리스트·후기·관리대장)', badge: '초안 완료', badgeType: 'doing' },
+      { name: '크루·모임 컨택 (리스트·템플릿·간단 크롤링)', badge: '초안 완료', badgeType: 'doing' },
     ],
     nav: [],
     navGroups: [
