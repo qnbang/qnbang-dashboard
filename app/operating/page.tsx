@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import styles from './operating.module.css';
 
@@ -33,9 +33,26 @@ const Badge = ({ children }: { children: string }) => <span className={styles.ba
 export default function OperatingPage() {
   const [view, setView] = useState<View>('홈');
   const [query, setQuery] = useState('');
+  const [operatingProjects, setOperatingProjects] = useState<Project[]>(projects);
   const [selectedMessage, setSelectedMessage] = useState(messages[0]);
   const [selectedProject, setSelectedProject] = useState(projects[0]);
-  const shownProjects = useMemo(() => projects.filter((p) => `${p.name} ${p.client}`.includes(query)), [query]);
+  const shownProjects = useMemo(() => operatingProjects.filter((p) => `${p.name} ${p.client}`.includes(query)), [operatingProjects, query]);
+
+  useEffect(() => {
+    fetch('/api/operating/good-movement').then(async (response) => {
+      if (!response.ok) return;
+      const data = await response.json();
+      const next = data.tasks?.[0]?.title || data.overview?.['다음 행동'];
+      const updated = operatingProjects.map((project) => project.name !== '좋은움직임연구소 러너 세션' ? project : {
+        ...project,
+        status: data.overview?.['상태'] || project.status,
+        next: next || project.next,
+        documents: data.documents?.map((document: { name: string; status: string }) => `${document.name} · ${document.status}`) || project.documents,
+      });
+      setOperatingProjects(updated);
+      setSelectedProject((project) => project.name !== '좋은움직임연구소 러너 세션' ? project : updated.find((item) => item.name === project.name) || project);
+    }).catch(() => undefined);
+  }, []);
 
   const content = () => {
     if (view === '수신함') return <Inbox selected={selectedMessage} onSelect={setSelectedMessage} />;
