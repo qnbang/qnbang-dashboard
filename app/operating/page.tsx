@@ -4,11 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import styles from './operating.module.css';
 
-type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '운영 설정';
+type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '이관 현황' | '운영 설정';
 type Workstream = { name: string; outcome: string; status: string; owner: string; next: string; due?: string; links?: string };
 type Project = { name: string; client: string; progress: number; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: Workstream[]; hubUrl?: string };
 
-const menu: View[] = ['홈', '수신함', '할 일', '캘린더', '고객 관리', '프로젝트', '재무·정산', '공용 도구', '운영 설정'];
+const menuGroups: { label: string; items: View[] }[] = [
+  { label: '운영', items: ['홈', '수신함', '할 일', '캘린더', '프로젝트', '고객 관리', '재무·정산'] },
+  { label: '자산', items: ['공용 도구'] },
+  { label: '전환', items: ['이관 현황', '운영 설정'] },
+];
 const tasks = [
   { title: '시그니처 종목과 예산 구조 확정', project: '다리마티 운동회', due: '이번 주', owner: '신종호', state: '진행 중' },
   { title: '제안 문서와 체크리스트 현황 확인', project: '브이큐 업무자동화', due: '이번 주', owner: '신종호', state: '진행 중' },
@@ -63,6 +67,7 @@ export default function OperatingPage() {
     if (view === '프로젝트') return <Projects projects={shownProjects} selected={selectedProject} onSelect={setSelectedProject} />;
     if (view === '재무·정산') return <Finance />;
     if (view === '공용 도구') return <Tools />;
+    if (view === '이관 현황') return <Migration />;
     if (view === '운영 설정') return <Settings />;
     return <Home onView={setView} />;
   };
@@ -70,8 +75,8 @@ export default function OperatingPage() {
   return <div className={styles.shell}>
     <aside className={styles.side}>
       <Link className={styles.brand} href="/">QNB <span>운영OS</span></Link>
-      <nav>{menu.map((item) => <button key={item} className={view === item ? styles.active : ''} onClick={() => setView(item)}>{item}</button>)}</nav>
-      <div className={styles.sync}><strong>실험 모드</strong><p>기존 라크·정산은 유지 중</p><p>원장 연결 대기</p></div>
+      <nav>{menuGroups.map((group) => <section className={styles.navGroup} key={group.label}><span>{group.label}</span>{group.items.map((item) => <button key={item} className={view === item ? styles.active : ''} onClick={() => setView(item)}>{item}</button>)}</section>)}</nav>
+      <div className={styles.sync}><strong>전면 이관 진행</strong><p>새 기준: 큐앤뱅 뉴 대시보드</p><p>기존 시스템은 원본 보존</p></div>
     </aside>
     <main className={styles.main}>
       <header className={styles.top}><div><p className={styles.crumb}>큐앤뱅 운영 허브</p><h1>{view}</h1></div><div className={styles.actions}><input aria-label="프로젝트와 고객 검색" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="프로젝트·고객 검색"/><button className={styles.primary} onClick={() => setView('프로젝트')}>새 프로젝트</button></div></header>
@@ -145,7 +150,15 @@ function Projects({ projects: rows, selected, onSelect }: { projects: Project[];
 function Finance() { const rows = [{time:'오늘 09:12', who:'주식회사 오르', amount:'1,100,000원', type:'입금', category:'프로젝트 매출', confidence:'72%', state:'확인 필요'}, {time:'어제 16:44', who:'어도비', amount:'33,000원', type:'출금', category:'프로그램 사용료', confidence:'98%', state:'자동 분류'}, {time:'어제 13:28', who:'모호스 스튜디오', amount:'2,200,000원', type:'입금', category:'프로젝트 매출', confidence:'99%', state:'자동 분류'}]; return <><section className={styles.metrics}><Metric label="이번 달 입금" value="8,420,000" detail="확정 매출 기준"/><Metric label="이번 달 지출" value="1,264,000" detail="통장 기록 기준"/><Metric label="확인 대기" value="1" detail="사람 확인 필요"/><Metric label="미수금" value="3,300,000" detail="기존 원장 연동"/></section><section className={styles.panel}><Header title="통장 기록" action="자동 분류 · 확인 후 확정"/><table><thead><tr><th>시각</th><th>상대</th><th>금액</th><th>자동 분류</th><th>신뢰도</th><th>상태</th></tr></thead><tbody>{rows.map((r) => <tr key={r.time}><td>{r.time}</td><td><b>{r.who}</b></td><td>{r.amount}<small>{r.type}</small></td><td>{r.category}</td><td>{r.confidence}</td><td><Badge>{r.state}</Badge></td></tr>)}</tbody></table></section><section className={styles.notice}><div><b>사람 확인이 필요한 거래</b><p>‘주식회사 오르’ 입금은 고객·프로젝트 후보를 찾아두었습니다. 확인하면 기존 정산 원장에 기록합니다.</p></div><button>거래 확인</button></section></> }
 
 function Tools() { return <section className={styles.panel}><Header title="팀 공용 도구" action="드라이브 자산"/><div className={styles.toolGrid}>{[['쇼츠 자동편집기','맥·윈도우 지원','영상 제작'], ['견적서 생성기','웹에서 사용','운영 문서'], ['키워드 검색기','웹에서 사용','마케팅']].map(([name,os,purpose]) => <div className={styles.tool} key={name}><h3>{name}</h3><p>{purpose}</p><Badge>{os}</Badge><button>사용 안내</button></div>)}</div></section> }
-function Settings() { return <section className={styles.panel}><Header title="운영OS 연결 상태" action="실험 단계"/><div className={styles.settings}><p><b>구글 드라이브</b><span>공식 폴더 생성 완료 · 실험 원장 연결 대기</span></p><p><b>구글 시트</b><span>고객·프로젝트·할 일·수신·정산 확인 원장 준비</span></p><p><b>라크</b><span>기존 실시간 자동화 유지 · 신규 원장은 읽기 중심</span></p><p><b>구글 캘린더</b><span>기존 연동 유지 · 일정/할 일 분리 표시</span></p><p><b>GitHub</b><span>배포 코드만 유지 · 운영 지식과 문서는 드라이브 중심</span></p></div></section> }
+function Migration() { const rows = [
+  ['프로젝트 파일', '기존 프로젝트 31개 확인', '새 번호·고객ID 배정 전'],
+  ['고객·담당자·명함', '고객 관리 화면 우선 구축', '기존 CRM 원장 대조 전'],
+  ['할 일·결정·일정', '기존 과업·캘린더 자동화 유지', '프로젝트 원장 7개 탭 이관 전'],
+  ['계약·매출·지출', '기존 재무 단일원장 유지', '월별 행 수·합계 대조 전'],
+  ['수신함·회의록', '라크·메일 경로 확인됨', '카카오톡봇 맥북 연결 필요'],
+  ['공용도구·개인규칙', '새 드라이브 폴더 생성 완료', '실행 가능 여부 점검 전'],
+]; return <><section className={styles.hero}><div><p className={styles.eyebrow}>전체 데이터 이주</p><h2>새 운영은 새 폴더에서,<br/>기존 기록은 그대로 보존합니다.</h2><p>새 기준 공간은 구글 드라이브 최상단의 ‘큐앤뱅 뉴 대시보드’입니다. 파일을 먼저 복사·대조한 뒤에만 기존 시스템을 과거 열람으로 전환합니다.</p></div><Badge>원본 삭제 없음</Badge></section><section className={styles.panel}><Header title="이관 현황" action="전면 이관 준비"/><table><thead><tr><th>데이터</th><th>현재 확인</th><th>다음 작업</th></tr></thead><tbody>{rows.map(([name, current, next]) => <tr key={name}><td><b>{name}</b></td><td>{current}</td><td>{next}</td></tr>)}</tbody></table></section><section className={styles.notice}><div><b>다른 맥북 작업 1건</b><p>카카오톡봇이 돌아가는 맥북에서 원문·발신시각·대화ID·첨부 링크를 GCP 수신 주소로 보내도록 바꾸면, 새 통합 수신함에서 고객과 프로젝트 후보를 연결할 수 있습니다.</p></div><button>작업 목록 보기</button></section></> }
+function Settings() { return <section className={styles.panel}><Header title="운영OS 연결 상태" action="전면 이관 준비"/><div className={styles.settings}><p><b>구글 드라이브</b><span>‘큐앤뱅 뉴 대시보드’ 전용 루트 생성 완료</span></p><p><b>구글 시트</b><span>고객·프로젝트·할 일·수신·정산 원장을 새 기준으로 이관 예정</span></p><p><b>라크</b><span>기존 실시간 자동화를 새 통합수신함과 원장으로 단계 전환</span></p><p><b>구글 캘린더</b><span>기존 일정 원본을 보존하며 새 일정 원장으로 연결</span></p><p><b>카카오톡봇</b><span>별도 맥북의 봇을 GCP 수신 주소에 연결해야 함</span></p><p><b>GitHub</b><span>배포 코드만 유지 · 운영 지식과 문서는 드라이브 중심</span></p></div></section> }
 function Header({ title, action, onClick }: { title:string; action:string; onClick?: () => void }) { return <div className={styles.panelHead}><h2>{title}</h2>{onClick ? <button onClick={onClick}>{action}</button> : <span>{action}</span>}</div> }
 function Metric({ label, value, detail }: { label:string; value:string; detail:string }) { return <div className={styles.metric}><span>{label}</span><b>{value}</b><small>{detail}</small></div> }
 function Event({ title, project }: { title:string; project:string }) { return <div className={styles.event}><b>{title}</b><small>{project}</small></div> }
