@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import BusinessCardCapture, { type 명함등록값 } from './components/BusinessCardCapture';
 import styles from './operating.module.css';
 
 type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '사이트 관리' | '이관 현황' | '통합 운영 로그' | '운영 설정';
@@ -97,7 +98,7 @@ export default function OperatingPage() {
     if (view === '수신함') return <Inbox selected={selectedMessage} onSelect={setSelectedMessage} />;
     if (view === '할 일') return <><ScreenIntro crumb="할 일" title="할 일" description="할 일은 하나만 기록하고, 프로젝트·고객·캘린더에서 같은 상태를 봅니다." action="할 일 추가" onAction={() => undefined}/><TaskList projects={operatingProjects} onOpenProject={openProjectByName} /></>;
     if (view === '캘린더') return <Calendar />;
-    if (view === '고객 관리') return <Partners query={query} />;
+    if (view === '고객 관리') return <PartnersWithCardCapture query={query} />;
     if (view === '프로젝트') return <><ScreenIntro crumb="프로젝트" title="프로젝트" description="진행 중인 업무를 ‘다음 행동’과 함께 목록으로 이어갑니다." action="새 프로젝트 등록" onAction={() => undefined}/><div className={styles.projectSearch}><input placeholder="프로젝트명, 고객사, 담당자로 검색" value={query} onChange={(event) => setQuery(event.target.value)} /><button>진행 중</button></div><Projects projects={shownProjects} selected={selectedProject} onSelect={setSelectedProject} onOpenProject={openProject} /></>;
     if (view === '재무·정산') return <Finance />;
     if (view === '공용 도구') return <Tools />;
@@ -215,3 +216,35 @@ function Settings() { return <section className={styles.panel}><Header title="�
 function Header({ title, action, onClick }: { title:string; action:string; onClick?: () => void }) { return <div className={styles.panelHead}><h2>{title}</h2>{onClick ? <button onClick={onClick}>{action}</button> : <span>{action}</span>}</div> }
 function Metric({ label, value, detail }: { label:string; value:string; detail:string }) { return <div className={styles.metric}><span>{label}</span><b>{value}</b><small>{detail}</small></div> }
 function Event({ title, project }: { title:string; project:string }) { return <div className={styles.event}><b>{title}</b><small>{project}</small></div> }
+
+function PartnersWithCardCapture({ query }: { query: string }) {
+  const [partners, setPartners] = useState<Partner[]>(initialPartners);
+  const [selectedId, setSelectedId] = useState(initialPartners[0].id);
+  const [filter, setFilter] = useState<'전체' | Partner['kind']>('전체');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const rows = partners.filter((partner) => (filter === '전체' || partner.kind === filter) && `${partner.name} ${partner.contacts.map((contact) => contact.name).join(' ')}`.includes(query));
+  const selected = partners.find((partner) => partner.id === selectedId) || rows[0] || partners[0];
+  const register = (card: 명함등록값) => {
+    const partnerName = card.회사명.trim() || card.이름.trim();
+    const kind: Partner['kind'] = card.구분 === '회사' ? '회사' : card.회사명.trim() ? '회사' : '개인';
+    const contact = { name: card.이름.trim() || partnerName, role: card.직함.trim() || (kind === '개인' ? '개인' : '담당자'), phone: card.연락처.trim() || undefined, email: card.이메일.trim() || undefined, card: card.이미지?.name || '명함 정보 직접 등록' };
+    const existing = partners.find((partner) => partner.name === partnerName);
+    if (existing) {
+      setPartners((current) => current.map((partner) => partner.id === existing.id ? { ...partner, contacts: [...partner.contacts, contact], last: '방금 명함 등록' } : partner));
+      setSelectedId(existing.id);
+    } else {
+      const id = `p-${Date.now()}`;
+      setPartners((current) => [...current, { id, name: partnerName, kind, status: '계약 전', projects: [], last: '방금 명함 등록', next: '첫 대화와 다음 행동 등록', contacts: [contact], note: card.메모.trim() || '명함에서 새로 등록한 고객 또는 개인 연락처입니다.' }]);
+      setSelectedId(id);
+    }
+    setIsRegistering(false);
+  };
+  return <>
+    <section className={styles.partnerToolbar}><div><h2>고객 관리</h2><p>회사·개인·담당자를 한 번만 등록하고, 명함과 프로젝트를 연결합니다.</p></div><button className={styles.primary} onClick={() => setIsRegistering(true)}>명함 등록</button></section>
+    <section className={styles.partnerFilters}>{(['전체', '회사', '개인'] as const).map((item) => <button key={item} className={filter === item ? styles.filterActive : ''} onClick={() => setFilter(item)}>{item}</button>)}</section>
+    <section className={styles.partnerLayout}><div className={styles.panel}><Header title="고객·개인 목록" action={`${rows.length}건`} />{rows.length ? <div className={styles.partnerList}>{rows.map((partner) => <button className={`${styles.partnerRow} ${selected.id === partner.id ? styles.selected : ''}`} key={partner.id} onClick={() => setSelectedId(partner.id)}><div><b>{partner.name}</b><small>{partner.kind} · {partner.status} · 담당자 {partner.contacts.length}명</small></div><span><Badge>{partner.projects.length ? `${partner.projects.length}개 프로젝트` : '프로젝트 미연결'}</Badge><small>{partner.last}</small></span></button>)}</div> : <p className={styles.empty}>조건에 맞는 고객이나 개인이 없습니다.</p>}</div>
+      <div className={`${styles.panel} ${styles.partnerDetail}`}><Header title={selected.name} action={`${selected.kind} · ${selected.status}`} /><p className={styles.meta}>{selected.note}</p><div className={styles.partnerSection}><h3>담당자와 명함</h3>{selected.contacts.map((contact) => <div className={styles.contactRow} key={`${contact.name}-${contact.card || ''}`}><div><b>{contact.name}</b><small>{contact.role}{contact.phone ? ` · ${contact.phone}` : ''}{contact.email ? ` · ${contact.email}` : ''}</small></div>{contact.card ? <Badge>{contact.card === '명함 등록됨' ? '명함 있음' : '등록됨'}</Badge> : <span className={styles.noCard}>명함 없음</span>}</div>)}</div><div className={styles.partnerSection}><h3>연결 프로젝트</h3>{selected.projects.length ? selected.projects.map((project) => <div className={styles.linkRow} key={project}><b>{project}</b><span>프로젝트 원장에서 진행 상황 확인</span></div>) : <p className={styles.empty}>아직 연결한 프로젝트가 없습니다.</p>}</div><div className={styles.partnerSection}><h3>최근 기록</h3><div className={styles.timeline}><p><b>최근 접점</b>{selected.last}</p><p><b>다음 행동</b>{selected.next}</p></div></div></div>
+    </section>
+    {isRegistering && <div className={styles.modalBackdrop} role="presentation"><section className={`${styles.modal} ${styles.cardCaptureModal}`} role="dialog" aria-modal="true" aria-label="명함 등록" onMouseDown={(event) => event.stopPropagation()}><BusinessCardCapture onCancel={() => setIsRegistering(false)} onSubmit={register} /></section></div>}
+  </>;
+}
