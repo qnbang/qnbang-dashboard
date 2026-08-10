@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import BusinessCardCapture, { type 명함등록값 } from './components/BusinessCardCapture';
 import OperatingInbox, { type 수신메시지 } from './components/OperatingInbox';
+import ProjectWorkspaceModal from './components/ProjectWorkspaceModal';
 import styles from './operating.module.css';
 
 type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '사이트 관리' | '이관 현황' | '통합 운영 로그' | '운영 설정';
@@ -131,7 +132,7 @@ export default function OperatingPage() {
     <main className={styles.main}>
       {!(['홈', '수신함', '할 일', '프로젝트'] as View[]).includes(view) && <header className={styles.top}><div><p className={styles.crumb}>큐앤뱅 운영 허브</p><h1>{view}</h1></div><div className={styles.actions}><input aria-label="프로젝트와 고객 검색" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="프로젝트·고객 검색"/><button className={styles.primary} onClick={() => setView('프로젝트')}>새 프로젝트</button></div></header>}
       {content()}
-      {openedProject && <ProjectFigmaModal project={openedProject} onClose={() => setOpenedProject(null)} />}
+      {openedProject && <ProjectWorkspaceModal project={openedProject} projects={operatingProjects} tasks={tasks} onClose={() => setOpenedProject(null)} />}
     </main>
   </div>;
 }
