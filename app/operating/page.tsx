@@ -40,15 +40,23 @@ const sharedTools = [
   { name: '매크로 투자 브리핑', kind: '웹 도구', platform: '공용', purpose: '시장 브리핑을 확인하는 내부 서비스입니다.', url: 'https://qnbang-macro-briefing.vercel.app' },
   { name: '가격 모니터링', kind: '웹 도구', platform: '공용', purpose: '상품 가격 변동을 확인하는 내부 서비스입니다.', url: 'https://qnbang-price-monitor.vercel.app' },
   { name: '쇼츠 자동편집기', kind: '로컬 도구', platform: 'macOS 확인됨', purpose: '현재 맥 작업환경에서 영상 전사·컷 구성·자막 작업을 실행합니다.', note: '공용도구 이관과 윈도우 실행 검증 후 팀 공용 실행 버튼을 연결합니다.' },
+  { name: '시각편집기', kind: '로컬 도구', platform: 'macOS 확인됨', purpose: '정적 사이트 화면을 브라우저에서 고치고 원본 프로젝트에 저장합니다.', note: '프로젝트 폴더에서 실행합니다. 윈도우는 실행 검증이 필요합니다.' },
+  { name: '이미지보정', kind: '로컬 도구', platform: 'macOS 전용', purpose: '이미지 업스케일·워터마크 제거 등 고해상도 보정 작업을 합니다.', note: '현재 제공 실행 파일이 macOS용입니다. 윈도우는 별도 패키지가 필요합니다.' },
+  { name: '한글 HWPX 편집', kind: '로컬 도구', platform: 'macOS 확인됨', purpose: '한컴 없이 HWPX 문서의 내용을 교체하고 서식을 보존합니다.', note: '윈도우 실행 환경은 별도 확인이 필요합니다.' },
+  { name: 'PPT 읽기', kind: '로컬 도구', platform: 'macOS 확인됨', purpose: 'PPTX 표·노트·슬라이드 내용을 정밀하게 추출합니다.', note: '윈도우 실행 환경은 별도 확인이 필요합니다.' },
+  { name: '템플릿 깃 검증', kind: '로컬 도구', platform: 'Windows 확인됨', purpose: '받은 템플릿에 남은 외부 깃 기록을 정리하고 검증합니다.', note: '윈도우 PowerShell용입니다. macOS용 실행 흐름은 별도 준비가 필요합니다.' },
 ];
 
 const managedSites = [
+  { name: '큐앤뱅 공식 홈페이지', kind: '회사 사이트', status: '운영 중', site: 'https://qnbang.com', admin: 'https://dashboard.qnbang.com/company', adminLabel: '운영 현황 열기', detail: '큐앤뱅의 공개 홈페이지입니다. 회사 운영 현황은 대시보드 대표 전용 화면에서 확인합니다.' },
   { name: '큐앤뱅 운영 대시보드', kind: '내부 운영', status: '운영 중', site: 'https://dashboard.qnbang.com', admin: 'https://dashboard.qnbang.com', detail: '팀 운영·정산·프로젝트 허브. 같은 주소에서 로그인 후 관리합니다.' },
   { name: '반보', kind: '자체 서비스', status: '운영 중', site: 'https://banbo-preview.vercel.app', admin: 'https://banbo-preview.vercel.app/admin.html', detail: '공개 화면과 전용 어드민을 분리해 운영합니다.' },
-  { name: '다비교랩', kind: '자체 서비스', status: '검수 중', site: 'https://dabigyo-lab.vercel.app', admin: 'https://dashboard.qnbang.com/hub/dabigyo', detail: '서비스 주소는 확인됐고, 운영 현황은 프로젝트 허브에서 확인합니다.' },
+  { name: '다비교랩', kind: '자체 서비스', status: '검수 중', site: 'https://dabigyo-lab.vercel.app', admin: 'https://dabigyo-lab.vercel.app/admin', detail: '공개 서비스와 콘텐츠 관리 화면을 분리해 운영합니다.' },
   { name: '자동화청년 사례집', kind: '자체 브랜드', status: '운영 중', site: 'https://jadong-cases.vercel.app', detail: '브랜드 사례를 보여주는 공개 사이트입니다.' },
-  { name: '큐앤뱅 공식 홈페이지', kind: '회사 사이트', status: '주소 확인 필요', detail: '공개 주소와 어드민 주소를 확인한 뒤 이 목록에 각각 등록합니다.' },
-  { name: '소리쉼', kind: '고객 사이트', status: '관리 주소 확인 필요', admin: 'https://business.naver.com', detail: '네이버 플레이스 관리는 연결됐습니다. 홈페이지 어드민의 정확한 주소는 확인 후 별도로 등록합니다.' },
+  { name: '소리쉼', kind: '고객 사이트', status: '운영 중', site: 'https://xn--oy2b17lvua.com', admin: 'https://xn--oy2b17lvua.com/admin.html', adminLabel: '고객 관리자 열기', detail: '고객이 문구·가격·사진·연락처·SEO를 수정하는 전용 관리자 화면입니다.' },
+  { name: '모호소 홈페이지', kind: '고객 사이트', status: '운영 중', site: 'https://mohoso-website.vercel.app', detail: '고객 홈페이지의 공개 운영 주소입니다.' },
+  { name: '망원 야간보물찾기', kind: '고객 서비스', status: '운영 중', site: 'https://mangwon-contract-web.vercel.app', admin: 'https://dashboard.qnbang.com/hub/mangwon', adminLabel: '운영 허브 열기', detail: '행사 웹과 프로젝트 운영 기록을 분리해 관리합니다.' },
+  { name: '다리마티 체크리스트', kind: '고객 서비스', status: '운영 중', site: 'https://darimati-checklist.vercel.app', detail: '행사 준비 자료를 받는 체크리스트 서비스입니다.' },
 ];
 
 const operatingLogs = [
@@ -183,7 +191,7 @@ function Tools() { return <>
 
 function Sites() { return <>
   <section className={styles.assetIntro}><div><h2>사이트 관리</h2><p>공개 사이트·관리 화면·배포된 서비스를 따로 모읍니다. 프로젝트 화면은 만드는 일을 관리하고, 이 화면은 이미 운영하는 사이트를 엽니다.</p></div><Badge>운영 자산</Badge></section>
-  <section className={styles.siteGrid}>{managedSites.map((site) => <article className={styles.siteCard} key={site.name}><div className={styles.siteHeading}><div><h3>{site.name}</h3><p>{site.kind}</p></div><Badge>{site.status}</Badge></div><p className={styles.siteDetail}>{site.detail}</p><div className={styles.siteActions}>{site.site && <a className={styles.secondaryLink} href={site.site} target="_blank" rel="noreferrer">사이트 열기</a>}{site.admin && <a className={styles.assetLink} href={site.admin} target="_blank" rel="noreferrer">관리 화면 열기</a>}</div></article>)}</section>
+  <section className={styles.siteGrid}>{managedSites.map((site) => <article className={styles.siteCard} key={site.name}><div className={styles.siteHeading}><div><h3>{site.name}</h3><p>{site.kind}</p></div><Badge>{site.status}</Badge></div><p className={styles.siteDetail}>{site.detail}</p><div className={styles.siteActions}>{site.site && <a className={styles.secondaryLink} href={site.site} target="_blank" rel="noreferrer">사이트 열기</a>}{site.admin && <a className={styles.assetLink} href={site.admin} target="_blank" rel="noreferrer">{site.adminLabel || '관리 화면 열기'}</a>}</div></article>)}</section>
 </> }
 
 function OperatingLog() { return <section className={styles.logLayout}><div className={styles.panel}><Header title="통합 운영 로그" action="프로젝트 로그와 분리"/><p className={styles.logGuide}>홈페이지·대시보드·도구·연동·저장 규칙처럼 여러 프로젝트에 영향을 주는 변경만 한 줄로 남깁니다.</p><div className={styles.logList}>{operatingLogs.map((log) => <article className={styles.logRow} key={`${log.date}-${log.area}`}><time>{log.date}</time><Badge>{log.area}</Badge><p>{log.text}</p></article>)}</div></div><aside className={`${styles.panel} ${styles.logRule}`}><Header title="기록 기준" action="운영원장 연결 예정"/><p><b>여기에 기록</b>사이트 수정, 배포 방식 변경, 도구 추가·폐기, 라크·카카오톡·캘린더 연결 변경</p><p><b>여기에 기록하지 않음</b>고객별 회의, 제작 피드백, 개별 프로젝트 진행 상황</p><p><b>저장 원칙</b>확정 후에는 운영원장 ‘통합 운영 로그’ 탭에 한 줄로 저장하고 이 화면에서 읽습니다.</p></aside></section> }
