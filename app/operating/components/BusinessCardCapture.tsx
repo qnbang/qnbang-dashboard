@@ -53,12 +53,6 @@ const 입력스타일 = {
   font: '400 14px inherit',
 };
 
-type 글자영역 = { rawValue: string };
-type 글자인식기 = { detect: (이미지: ImageBitmapSource) => Promise<글자영역[]> };
-type 글자인식기생성자 = new () => 글자인식기;
-
-const 브라우저글자인식기 = () => (window as unknown as { TextDetector?: 글자인식기생성자 }).TextDetector;
-
 /**
  * 카메라 또는 이미지 선택 뒤 사람이 내용을 확인해서 등록하는 명함 입력 화면입니다.
  * OCR 연결 전에는 원문 입력란을 바로 수정해 사용할 수 있습니다.
@@ -150,17 +144,18 @@ export default function BusinessCardCapture({ 기본값, onSubmit, onCancel, 제
 
   const 명함내용읽기 = async () => {
     if (!이미지) return;
-    const TextDetector = 브라우저글자인식기();
-    if (!TextDetector) {
-      set인식상태('지원 안 됨');
-      return;
-    }
     set인식상태('읽는 중');
     try {
-      const 결과 = await new TextDetector().detect(이미지);
-      const 원문 = 결과.map((영역) => 영역.rawValue.trim()).filter(Boolean).join('\n');
-      if (!원문) throw new Error('읽은 글자가 없습니다.');
-      set값((현재) => ({ ...현재, 원문 }));
+      const imageBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(이미지);
+      });
+      const response = await fetch('/api/operating/card-ocr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageBase64, mimeType: 이미지.type }) });
+      const result = await response.json();
+      if (!response.ok || !result.text) throw new Error(result.error || '명함을 읽지 못했습니다.');
+      set값((현재) => ({ ...현재, 원문: result.text }));
       set인식상태('완료');
     } catch {
       set인식상태('실패');
@@ -205,7 +200,7 @@ export default function BusinessCardCapture({ 기본값, onSubmit, onCancel, 제
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '-6px 0 20px', padding: 12, borderRadius: 8, background: 'var(--surface, #f7f8fa)' }}>
       <button type="button" disabled={!이미지 || 인식상태 === '읽는 중'} onClick={명함내용읽기} style={{ minHeight: 38, flexShrink: 0, padding: '0 12px', border: 0, borderRadius: 8, background: !이미지 || 인식상태 === '읽는 중' ? '#e9eaf0' : 'var(--accent, #5046e5)', color: !이미지 || 인식상태 === '읽는 중' ? '#98a2b3' : '#fff', font: '600 13px inherit', cursor: !이미지 || 인식상태 === '읽는 중' ? 'not-allowed' : 'pointer' }}>{인식상태 === '읽는 중' ? '명함 읽는 중…' : '명함 내용 읽기'}</button>
       <p role="status" style={{ margin: 0, color: 'var(--muted, #667085)', fontSize: 12, lineHeight: 1.55 }}>
-        {인식상태 === '지원 안 됨' ? '이 브라우저는 기기 내 글자인식을 지원하지 않습니다. 원문 칸에 직접 입력해 주세요.' : 인식상태 === '실패' ? '글자를 읽지 못했습니다. 사진을 다시 찍거나 원문을 직접 입력해 주세요.' : 인식상태 === '완료' ? '읽은 내용을 원문 칸에 넣었습니다. 정확도를 확인해 수정해 주세요.' : '이미지는 외부로 업로드하지 않고, 지원되는 브라우저에서 현재 기기 안에서만 읽습니다.'}
+        {인식상태 === '실패' ? 'OCR이 명함을 읽지 못했습니다. 사진을 다시 찍거나 원문을 직접 입력해 주세요.' : 인식상태 === '완료' ? 'OCR이 읽은 내용을 원문 칸에 넣었습니다. 정확도를 확인해 수정해 주세요.' : '촬영 이미지는 큐앤뱅 구글 클라우드 OCR에서 읽고, 인식 결과는 사람이 확인한 뒤에만 등록합니다.'}
       </p>
     </div>
 
