@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import BusinessCardCapture, { type 명함등록값 } from './components/BusinessCardCapture';
+import OperatingInbox, { type 수신메시지 } from './components/OperatingInbox';
 import styles from './operating.module.css';
 
 type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '사이트 관리' | '이관 현황' | '통합 운영 로그' | '운영 설정';
@@ -28,11 +29,7 @@ const projects: Project[] = [
   { name: '다비교랩', client: '큐앤뱅 자체사업', progress: 92, next: '라이브 서비스와 어드민 최종 검수', status: '검수 중', owner: '신종호', blocker: '최종 검수 항목 정리 필요', due: '다음 순서' },
   { name: '망원 야간보물찾기', client: '망리단길골목형상점가 상인회', progress: 58, next: '행사 개발·현장테스트 일정 재확인', status: '진행 중', owner: '신종호', blocker: '참여 매장 명단 확인 필요', due: '확인 필요' },
 ];
-const messages = [
-  { channel: '라크', sender: '다리마티 프로젝트', time: '최신', body: '첫 행사는 10월 18일로 확정. 시그니처 종목 개발 원칙을 정리했습니다.', project: '다리마티 운동회', customer: '다리마티', action: '종목·공간·예산 우선순위 확정' },
-  { channel: '문서', sender: '좋은움직임연구소', time: '오늘', body: '대표님 제공 60분 프로그램을 반영한 납품 문서 4종 초안이 준비되었습니다.', project: '좋은움직임연구소 러너 세션', customer: '좋은움직임연구소', action: '세션명·전문 동작·후속 안내 범위를 대표님과 검토' },
-  { channel: '라크', sender: '망원 야간보물찾기', time: '최신', body: '개발·현장 테스트 일정과 참여 매장 명단 일정을 다시 확인해야 합니다.', project: '망원 야간보물찾기', customer: '망리단길골목형상점가 상인회', action: '크리티컬 패스 일정 점검' },
-];
+const messages: 수신메시지[] = [];
 
 const sharedTools = [
   { name: '키워드 광고 도구', kind: '웹 도구', platform: '공용', purpose: '네이버 키워드 광고 데이터를 확인하는 업무 도구입니다.', url: 'https://qnbang-naver-keyword.vercel.app' },
@@ -72,6 +69,9 @@ export default function OperatingPage() {
   const [query, setQuery] = useState('');
   const [operatingProjects, setOperatingProjects] = useState<Project[]>(projects);
   const [selectedMessage, setSelectedMessage] = useState(messages[0]);
+  const [inboxMessages, setInboxMessages] = useState<수신메시지[]>(messages);
+  const [inboxStatus, setInboxStatus] = useState('불러오는 중');
+  const [inboxNotice, setInboxNotice] = useState('');
   const [selectedProject, setSelectedProject] = useState(projects[0]);
   const [openedProject, setOpenedProject] = useState<Project | null>(null);
   const shownProjects = useMemo(() => operatingProjects.filter((p) => `${p.name} ${p.client}`.includes(query)), [operatingProjects, query]);
@@ -94,8 +94,21 @@ export default function OperatingPage() {
     }).catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    fetch('/api/operating/inbox').then(async (response) => {
+      const data = await response.json();
+      setInboxMessages(data.items || []);
+      setInboxStatus(data.status || (response.ok ? '연결됨' : '오류'));
+      setInboxNotice(data.message || '');
+      if (data.items?.[0]) setSelectedMessage(data.items[0]);
+    }).catch(() => {
+      setInboxStatus('오류');
+      setInboxNotice('통합 수신 원장 연결을 확인하지 못했습니다.');
+    });
+  }, []);
+
   const content = () => {
-    if (view === '수신함') return <Inbox selected={selectedMessage} onSelect={setSelectedMessage} />;
+    if (view === '수신함') return <OperatingInbox items={inboxMessages} status={inboxStatus} message={inboxNotice} />;
     if (view === '할 일') return <><ScreenIntro crumb="할 일" title="할 일" description="할 일은 하나만 기록하고, 프로젝트·고객·캘린더에서 같은 상태를 봅니다." action="할 일 추가" onAction={() => undefined}/><TaskList projects={operatingProjects} onOpenProject={openProjectByName} /></>;
     if (view === '캘린더') return <Calendar />;
     if (view === '고객 관리') return <PartnersWithCardCapture query={query} />;
@@ -106,7 +119,7 @@ export default function OperatingPage() {
     if (view === '이관 현황') return <Migration />;
     if (view === '통합 운영 로그') return <OperatingLog />;
     if (view === '운영 설정') return <Settings />;
-    return <Home onView={setView} projects={operatingProjects} onOpenProject={openProject} />;
+    return <Home onView={setView} projects={operatingProjects} onOpenProject={openProject} messages={inboxMessages} inboxStatus={inboxStatus} />;
   };
 
   return <div className={styles.shell}>
@@ -123,11 +136,11 @@ export default function OperatingPage() {
   </div>;
 }
 
-function Home({ onView, projects: homeProjects, onOpenProject }: { onView: (view: View) => void; projects: Project[]; onOpenProject: (project: Project) => void }) { return <>
+function Home({ onView, projects: homeProjects, onOpenProject, messages: homeMessages, inboxStatus }: { onView: (view: View) => void; projects: Project[]; onOpenProject: (project: Project) => void; messages: 수신메시지[]; inboxStatus: string }) { return <>
   <section className={styles.homeIntro}><div><p className={styles.crumb}>운영 대시보드</p><h2>오늘, 팀이 이어서 일할 수 있게</h2><p>수신함과 원장을 확인해 다음 행동을 정리합니다.</p></div><button className={styles.primary} onClick={() => onView('프로젝트')}>새 프로젝트</button></section>
-  <section className={styles.todayCheck}><b>오늘 확인할 것 3개</b><span>수신함에서 할 일 후보 2건 · 통장 거래 분류 1건</span><button onClick={() => onView('수신함')}>확인하기</button></section>
-  <section className={styles.metrics}><Metric label="새 수신" value="3건" detail="라크 2 · 문서 1"/><Metric label="오늘 할 일" value="5건" detail="마감 임박 2건"/><Metric label="오늘 일정" value="3건" detail="라크·구글 캘린더"/><Metric label="확인 대기" value="3건" detail="거래·고객 연결 필요"/></section>
-  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>통합 수신함</h2><p>원문과 출처를 유지한 채, 필요한 것만 할 일로 전환합니다.</p></div><button onClick={() => onView('수신함')}>전체 보기</button></div>{messages.map((m) => <button key={m.time} className={styles.messageRow} onClick={() => onView('수신함')}><Badge>{m.channel}</Badge><span><b>{m.sender}</b><small>{m.body}</small></span><time>{m.time}</time></button>)}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>오늘 팀의 실행</h2><p>할 일과 일정은 한 번 기록하고, 필요한 화면에서 함께 봅니다.</p></div></div>{tasks.slice(0,3).map((t, index) => <button className={styles.executionRow} key={t.title} onClick={() => onView('할 일')}><b>{['14:00', '16:00', '17:30'][index]}</b><span><strong>{t.title}</strong><small>{t.project}</small></span></button>)}<div className={styles.panelActions}><button onClick={() => onView('할 일')}>할 일·일정 보기</button></div></div></section>
+  <section className={styles.todayCheck}><b>오늘 확인할 것</b><span>수신 원문 {homeMessages.length}건 · 통장 거래 분류 1건</span><button onClick={() => onView('수신함')}>확인하기</button></section>
+  <section className={styles.metrics}><Metric label="새 수신" value={`${homeMessages.length}건`} detail={inboxStatus}/><Metric label="오늘 할 일" value="5건" detail="마감 임박 2건"/><Metric label="오늘 일정" value="3건" detail="라크·구글 캘린더"/><Metric label="확인 대기" value="3건" detail="거래·고객 연결 필요"/></section>
+  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>통합 수신함</h2><p>원문과 출처를 유지한 채, 필요한 것만 할 일로 전환합니다.</p></div><button onClick={() => onView('수신함')}>전체 보기</button></div>{homeMessages.length ? homeMessages.slice(0, 3).map((m) => <button key={m.id} className={styles.messageRow} onClick={() => onView('수신함')}><Badge>{m.channel}</Badge><span><b>{m.sender}</b><small>{m.body}</small></span><time>{m.receivedAt || '시각 미상'}</time></button>) : <p className={styles.empty}>통합 수신 원장 연결 뒤 라크·카카오톡·메일 원문이 여기에 표시됩니다.</p>}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>오늘 팀의 실행</h2><p>할 일과 일정은 한 번 기록하고, 필요한 화면에서 함께 봅니다.</p></div></div>{tasks.slice(0,3).map((t, index) => <button className={styles.executionRow} key={t.title} onClick={() => onView('할 일')}><b>{['14:00', '16:00', '17:30'][index]}</b><span><strong>{t.title}</strong><small>{t.project}</small></span></button>)}<div className={styles.panelActions}><button onClick={() => onView('할 일')}>할 일·일정 보기</button></div></div></section>
   <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>진행 프로젝트</h2><p>다음 행동이 가까운 순으로 보여줍니다.</p></div><button onClick={() => onView('프로젝트')}>프로젝트 전체</button></div>{homeProjects.map((p) => <button className={styles.projectRow} key={p.name} onClick={() => onOpenProject(p)}><span><b>{p.name}</b><small>{p.client}</small></span><strong>{p.progress}%</strong><small>{p.next}</small></button>)}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>정산 확인</h2><p>통장 거래 3건이 사람 확인을 기다립니다.</p></div></div><div className={styles.financeMini}><b>주식회사 오르 입금</b><strong>1,100,000원</strong><span>후보 프로젝트 연결 필요</span></div><div className={styles.panelActions}><button className={styles.primary} onClick={() => onView('재무·정산')}>정산 확인하기</button></div></div></section>
 </> }
 
