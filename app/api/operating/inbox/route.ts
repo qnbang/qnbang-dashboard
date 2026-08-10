@@ -14,14 +14,7 @@ function 수신시각값(value: string) {
 }
 
 export async function GET() {
-  const spreadsheetId = process.env.OPERATING_INBOX_SHEET_ID;
-  if (!spreadsheetId) {
-    return NextResponse.json({
-      items: [],
-      status: '연결 대기',
-      message: '통합 수신 원장 주소가 아직 연결되지 않았습니다.',
-    });
-  }
+  const spreadsheetId = process.env.OPERATING_INBOX_SHEET_ID || '1Jr959-YzcNG1zS2c5m54Sy8GEytHMax1hPwg_5_m7yI';
 
   try {
     const serviceAccount = JSON.parse(process.env.GOOGLE_SA_JSON || '');
