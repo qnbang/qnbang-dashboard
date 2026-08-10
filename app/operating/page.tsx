@@ -9,7 +9,7 @@ import styles from './operating.module.css';
 
 type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '사이트 관리' | '이관 현황' | '통합 운영 로그' | '운영 설정';
 type Workstream = { name: string; outcome: string; status: string; owner: string; next: string; due?: string; links?: string };
-type Project = { name: string; client: string; progress: number; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: Workstream[]; hubUrl?: string };
+type Project = { name: string; client: string; progress: number; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: Workstream[]; hubUrl?: string; driveUrl?: string };
 
 const menuGroups: { label: string; items: View[] }[] = [
   { label: '운영', items: ['홈', '수신함', '할 일', '캘린더', '프로젝트', '고객 관리', '재무·정산'] },
@@ -24,11 +24,11 @@ const tasks = [
   { title: '행사 개발·현장테스트 일정 재확인', project: '망원 야간보물찾기', due: '확인 필요', owner: '신종호', state: '진행 중' },
 ];
 const projects: Project[] = [
-  { name: '다리마티 운동회', client: '다리마티', progress: 18, next: '시그니처 종목과 예산 구조 확정', status: '기획 중', owner: '신종호', blocker: '후보 공간과 예산 기준 결정 필요', due: '이번 주' },
-  { name: '브이큐 업무자동화', client: '브이큐스튜디오', progress: 42, next: '제안 문서와 체크리스트 현황 확인', status: '진행 중', owner: '신종호', blocker: '고객 검토 범위 확인 필요', due: '이번 주' },
-  { name: '좋은움직임연구소 러너 세션', client: '좋은움직임연구소', progress: 72, next: '세션 문구 검토 결과를 반영', status: '검토 중', owner: '신종호', blocker: '대표님 검토 회신 대기', due: '검토 대기', summary: '통증·재발이 있는 일반 러너를 위한 60분 세션을, 문구·고객관리·크루 컨택까지 실제 실행 단위로 정리합니다.', workstreams: [{ name: '세션 문구 검토', outcome: '세션명과 전문 동작 표현 확정', status: '검토 중', owner: '신종호', next: '대표님 검토 의견 반영', due: '이번 주' }, { name: '고객 관리 양식 확정', outcome: '참여자 사전·사후 관리 양식 확정', status: '준비 중', owner: '신종호', next: '필수 항목 초안 작성' }, { name: '크루 컨택 준비', outcome: '우선 컨택 대상과 안내 문구 준비', status: '대기', owner: '신종호', next: '크루 후보 목록 확인' }], hubUrl: '/hub/good-movement' },
+  { name: '다리마티 운동회', client: '다리마티', progress: 18, next: '시그니처 종목과 예산 구조 확정', status: '기획 중', owner: '신종호', blocker: '후보 공간과 예산 기준 결정 필요', due: '이번 주', driveUrl: 'https://drive.google.com/drive/folders/15SXH1yr55OEbh8ExOngcY2vf7Fz9-HzQ' },
+  { name: '브이큐 업무자동화', client: '브이큐스튜디오', progress: 42, next: '제안 문서와 체크리스트 현황 확인', status: '진행 중', owner: '신종호', blocker: '고객 검토 범위 확인 필요', due: '이번 주', driveUrl: 'https://drive.google.com/drive/folders/1NBr_jWjJviN8WgcbTt31f3okwC-dsKZa' },
+  { name: '좋은움직임연구소 러너 세션', client: '좋은움직임연구소', progress: 72, next: '세션 문구 검토 결과를 반영', status: '검토 중', owner: '신종호', blocker: '대표님 검토 회신 대기', due: '검토 대기', summary: '통증·재발이 있는 일반 러너를 위한 60분 세션을, 문구·고객관리·크루 컨택까지 실제 실행 단위로 정리합니다.', workstreams: [{ name: '세션 문구 검토', outcome: '세션명과 전문 동작 표현 확정', status: '검토 중', owner: '신종호', next: '대표님 검토 의견 반영', due: '이번 주' }, { name: '고객 관리 양식 확정', outcome: '참여자 사전·사후 관리 양식 확정', status: '준비 중', owner: '신종호', next: '필수 항목 초안 작성' }, { name: '크루 컨택 준비', outcome: '우선 컨택 대상과 안내 문구 준비', status: '대기', owner: '신종호', next: '크루 후보 목록 확인' }], hubUrl: '/hub/good-movement', driveUrl: 'https://drive.google.com/drive/folders/1eWlL_3LUmfbV4GO_n2dl2j4SNDtZHpoq' },
   { name: '다비교랩', client: '큐앤뱅 자체사업', progress: 92, next: '라이브 서비스와 어드민 최종 검수', status: '검수 중', owner: '신종호', blocker: '최종 검수 항목 정리 필요', due: '다음 순서' },
-  { name: '망원 야간보물찾기', client: '망리단길골목형상점가 상인회', progress: 58, next: '행사 개발·현장테스트 일정 재확인', status: '진행 중', owner: '신종호', blocker: '참여 매장 명단 확인 필요', due: '확인 필요' },
+  { name: '망원 야간보물찾기', client: '망리단길골목형상점가 상인회', progress: 58, next: '행사 개발·현장테스트 일정 재확인', status: '진행 중', owner: '신종호', blocker: '참여 매장 명단 확인 필요', due: '확인 필요', driveUrl: 'https://drive.google.com/drive/folders/14eqd-CCtCVlOTpjKNjNp76hnDaUXaKGB' },
 ];
 const messages: 수신메시지[] = [];
 
