@@ -4,14 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import styles from './operating.module.css';
 
-type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '이관 현황' | '운영 설정';
+type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '프로젝트' | '재무·정산' | '공용 도구' | '사이트 관리' | '이관 현황' | '통합 운영 로그' | '운영 설정';
 type Workstream = { name: string; outcome: string; status: string; owner: string; next: string; due?: string; links?: string };
 type Project = { name: string; client: string; progress: number; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: Workstream[]; hubUrl?: string };
 
 const menuGroups: { label: string; items: View[] }[] = [
   { label: '운영', items: ['홈', '수신함', '할 일', '캘린더', '프로젝트', '고객 관리', '재무·정산'] },
-  { label: '자산', items: ['공용 도구'] },
-  { label: '전환', items: ['이관 현황', '운영 설정'] },
+  { label: '자산', items: ['공용 도구', '사이트 관리'] },
+  { label: '전환', items: ['이관 현황', '통합 운영 로그', '운영 설정'] },
 ];
 const tasks = [
   { title: '시그니처 종목과 예산 구조 확정', project: '다리마티 운동회', due: '이번 주', owner: '신종호', state: '진행 중' },
@@ -31,6 +31,31 @@ const messages = [
   { channel: '라크', sender: '다리마티 프로젝트', time: '최신', body: '첫 행사는 10월 18일로 확정. 시그니처 종목 개발 원칙을 정리했습니다.', project: '다리마티 운동회', customer: '다리마티', action: '종목·공간·예산 우선순위 확정' },
   { channel: '문서', sender: '좋은움직임연구소', time: '오늘', body: '대표님 제공 60분 프로그램을 반영한 납품 문서 4종 초안이 준비되었습니다.', project: '좋은움직임연구소 러너 세션', customer: '좋은움직임연구소', action: '세션명·전문 동작·후속 안내 범위를 대표님과 검토' },
   { channel: '라크', sender: '망원 야간보물찾기', time: '최신', body: '개발·현장 테스트 일정과 참여 매장 명단 일정을 다시 확인해야 합니다.', project: '망원 야간보물찾기', customer: '망리단길골목형상점가 상인회', action: '크리티컬 패스 일정 점검' },
+];
+
+const sharedTools = [
+  { name: '키워드 광고 도구', kind: '웹 도구', platform: '공용', purpose: '네이버 키워드 광고 데이터를 확인하는 업무 도구입니다.', url: 'https://qnbang-naver-keyword.vercel.app' },
+  { name: 'SEO 상품 작명기', kind: '웹 도구', platform: '공용', purpose: '상품명 후보와 검색 노출 키워드를 정리합니다.', url: 'https://qnbang-seo-namer.vercel.app' },
+  { name: '스레드 링크 자동수집기', kind: '웹 도구', platform: '공용', purpose: '스레드 링크를 수집하고 작업 후보로 정리합니다.', url: 'https://collector.qnbang.com' },
+  { name: '매크로 투자 브리핑', kind: '웹 도구', platform: '공용', purpose: '시장 브리핑을 확인하는 내부 서비스입니다.', url: 'https://qnbang-macro-briefing.vercel.app' },
+  { name: '가격 모니터링', kind: '웹 도구', platform: '공용', purpose: '상품 가격 변동을 확인하는 내부 서비스입니다.', url: 'https://qnbang-price-monitor.vercel.app' },
+  { name: '쇼츠 자동편집기', kind: '로컬 도구', platform: 'macOS 확인됨', purpose: '현재 맥 작업환경에서 영상 전사·컷 구성·자막 작업을 실행합니다.', note: '공용도구 이관과 윈도우 실행 검증 후 팀 공용 실행 버튼을 연결합니다.' },
+];
+
+const managedSites = [
+  { name: '큐앤뱅 운영 대시보드', kind: '내부 운영', status: '운영 중', site: 'https://dashboard.qnbang.com', admin: 'https://dashboard.qnbang.com', detail: '팀 운영·정산·프로젝트 허브. 같은 주소에서 로그인 후 관리합니다.' },
+  { name: '반보', kind: '자체 서비스', status: '운영 중', site: 'https://banbo-preview.vercel.app', admin: 'https://banbo-preview.vercel.app/admin.html', detail: '공개 화면과 전용 어드민을 분리해 운영합니다.' },
+  { name: '다비교랩', kind: '자체 서비스', status: '검수 중', site: 'https://dabigyo-lab.vercel.app', admin: 'https://dashboard.qnbang.com/hub/dabigyo', detail: '서비스 주소는 확인됐고, 운영 현황은 프로젝트 허브에서 확인합니다.' },
+  { name: '자동화청년 사례집', kind: '자체 브랜드', status: '운영 중', site: 'https://jadong-cases.vercel.app', detail: '브랜드 사례를 보여주는 공개 사이트입니다.' },
+  { name: '큐앤뱅 공식 홈페이지', kind: '회사 사이트', status: '주소 확인 필요', detail: '공개 주소와 어드민 주소를 확인한 뒤 이 목록에 각각 등록합니다.' },
+  { name: '소리쉼', kind: '고객 사이트', status: '관리 주소 확인 필요', admin: 'https://business.naver.com', detail: '네이버 플레이스 관리는 연결됐습니다. 홈페이지 어드민의 정확한 주소는 확인 후 별도로 등록합니다.' },
+];
+
+const operatingLogs = [
+  { date: '2026.08.10', area: '운영OS', text: '공용 도구와 사이트 관리를 분리하고, 실제로 확인된 웹 도구·운영 주소를 자산 화면에 등록함.' },
+  { date: '2026.08.09', area: '데이터 이관', text: '기존 프로젝트와 자동화청년 원본 보존 복사를 완료하고, 새 기준 공간에서 검증을 시작함.' },
+  { date: '2026.08.09', area: '프로젝트 원장', text: '프로젝트별 원장을 개요·진행·할일·결정·일정·이력·링크 기준으로 전환함.' },
+  { date: '2026.08.07', area: '운영OS', text: '기존 대시보드를 유지한 채 새 운영OS 화면을 별도 경로로 시작함.' },
 ];
 
 const Badge = ({ children }: { children: string }) => <span className={styles.badge}>{children}</span>;
@@ -67,9 +92,11 @@ export default function OperatingPage() {
     if (view === '프로젝트') return <Projects projects={shownProjects} selected={selectedProject} onSelect={setSelectedProject} />;
     if (view === '재무·정산') return <Finance />;
     if (view === '공용 도구') return <Tools />;
+    if (view === '사이트 관리') return <Sites />;
     if (view === '이관 현황') return <Migration />;
+    if (view === '통합 운영 로그') return <OperatingLog />;
     if (view === '운영 설정') return <Settings />;
-    return <Home onView={setView} />;
+    return <Home onView={setView} projects={operatingProjects} onOpenProject={(project) => { setSelectedProject(project); setView('프로젝트'); }} />;
   };
 
   return <div className={styles.shell}>
@@ -85,11 +112,11 @@ export default function OperatingPage() {
   </div>;
 }
 
-function Home({ onView }: { onView: (view: View) => void }) { return <>
+function Home({ onView, projects: homeProjects, onOpenProject }: { onView: (view: View) => void; projects: Project[]; onOpenProject: (project: Project) => void }) { return <>
   <section className={styles.hero}><div><p className={styles.eyebrow}>오늘, 팀이 이어서 일할 수 있게</p><h2>놓친 대화와 다음 행동을<br/>한 곳에서 확인합니다.</h2><p>라크·메일·카카오톡·캘린더·정산 원장을 연결해, 같은 일을 두 번 입력하지 않습니다.</p></div><button className={styles.primary} onClick={() => onView('프로젝트')}>새 프로젝트</button></section>
   <section className={styles.metrics}><Metric label="새 할 일" value="8" detail="오늘 처리할 항목"/><Metric label="확인 대기" value="3" detail="정산·고객 연결 필요"/><Metric label="진행 중 프로젝트" value="3" detail="다음 행동이 등록됨"/><Metric label="오늘 일정" value="4" detail="라크·구글 캘린더"/></section>
   <section className={styles.columns}><div className={styles.panel}><Header title="통합 수신함" action="수신함 열기" onClick={() => onView('수신함')} />{messages.map((m) => <button key={m.time} className={styles.messageRow} onClick={() => onView('수신함')}><Badge>{m.channel}</Badge><span><b>{m.sender}</b><small>{m.body}</small></span><time>{m.time}</time></button>)}</div><div className={styles.panel}><Header title="오늘 우선 처리" action="할 일 보기" onClick={() => onView('할 일')} />{tasks.slice(0,3).map((t) => <div className={styles.taskRow} key={t.title}><span className={styles.check}></span><span><b>{t.title}</b><small>{t.project}</small></span><Badge>{t.due}</Badge></div>)}</div></section>
-  <section className={styles.columns}><div className={styles.panel}><Header title="진행 중 프로젝트" action="프로젝트 열기" onClick={() => onView('프로젝트')} />{projects.map((p) => <div className={styles.projectRow} key={p.name}><div><b>{p.name}</b><small>{p.client} · 다음 행동: {p.next}</small></div><div className={styles.progress}><span style={{ width: `${p.progress}%` }}></span></div><strong>{p.progress}%</strong></div>)}</div><div className={styles.panel}><Header title="오늘 캘린더" action="캘린더 보기" onClick={() => onView('캘린더')} /><div className={styles.schedule}><b>10:00</b><span>모호스 수정안 정리 <small>집중 작업</small></span></div><div className={styles.schedule}><b>14:00</b><span>금문도 담당자 미팅 <small>구글 캘린더</small></span></div><div className={styles.schedule}><b>16:30</b><span>프로젝트 폴더 정리 <small>라크에서 생성</small></span></div></div></section>
+  <section className={styles.columns}><div className={styles.panel}><Header title="진행 중 프로젝트" action="프로젝트 열기" onClick={() => onView('프로젝트')} />{homeProjects.map((p) => <button className={styles.projectRow} key={p.name} onClick={() => onOpenProject(p)}><span><b>{p.name}</b><small>{p.client} · 다음 행동: {p.next}</small></span><span className={styles.progress}><i style={{ width: `${p.progress}%` }}></i></span><strong>{p.progress}%</strong></button>)}</div><div className={styles.panel}><Header title="오늘 캘린더" action="캘린더 보기" onClick={() => onView('캘린더')} /><div className={styles.schedule}><b>10:00</b><span>모호스 수정안 정리 <small>집중 작업</small></span></div><div className={styles.schedule}><b>14:00</b><span>금문도 담당자 미팅 <small>구글 캘린더</small></span></div><div className={styles.schedule}><b>16:30</b><span>프로젝트 폴더 정리 <small>라크에서 생성</small></span></div></div></section>
   <section className={styles.notice}><div><b>정산 확인 필요</b><p>카카오뱅크 입금 1건이 ‘오르’와 연결 후보입니다. 자동 분류 신뢰도 72%.</p></div><button onClick={() => onView('재무·정산')}>확인하기</button></section>
 </> }
 
@@ -149,7 +176,17 @@ function Projects({ projects: rows, selected, onSelect }: { projects: Project[];
 
 function Finance() { const rows = [{time:'오늘 09:12', who:'주식회사 오르', amount:'1,100,000원', type:'입금', category:'프로젝트 매출', confidence:'72%', state:'확인 필요'}, {time:'어제 16:44', who:'어도비', amount:'33,000원', type:'출금', category:'프로그램 사용료', confidence:'98%', state:'자동 분류'}, {time:'어제 13:28', who:'모호스 스튜디오', amount:'2,200,000원', type:'입금', category:'프로젝트 매출', confidence:'99%', state:'자동 분류'}]; return <><section className={styles.metrics}><Metric label="이번 달 입금" value="8,420,000" detail="확정 매출 기준"/><Metric label="이번 달 지출" value="1,264,000" detail="통장 기록 기준"/><Metric label="확인 대기" value="1" detail="사람 확인 필요"/><Metric label="미수금" value="3,300,000" detail="기존 원장 연동"/></section><section className={styles.panel}><Header title="통장 기록" action="자동 분류 · 확인 후 확정"/><table><thead><tr><th>시각</th><th>상대</th><th>금액</th><th>자동 분류</th><th>신뢰도</th><th>상태</th></tr></thead><tbody>{rows.map((r) => <tr key={r.time}><td>{r.time}</td><td><b>{r.who}</b></td><td>{r.amount}<small>{r.type}</small></td><td>{r.category}</td><td>{r.confidence}</td><td><Badge>{r.state}</Badge></td></tr>)}</tbody></table></section><section className={styles.notice}><div><b>사람 확인이 필요한 거래</b><p>‘주식회사 오르’ 입금은 고객·프로젝트 후보를 찾아두었습니다. 확인하면 기존 정산 원장에 기록합니다.</p></div><button>거래 확인</button></section></> }
 
-function Tools() { return <section className={styles.panel}><Header title="팀 공용 도구" action="드라이브 자산"/><div className={styles.toolGrid}>{[['쇼츠 자동편집기','맥·윈도우 지원','영상 제작'], ['견적서 생성기','웹에서 사용','운영 문서'], ['키워드 검색기','웹에서 사용','마케팅']].map(([name,os,purpose]) => <div className={styles.tool} key={name}><h3>{name}</h3><p>{purpose}</p><Badge>{os}</Badge><button>사용 안내</button></div>)}</div></section> }
+function Tools() { return <>
+  <section className={styles.assetIntro}><div><h2>팀 공용 도구</h2><p>실제로 실행하거나 웹에서 열 수 있는 도구만 둡니다. 결과물·개인 설정·실험 중인 파일은 이 목록에 넣지 않습니다.</p></div><Badge>07_공용도구 기준</Badge></section>
+  <section className={styles.toolGrid}>{sharedTools.map((tool) => <article className={styles.tool} key={tool.name}><div className={styles.assetMeta}><Badge>{tool.kind}</Badge><Badge>{tool.platform}</Badge></div><h3>{tool.name}</h3><p>{tool.purpose}</p>{tool.url ? <a className={styles.assetLink} href={tool.url} target="_blank" rel="noreferrer">도구 열기</a> : <span className={styles.pendingLink}>{tool.note}</span>}</article>)}</section>
+</> }
+
+function Sites() { return <>
+  <section className={styles.assetIntro}><div><h2>사이트 관리</h2><p>공개 사이트·관리 화면·배포된 서비스를 따로 모읍니다. 프로젝트 화면은 만드는 일을 관리하고, 이 화면은 이미 운영하는 사이트를 엽니다.</p></div><Badge>운영 자산</Badge></section>
+  <section className={styles.siteGrid}>{managedSites.map((site) => <article className={styles.siteCard} key={site.name}><div className={styles.siteHeading}><div><h3>{site.name}</h3><p>{site.kind}</p></div><Badge>{site.status}</Badge></div><p className={styles.siteDetail}>{site.detail}</p><div className={styles.siteActions}>{site.site && <a className={styles.secondaryLink} href={site.site} target="_blank" rel="noreferrer">사이트 열기</a>}{site.admin && <a className={styles.assetLink} href={site.admin} target="_blank" rel="noreferrer">관리 화면 열기</a>}</div></article>)}</section>
+</> }
+
+function OperatingLog() { return <section className={styles.logLayout}><div className={styles.panel}><Header title="통합 운영 로그" action="프로젝트 로그와 분리"/><p className={styles.logGuide}>홈페이지·대시보드·도구·연동·저장 규칙처럼 여러 프로젝트에 영향을 주는 변경만 한 줄로 남깁니다.</p><div className={styles.logList}>{operatingLogs.map((log) => <article className={styles.logRow} key={`${log.date}-${log.area}`}><time>{log.date}</time><Badge>{log.area}</Badge><p>{log.text}</p></article>)}</div></div><aside className={`${styles.panel} ${styles.logRule}`}><Header title="기록 기준" action="운영원장 연결 예정"/><p><b>여기에 기록</b>사이트 수정, 배포 방식 변경, 도구 추가·폐기, 라크·카카오톡·캘린더 연결 변경</p><p><b>여기에 기록하지 않음</b>고객별 회의, 제작 피드백, 개별 프로젝트 진행 상황</p><p><b>저장 원칙</b>확정 후에는 운영원장 ‘통합 운영 로그’ 탭에 한 줄로 저장하고 이 화면에서 읽습니다.</p></aside></section> }
 function Migration() { const rows = [
   ['프로젝트 파일', '기존 프로젝트 31개 확인', '새 번호·고객ID 배정 전'],
   ['고객·담당자·명함', '고객 관리 화면 우선 구축', '기존 CRM 원장 대조 전'],
