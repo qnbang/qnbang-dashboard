@@ -4,7 +4,7 @@
 # (값은 화면에 안 보이게 입력됨. 키를 저장해둔 게 없으면 resend.com → API Keys 에서
 #  새로 하나 만들면 됨 — 도메인 qnbang.com은 이미 verified 라 바로 발송 가능.)
 set -e
-DASH=~/Documents/claude-workspace/큐앤뱅-사내시스템/큐앤뱅-사내웹대시보드
+DASH=~/Documents/QNB_work/큐앤뱅-사내시스템/큐앤뱅-사내웹대시보드
 
 echo "큐앤뱅 Resend 키를 붙여넣고 엔터 (화면에 안 보입니다):"
 read -rs KEY; echo

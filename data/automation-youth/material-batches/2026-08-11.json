@@ -1,0 +1,142 @@
+{
+  "batchId": "automation-youth-material-2026-08-11",
+  "brandKey": "automation-youth",
+  "date": "2026-08-11",
+  "stage": "material",
+  "status": "pending",
+  "recommendedIds": [
+    "codex-skills-automations",
+    "playwright-cli-skills",
+    "threads-api-workflow"
+  ],
+  "selectedIds": [],
+  "createdAt": "2026-08-11T10:00:00+09:00",
+  "updatedAt": "2026-08-11T10:00:00+09:00",
+  "items": [
+    {
+      "id": "codex-skills-automations",
+      "brandKey": "automation-youth",
+      "stage": "material",
+      "sourceId": "openai-codex-app-2026",
+      "title": "반복 업무를 Codex 스킬과 자동화로 묶으면 어디까지 줄어들까",
+      "summary": "OpenAI가 공개한 스킬·자동화 흐름을 초보자도 따라 할 수 있는 하루짜리 업무 자동화로 직접 검증합니다.",
+      "payload": {
+        "sourceName": "OpenAI · Introducing the Codex app",
+        "sourceUrl": "https://openai.com/index/introducing-the-codex-app/",
+        "whyNow": "스킬로 팀 규칙을 재사용하고 자동화로 반복 작업을 예약하는 방식이 공식 제품 흐름으로 자리 잡았습니다.",
+        "beginnerTarget": "매번 같은 자료 조사·정리·보고를 손으로 반복하는 1인 사업자와 초보 실무자",
+        "experimentPlan": "매일 하는 자료 수집 한 가지를 스킬 지침으로 만들고 자동 실행 전후의 클릭 수와 소요 시간을 비교합니다.",
+        "valueReason": "설명보다 실제 전후 비교가 가능하고, 큐앤뱅의 운영 규칙 자산화와 바로 연결됩니다.",
+        "contentType": "직접 만듦",
+        "nextStatus": "실험 승인 대기"
+      },
+      "aiChecks": null,
+      "recommendation": "오늘 직접 작은 스킬 1개를 만들어 전후 차이를 촬영",
+      "riskLevel": "low",
+      "suggestedSlot": null,
+      "status": "pending",
+      "createdAt": "2026-08-11T10:00:00+09:00",
+      "updatedAt": "2026-08-11T10:00:00+09:00"
+    },
+    {
+      "id": "codex-plugins-noncoder",
+      "brandKey": "automation-youth",
+      "stage": "material",
+      "sourceId": "openai-codex-plugins-2026",
+      "title": "코딩을 몰라도 플러그인으로 사내 도구를 만들 수 있을까",
+      "summary": "역할별 플러그인과 연결 앱을 이용해 비개발자가 실제 업무 화면을 만드는 과정을 검증합니다.",
+      "payload": {
+        "sourceName": "OpenAI · Codex for every role, tool, and workflow",
+        "sourceUrl": "https://openai.com/index/codex-for-every-role-tool-workflow/",
+        "whyNow": "Codex가 개발자 도구를 넘어 문서·시트·대시보드 같은 지식 업무까지 확장됐습니다.",
+        "beginnerTarget": "개발자를 고용하기 전 내부 업무 화면부터 시험해보고 싶은 소규모 팀",
+        "experimentPlan": "기존 구글시트 하나를 바탕으로 조회용 미니 운영 화면을 만들고 사람이 하던 단계를 기록합니다.",
+        "valueReason": "현재 큐앤뱅 대시보드 이관 자체가 실제 사례라 결과와 시행착오를 모두 보여줄 수 있습니다.",
+        "contentType": "실사용 성공담",
+        "nextStatus": "실험 방향 확인"
+      },
+      "aiChecks": null,
+      "recommendation": "현재 대시보드의 실제 연결 전후를 사례로 사용",
+      "riskLevel": "low",
+      "suggestedSlot": null,
+      "status": "pending",
+      "createdAt": "2026-08-11T10:00:00+09:00",
+      "updatedAt": "2026-08-11T10:00:00+09:00"
+    },
+    {
+      "id": "github-custom-agents",
+      "brandKey": "automation-youth",
+      "stage": "material",
+      "sourceId": "github-custom-agents-2026",
+      "title": "팀 규칙 파일 하나로 AI 작업자 역할을 나눌 수 있을까",
+      "summary": "GitHub의 커스텀 에이전트 방식을 작은 프로젝트에 적용해 역할 분리 효과를 확인합니다.",
+      "payload": {
+        "sourceName": "GitHub Blog · What's new with Copilot coding agent",
+        "sourceUrl": "https://github.blog/ai-and-ml/github-copilot/whats-new-with-github-copilot-coding-agent/",
+        "whyNow": "커스텀 에이전트, 자체 검토, 보안 검사와 작업 인계가 공식 기능으로 묶였습니다.",
+        "beginnerTarget": "AI에게 일을 시킬 때 매번 같은 설명을 반복하고 결과 편차가 큰 초보 사용자",
+        "experimentPlan": "같은 간단한 웹 수정 작업을 일반 지시와 역할 규칙이 있는 지시로 각각 실행해 결과 차이를 비교합니다.",
+        "valueReason": "회사 규칙을 AI가 읽는 구조가 실제로 품질을 얼마나 안정시키는지 보여줄 수 있습니다.",
+        "contentType": "직접 돌려봄",
+        "nextStatus": "비교 실험 대기"
+      },
+      "aiChecks": null,
+      "recommendation": "같은 과제를 두 방식으로 실행해 화면과 누락 수 비교",
+      "riskLevel": "low",
+      "suggestedSlot": null,
+      "status": "pending",
+      "createdAt": "2026-08-11T10:00:00+09:00",
+      "updatedAt": "2026-08-11T10:00:00+09:00"
+    },
+    {
+      "id": "playwright-cli-skills",
+      "brandKey": "automation-youth",
+      "stage": "material",
+      "sourceId": "microsoft-playwright-mcp",
+      "title": "웹 자동화는 MCP보다 CLI 스킬이 더 싸고 빠를까",
+      "summary": "Microsoft가 안내한 MCP와 CLI+스킬의 차이를 같은 웹 작업으로 직접 비교합니다.",
+      "payload": {
+        "sourceName": "Microsoft · Playwright MCP",
+        "sourceUrl": "https://github.com/microsoft/playwright-mcp",
+        "whyNow": "공식 저장소가 반복적인 코딩 에이전트 작업에는 CLI+스킬이 더 간결할 수 있다고 구분해 안내합니다.",
+        "beginnerTarget": "브라우저 자동화를 붙였지만 느리거나 토큰 사용량이 커서 답답한 AI 자동화 입문자",
+        "experimentPlan": "동일한 로그인 없는 페이지 점검을 MCP 방식과 CLI 스킬 방식으로 실행해 시간·호출 횟수·결과를 비교합니다.",
+        "valueReason": "도구 선택에서 생기는 실제 비용과 속도 차이를 숫자로 보여줄 수 있습니다.",
+        "contentType": "직접 돌려봄",
+        "nextStatus": "실험 승인 대기"
+      },
+      "aiChecks": null,
+      "recommendation": "작은 반복 점검으로 두 방식의 호출량부터 비교",
+      "riskLevel": "medium",
+      "suggestedSlot": null,
+      "status": "pending",
+      "createdAt": "2026-08-11T10:00:00+09:00",
+      "updatedAt": "2026-08-11T10:00:00+09:00"
+    },
+    {
+      "id": "threads-api-workflow",
+      "brandKey": "automation-youth",
+      "stage": "material",
+      "sourceId": "meta-threads-api",
+      "title": "스레드 초안 3개를 승인 한 번으로 예약하는 흐름 만들기",
+      "summary": "Threads API의 발행 구조를 기준으로 초안·승인·예약을 분리한 안전한 운영 흐름을 직접 만듭니다.",
+      "payload": {
+        "sourceName": "Meta for Developers · Threads API",
+        "sourceUrl": "https://developers.facebook.com/docs/threads/",
+        "whyNow": "공식 API로 게시와 성과 조회가 가능해지면서 사람 승인과 자동 발행의 경계를 구체적으로 설계할 수 있습니다.",
+        "beginnerTarget": "스레드를 꾸준히 운영하고 싶지만 오발행이 무서워 자동화를 못 쓰는 1인 브랜드",
+        "experimentPlan": "실제 게시 없이 초안 3개를 12시·15시·18시에 배치하고 최종 승인 직전까지의 흐름을 검증합니다.",
+        "valueReason": "현재 자동화청년 발행기가 실제 사례이며, 자동 게시보다 중요한 승인 안전장치를 보여줄 수 있습니다.",
+        "contentType": "직접 만듦",
+        "nextStatus": "안전 흐름 검증 대기"
+      },
+      "aiChecks": null,
+      "recommendation": "실제 게시 없이 승인 직전까지 화면 녹화",
+      "riskLevel": "medium",
+      "suggestedSlot": null,
+      "status": "pending",
+      "createdAt": "2026-08-11T10:00:00+09:00",
+      "updatedAt": "2026-08-11T10:00:00+09:00"
+    }
+  ]
+}

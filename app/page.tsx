@@ -9,6 +9,7 @@ import OfficeBoardView from './components/OfficeBoardView';
 import ProjectArchiveView from './components/ProjectArchiveView';
 import ProjectDocs from './components/ProjectDocs';
 import BizOps from './components/BizOps';
+import ContentPublishersHub from './components/ContentPublishersHub';
 import { mdToHtml } from '@/lib/md';
 import { SHARE_DOC_CSS } from '@/lib/shareDocCss';
 import { Loading, ErrorBox } from './components/ui';
@@ -40,6 +41,7 @@ const TABS = [
   { key: 'operating', label: '운영OS 실험', ready: true },
   { key: 'office', label: '🏢 사무실', ready: true },
   { key: 'tools', label: '🚀 자체사업', ready: true },
+  { key: 'threads', label: '콘텐츠', ready: true },
   { key: 'archive', label: '📋 프로젝트', ready: true },
   { key: 'posts', label: '📝 게시판', ready: true },
   { key: 'crm', label: '👥 고객·영업', ready: true },
@@ -157,6 +159,7 @@ export default function Home() {
         {tab === 'shares' && <SharesView />}
         {tab === 'hubs' && <HubsView />}
         {tab === 'tools' && <BizView />}
+        {tab === 'threads' && <ContentPublishersHub />}
       </main>
     </div>
   );

@@ -5,6 +5,7 @@ import { sheetsWriteClient } from '@/lib/sheets';
 export const dynamic = 'force-dynamic';
 
 const SHEET_ID = process.env.SHEET_ID;
+const OPERATING_SHEET_ID = '1RnmSplWT2-Aqk-flDInpWMljKwBbUes1q6pab9j3dfo';
 const SA_JSON = process.env.GOOGLE_SA_JSON;
 const TOKEN = process.env.BANK_SMS_TOKEN;
 const api = sheetsWriteClient;
@@ -39,6 +40,22 @@ function parse(text: string) {
   };
 }
 
+async function 문자거래기록(sheets: ReturnType<typeof api>, id: string, parsed: NonNullable<ReturnType<typeof parse>>) {
+  const transactionId = `sms-${id}`;
+  const current = await sheets.spreadsheets.values.get({ spreadsheetId: OPERATING_SHEET_ID, range: "'정산확인대기'!A:A" });
+  if ((current.data.values || []).flat().some((value) => String(value) === transactionId)) return;
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: OPERATING_SHEET_ID,
+    range: "'정산확인대기'!A:M",
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: [[
+      transactionId, parsed.date, parsed.sender, parsed.kind === '입금' ? parsed.amount : '', parsed.kind === '출금' ? parsed.amount : '',
+      parsed.kind === '입금' ? '매출·입금' : '미분류', parsed.kind === '입금' ? '72%' : '35%', '', '', '확인 필요', '', '', '카카오뱅크 문자 알림',
+    ]] },
+  });
+}
+
 export async function POST(req: Request) {
   if (!TOKEN || req.headers.get('authorization') !== `Bearer ${TOKEN}`) {
     return NextResponse.json({ ok: false, error: '인증 실패' }, { status: 401 });
@@ -50,9 +67,10 @@ export async function POST(req: Request) {
     const id = String(body.id || '').trim();
     const parsed = parse(String(body.text || ''));
     if (!id || !parsed) return NextResponse.json({ ok: false, error: '카카오뱅크 SMS 형식이 아닙니다' }, { status: 400 });
-    if (parsed.kind !== '입금') return NextResponse.json({ ok: true, result: '출금 건너뜀' });
-
     const sheets = api();
+    await 문자거래기록(sheets, id, parsed);
+    if (parsed.kind !== '입금') return NextResponse.json({ ok: true, result: '출금 확인 대기 등록', transaction: parsed });
+
     const read = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: '매출!A1:K', valueRenderOption: 'FORMATTED_VALUE' });
     const values = read.data.values || [];
     const header = values[0] || [];

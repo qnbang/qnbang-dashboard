@@ -155,7 +155,15 @@ export default function BusinessCardCapture({ 기본값, onSubmit, onCancel, 제
       const response = await fetch('/api/operating/card-ocr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageBase64, mimeType: 이미지.type }) });
       const result = await response.json();
       if (!response.ok || !result.text) throw new Error(result.error || '명함을 읽지 못했습니다.');
-      set값((현재) => ({ ...현재, 원문: result.text }));
+      set값((현재) => ({
+        ...현재,
+        원문: result.text,
+        이름: result.fields?.이름 || 현재.이름,
+        회사명: result.fields?.회사명 || 현재.회사명,
+        직함: result.fields?.직함 || 현재.직함,
+        연락처: result.fields?.연락처 || 현재.연락처,
+        이메일: result.fields?.이메일 || 현재.이메일,
+      }));
       set인식상태('완료');
     } catch {
       set인식상태('실패');
@@ -178,7 +186,7 @@ export default function BusinessCardCapture({ 기본값, onSubmit, onCancel, 제
         <h2 style={{ margin: '0 0 6px', color: 'var(--ink, #182230)', fontSize: 20, lineHeight: 1.4 }}>명함 등록</h2>
         <p style={{ margin: 0, color: 'var(--muted, #667085)', fontSize: 13, lineHeight: 1.6 }}>사진을 올린 뒤, 읽은 내용을 확인해 고객·개인·담당자 정보로 연결합니다.</p>
       </div>
-      <span style={{ alignSelf: 'flex-start', borderRadius: 999, background: '#f1f2ff', color: 'var(--accent, #5046e5)', padding: '6px 10px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>기기 안에서 인식</span>
+      <span style={{ alignSelf: 'flex-start', borderRadius: 999, background: '#f1f2ff', color: 'var(--accent, #5046e5)', padding: '6px 10px', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>대시보드 OCR</span>
     </header>
 
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(240px, .72fr)', gap: 20, margin: '22px 0' }}>
@@ -193,7 +201,7 @@ export default function BusinessCardCapture({ 기본값, onSubmit, onCancel, 제
         {(카메라상태 === '권한 거부' || 카메라상태 === '지원 안 됨' || 카메라상태 === '오류') && <p role="status" style={{ margin: '9px 0 0', color: 'var(--muted, #667085)', fontSize: 12, lineHeight: 1.55 }}>{카메라상태 === '권한 거부' ? '카메라 권한이 거부되었습니다. 브라우저 설정에서 카메라를 허용하거나 이미지 선택을 이용해 주세요.' : 카메라상태 === '지원 안 됨' ? '이 브라우저에서는 카메라 촬영을 지원하지 않습니다. 이미지 선택을 이용해 주세요.' : '카메라를 시작하지 못했습니다. 다른 앱이 사용 중인지 확인하거나 이미지 선택을 이용해 주세요.'}</p>}
       </div>
       <label style={라벨스타일}>명함 원문
-        <textarea value={값.원문} onChange={(event) => 값변경('원문', event.target.value)} placeholder="OCR 연결 전에는 명함에 적힌 내용을 직접 붙여 넣을 수 있습니다." style={{ ...입력스타일, minHeight: 178, padding: 12, resize: 'vertical' }} />
+        <textarea value={값.원문} onChange={(event) => 값변경('원문', event.target.value)} placeholder="OCR 결과를 확인하거나 명함 내용을 직접 입력할 수 있습니다." style={{ ...입력스타일, minHeight: 178, padding: 12, resize: 'vertical' }} />
       </label>
     </div>
 
