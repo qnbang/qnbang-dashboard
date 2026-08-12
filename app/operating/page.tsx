@@ -292,13 +292,16 @@ function Partners({ query }: { query: string }) {
 }
 
 function Projects({ projects: rows, status, selected, creationReady, creationMessage, onSelect, onOpenProject, onRegistered }: { projects: Project[]; status: string; selected: Project | null; creationReady: boolean; creationMessage: string; onSelect: (p: Project) => void; onOpenProject: (p: Project) => void; onRegistered: (p: Project) => void }) {
-  const [scope, setScope] = useState<'현재 진행' | '고객대기' | '보류' | '완료·과거'>('현재 진행');
+  type 프로젝트범위 = '진행 중' | '고객대기' | '보류' | '완료·과거';
+  const [scope, setScope] = useState<프로젝트범위>('진행 중');
   const emptyForm = { name: '', client: '', owner: '신종호', goal: '', evidenceType: '', evidenceUrl: '' };
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
-  const scopes: Array<'현재 진행' | '고객대기' | '보류' | '완료·과거'> = ['현재 진행', '고객대기', '보류', '완료·과거'];
-  const visible = rows.filter((project) => (project.lifecycle || '현재 진행') === scope);
+  const scopes: 프로젝트범위[] = ['진행 중', '고객대기', '보류', '완료·과거'];
+  const inProgress = (project: Project) => ['현재 진행', '고객대기'].includes(project.lifecycle || '현재 진행');
+  const matchesScope = (project: Project, target: 프로젝트범위) => target === '진행 중' ? inProgress(project) : (project.lifecycle || '현재 진행') === target;
+  const visible = rows.filter((project) => matchesScope(project, scope));
   const register = async () => {
     if (!form.name.trim() || !form.client.trim() || !form.evidenceType || !form.evidenceUrl.trim() || !creationReady) return;
     setSaving(true);
@@ -319,8 +322,8 @@ function Projects({ projects: rows, status, selected, creationReady, creationMes
   const canCreate = creationReady && !saving && Boolean(form.name.trim() && form.client.trim() && form.evidenceType && form.evidenceUrl.trim());
   return <section className={styles.projectsScreen}>
     <div className={styles.panel}>
-      <div className={styles.panelLead}><div><h2>{scope}</h2><p>중앙 운영원장의 상태를 읽습니다. 보류와 완료는 진행 목록에 섞지 않습니다.</p></div><span>{status === '연결됨' ? `${visible.length}건` : status}</span></div>
-      <div className={styles.filterBar}>{scopes.map((item) => <button key={item} className={scope === item ? styles.filterActive : ''} onClick={() => setScope(item)}>{item} {status === '연결됨' ? rows.filter((project) => (project.lifecycle || '현재 진행') === item).length : '—'}</button>)}</div>
+      <div className={styles.panelLead}><div><h2>{scope === '고객대기' ? '고객 대기' : scope}</h2><p>진행 중에는 내부 작업과 고객 회신을 기다리는 프로젝트가 함께 보입니다. 보류와 완료만 따로 나눕니다.</p></div><span>{status === '연결됨' ? `${visible.length}건` : status}</span></div>
+      <div className={styles.filterBar}>{scopes.map((item) => <button key={item} className={scope === item ? styles.filterActive : ''} onClick={() => setScope(item)}>{item === '고객대기' ? '고객 대기' : item} {status === '연결됨' ? rows.filter((project) => matchesScope(project, item)).length : '—'}</button>)}</div>
       <div className={styles.projectTableHead}><span>프로젝트</span><span>거래상대</span><span>현재 상태</span><span>다음 행동</span><span>마지막 기록</span></div>
       {visible.map((p) => <button className={`${styles.projectTableRow} ${selected?.name === p.name ? styles.selected : ''}`} onClick={() => { onSelect(p); onOpenProject(p); }} key={p.name}><span><b>{p.name}</b><small>담당 {p.owner}</small></span><span>{p.client}</span><span className={styles.progressCell}><strong>{p.status}</strong></span><span>{p.next}</span><time>{p.updatedAt || p.due || '기록 없음'}</time></button>)}
       {!visible.length && <p className={styles.empty}>{status === '연결됨' ? '이 상태에 해당하는 프로젝트가 없습니다.' : '프로젝트 원장을 다시 연결하고 있습니다.'}</p>}
