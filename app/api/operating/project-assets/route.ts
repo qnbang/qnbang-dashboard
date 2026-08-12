@@ -55,6 +55,55 @@ async function 하위폴더(drive: ReturnType<typeof google.drive>, parentId: st
   return created.data.id;
 }
 
+function 드라이브주소(id: string, mimeType = '') {
+  return mimeType === 'application/vnd.google-apps.folder'
+    ? `https://drive.google.com/drive/folders/${id}`
+    : `https://drive.google.com/open?id=${id}`;
+}
+
+export async function GET(request: Request) {
+  try {
+    const projectId = new URL(request.url).searchParams.get('projectId')?.trim() || '';
+    if (!projectId) return NextResponse.json({ ok: false, error: '프로젝트가 필요합니다.' }, { status: 400 });
+    const { drive, driveFolderId } = await 연결정보(projectId);
+    if (!driveFolderId) return NextResponse.json({ ok: true, files: [], message: '프로젝트 Drive 폴더가 연결되지 않았습니다.' });
+
+    const root = await drive.files.list({
+      q: `'${driveFolderId}' in parents and trashed=false`,
+      fields: 'files(id,name,mimeType,modifiedTime,webViewLink,size)',
+      pageSize: 1000,
+      orderBy: 'modifiedTime desc',
+    });
+    const rootFiles = root.data.files || [];
+    const standardFolders = rootFiles.filter((file) => file.id && file.name && 허용폴더.has(file.name) && file.mimeType === 'application/vnd.google-apps.folder');
+    const nested = await Promise.all(standardFolders.map(async (folder) => {
+      const result = await drive.files.list({
+        q: `'${folder.id}' in parents and trashed=false`,
+        fields: 'files(id,name,mimeType,modifiedTime,webViewLink,size)',
+        pageSize: 1000,
+        orderBy: 'modifiedTime desc',
+      });
+      return (result.data.files || []).map((file) => ({ ...file, section: folder.name }));
+    }));
+    const files = [
+      ...rootFiles.filter((file) => file.id && file.name && !허용폴더.has(file.name)).map((file) => ({ ...file, section: '프로젝트 공통' })),
+      ...nested.flat(),
+    ].filter((file) => file.id && file.name).map((file) => ({
+      id: file.id as string,
+      name: file.name as string,
+      section: file.section,
+      mimeType: file.mimeType || '',
+      isFolder: file.mimeType === 'application/vnd.google-apps.folder',
+      updatedAt: file.modifiedTime || '',
+      size: file.size || '',
+      url: file.webViewLink || 드라이브주소(file.id as string, file.mimeType || ''),
+    }));
+    return NextResponse.json({ ok: true, files });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : '프로젝트 파일을 읽지 못했습니다.' }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const contentType = request.headers.get('content-type') || '';
