@@ -35,6 +35,13 @@ const managedSites = [
 
 const Badge = ({ children }: { children: string }) => <span className={styles.badge}>{children}</span>;
 
+function StatusBadge({ lifecycle, status }: { lifecycle?: Project['lifecycle']; status: string }) {
+  const state = lifecycle || (status === '진행 중' ? '현재 진행' : status);
+  const tone = state === '현재 진행' ? styles.statusRunning : state === '고객대기' ? styles.statusWaiting : state === '보류' ? styles.statusHold : styles.statusComplete;
+  const label = state === '현재 진행' ? '진행 중' : state;
+  return <span className={`${styles.statusBadge} ${tone}`}>{label}</span>;
+}
+
 export default function OperatingPage() {
   const [view, setView] = useState<View>('홈');
   const [query, setQuery] = useState('');
@@ -189,12 +196,12 @@ export default function OperatingPage() {
   </div>;
 }
 
-function Home({ onView, projects: homeProjects, tasks: homeTasks, onOpenProject, messages: homeMessages, inboxStatus }: { onView: (view: View) => void; projects: Project[]; tasks: DashboardTask[]; onOpenProject: (project: Project) => void; messages: 수신메시지[]; inboxStatus: string }) { const currentProjects = homeProjects.filter((project) => !project.lifecycle || project.lifecycle === '현재 진행' || project.lifecycle === '고객대기'); return <>
+function Home({ onView, projects: homeProjects, tasks: homeTasks, onOpenProject, messages: homeMessages, inboxStatus }: { onView: (view: View) => void; projects: Project[]; tasks: DashboardTask[]; onOpenProject: (project: Project) => void; messages: 수신메시지[]; inboxStatus: string }) { const currentProjects = homeProjects.filter((project) => !project.lifecycle || project.lifecycle === '현재 진행'); const waitingProjects = homeProjects.filter((project) => project.lifecycle === '고객대기'); return <>
   <section className={styles.homeIntro}><div><p className={styles.crumb}>운영 대시보드</p><h2>오늘, 팀이 이어서 일할 수 있게</h2><p>수신함과 원장을 확인해 다음 행동을 정리합니다.</p></div><button className={styles.primary} onClick={() => onView('프로젝트')}>프로젝트 보기</button></section>
   <section className={styles.todayCheck}><b>오늘 확인할 것</b><span>수신 원문 {homeMessages.length}건 · 금액 확정은 재무 원장에서 확인</span><button onClick={() => onView('수신함')}>수신함 보기</button></section>
-  <section className={styles.metrics}><Metric label="새 수신" value={`${homeMessages.length}건`} detail={inboxStatus}/><Metric label="현재 할 일" value={`${homeTasks.length}건`} detail="프로젝트 운영원장 우선"/><Metric label="진행·고객대기" value={`${currentProjects.length}건`} detail="보류·완료는 분리 표시"/><Metric label="보류" value={`${homeProjects.filter((project) => project.lifecycle === '보류').length}건`} detail="기록은 유지하고 기본 목록에서 제외"/></section>
+  <section className={styles.metrics}><Metric label="새 수신" value={`${homeMessages.length}건`} detail={inboxStatus}/><Metric label="현재 할 일" value={`${homeTasks.length}건`} detail="프로젝트 운영원장 기준"/><Metric label="진행 중" value={`${currentProjects.length}건`} detail="지금 실행 중인 프로젝트"/><Metric label="고객대기" value={`${waitingProjects.length}건`} detail="회신·확인을 기다리는 프로젝트"/></section>
   <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>통합 수신함</h2><p>원문과 출처를 유지한 채, 필요한 것만 할 일로 전환합니다.</p></div><button onClick={() => onView('수신함')}>전체 보기</button></div>{homeMessages.length ? homeMessages.slice(0, 3).map((m) => <button key={m.id} className={styles.messageRow} onClick={() => onView('수신함')}><Badge>{m.channel}</Badge><span><b>{m.sender}</b><small>{m.body}</small></span><time>{m.receivedAt || '시각 미상'}</time></button>) : <p className={styles.empty}>통합 수신 원장 연결 뒤 라크·카카오톡·메일 원문이 여기에 표시됩니다.</p>}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>오늘 팀의 실행</h2><p>프로젝트 운영원장과 연결된 현재 진행 항목입니다.</p></div></div>{homeTasks.slice(0,3).map((t, index) => <button className={styles.executionRow} key={`${t.project}-${t.title}`} onClick={() => onView('할 일')}><b>{t.due || ['우선', '다음', '확인'][index]}</b><span><strong>{t.title}</strong><small>{t.project}</small></span></button>)}<div className={styles.panelActions}><button onClick={() => onView('할 일')}>할 일·일정 보기</button></div></div></section>
-  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>진행 프로젝트</h2><p>중앙 운영원장에서 보류와 완료를 제외한 목록입니다.</p></div><button onClick={() => onView('프로젝트')}>프로젝트 전체</button></div>{currentProjects.slice(0, 6).map((p) => <button className={styles.projectRow} key={p.name} onClick={() => onOpenProject(p)}><span><b>{p.name}</b><small>{p.client}</small></span><strong>{p.lifecycle || p.status}</strong><small>{p.next}</small></button>)}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>정산 확인</h2><p>기존 재무 원장을 읽어 최신 매출·지출·잔고를 확인합니다.</p></div></div><p className={styles.empty}>통장 거래를 올리면 자동분류하고, 불확실한 거래만 사람이 확인합니다.</p><div className={styles.panelActions}><button className={styles.primary} onClick={() => onView('재무·정산')}>재무 원장 보기</button></div></div></section>
+  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>진행 프로젝트</h2><p>실제로 움직이고 있는 프로젝트만 먼저 보여줍니다.</p></div><button onClick={() => onView('프로젝트')}>프로젝트 전체</button></div>{currentProjects.slice(0, 6).map((p) => <button className={styles.projectRow} key={p.name} onClick={() => onOpenProject(p)}><span><b>{p.name}</b><small>{p.client}</small></span><StatusBadge lifecycle={p.lifecycle} status={p.status}/><small>{p.next}</small></button>)}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>정산 확인</h2><p>기존 재무 원장을 읽어 최신 매출·지출·잔고를 확인합니다.</p></div></div><p className={styles.empty}>통장 거래를 올리면 자동분류하고, 불확실한 거래만 사람이 확인합니다.</p><div className={styles.panelActions}><button className={styles.primary} onClick={() => onView('재무·정산')}>재무 원장 보기</button></div></div></section>
 </> }
 
 function ScreenIntro({ crumb, title, description, action, onAction }: { crumb:string; title:string; description:string; action?:string; onAction?:() => void }) { return <section className={styles.screenIntro}><div><p className={styles.crumb}>{crumb}</p><h1>{title}</h1><p>{description}</p></div>{action && onAction && <button className={styles.primary} onClick={onAction}>{action}</button>}</section> }
@@ -322,9 +329,9 @@ function Projects({ projects: rows, status, selected, creationReady, creationMes
   return <section className={styles.projectsScreen}>
     <div className={styles.panel}>
       <div className={styles.panelLead}><div><h2>{scope === '전체' ? '전체 프로젝트' : scope}</h2><p>전체 프로젝트를 먼저 보여주며, 상태 필터로 필요한 목록만 좁혀볼 수 있습니다.</p></div><span>{status === '연결됨' ? `${visible.length}건` : status}</span></div>
-      <div className={styles.filterBar}>{scopes.map((item) => <button key={item} className={scope === item ? styles.filterActive : ''} onClick={() => setScope(item)}>{item} {status === '연결됨' ? rows.filter((project) => matchesScope(project, item)).length : '—'}</button>)}</div>
+      <div className={styles.filterBar}>{scopes.map((item) => <button key={item} aria-pressed={scope === item} className={scope === item ? styles.filterActive : ''} onClick={() => setScope(item)}>{item} {status === '연결됨' ? rows.filter((project) => matchesScope(project, item)).length : '—'}</button>)}</div>
       <div className={styles.projectTableHead}><span>프로젝트</span><span>거래상대</span><span>현재 상태</span><span>다음 행동</span><span>마지막 기록</span></div>
-      {visible.map((p) => <button className={`${styles.projectTableRow} ${selected?.name === p.name ? styles.selected : ''}`} onClick={() => { onSelect(p); onOpenProject(p); }} key={p.name}><span><b>{p.name}</b><small>담당 {p.owner}</small></span><span>{p.client}</span><span className={styles.progressCell}><strong>{p.status}</strong></span><span>{p.next}</span><time>{p.updatedAt || p.due || '기록 없음'}</time></button>)}
+      {visible.map((p) => <button className={`${styles.projectTableRow} ${selected?.name === p.name ? styles.selected : ''}`} onClick={() => { onSelect(p); onOpenProject(p); }} key={p.name}><span><b>{p.name}</b><small>담당 {p.owner}</small></span><span>{p.client}</span><span className={styles.progressCell}><StatusBadge lifecycle={p.lifecycle} status={p.status}/></span><span>{p.next}</span><time>{p.updatedAt || p.due || '기록 없음'}</time></button>)}
       {!visible.length && <p className={styles.empty}>{status === '연결됨' ? '이 상태에 해당하는 프로젝트가 없습니다.' : '프로젝트 원장을 다시 연결하고 있습니다.'}</p>}
     </div>
     <aside className={`${styles.panel} ${styles.projectRegister}`}>
