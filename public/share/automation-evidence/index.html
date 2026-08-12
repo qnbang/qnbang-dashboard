@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>큐앤뱅 자동화 실행 증빙</title>
+  <style>
+    :root { --canvas:#fff; --surface:#f2f4f7; --ink:#1d2138; --muted:#5a6070; --line:#e6e9ee; --accent:#4545da; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--canvas); color:var(--ink); font-family:"Helvetica Neue",Pretendard,system-ui,sans-serif; word-break:keep-all; overflow-wrap:break-word; letter-spacing:-.02em; }
+    main { width:min(960px,calc(100% - 40px)); margin:0 auto; padding:72px 0 96px; }
+    .hero { border-bottom:1px solid var(--line); padding-bottom:48px; }
+    h1 { max-width:760px; margin:0; font-size:clamp(32px,5vw,52px); line-height:1.2; letter-spacing:-.03em; }
+    .lead { max-width:760px; margin:20px 0 0; color:var(--muted); font-size:18px; line-height:1.7; }
+    section { padding:48px 0; border-bottom:1px solid var(--line); }
+    h2 { margin:0 0 16px; font-size:24px; line-height:1.35; }
+    p { margin:0; font-size:17px; line-height:1.65; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:24px; }
+    .card { display:flex; flex-direction:column; min-height:220px; padding:28px; border:1px solid var(--line); border-radius:16px; background:var(--surface); }
+    .card h3 { margin:0 0 12px; font-size:20px; line-height:1.4; }
+    .card p { color:var(--muted); font-size:16px; }
+    .links { margin-top:auto; padding-top:24px; }
+    a { color:var(--accent); font-weight:600; text-decoration-thickness:1px; text-underline-offset:3px; }
+    figure { margin:24px 0 0; }
+    img { display:block; width:100%; border:1px solid var(--line); border-radius:16px; background:var(--surface); }
+    figcaption { margin-top:10px; color:var(--muted); font-size:14px; line-height:1.6; }
+    .notice { margin-top:24px; padding:24px; border-radius:16px; background:var(--accent); color:#fff; }
+    .notice p { font-size:16px; }
+    @media (max-width:700px) { main{width:min(100% - 32px,960px);padding-top:48px}.grid{grid-template-columns:1fr}.card{min-height:auto} }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <h1>업무 자동화와 자체 도구 실행 증빙</h1>
+      <p class="lead">실제 운영 구조와 공개 가능한 제품 화면만 정리했습니다. 고객명, 대화 원문, 매출·지출 데이터, 접근 정보는 포함하지 않았습니다.</p>
+    </header>
+
+    <section>
+      <h2>운영 자동화</h2>
+      <div class="grid">
+        <article class="card"><h3>1. 카카오톡 봇</h3><p>카카오톡 메시지를 업무 자동화로 전달하고, 회의록·할 일 정리와 커뮤니티 운영 흐름에 사용합니다. 실제 대화는 개인정보 보호를 위해 공개하지 않습니다.</p><div class="links">면접 시 실제 흐름 시연 가능</div></article>
+        <article class="card"><h3>2. 메신저 업무 등록</h3><p>일정·지출·과업 입력을 해석해 캘린더와 업무 원장에 연결합니다. 일정 관리, 지출 기록, 과업 등록을 하나의 메시지 흐름으로 운영합니다.</p><div class="links">면접 시 실행 화면과 코드 제시 가능</div></article>
+        <article class="card"><h3>3. 견적·계약 문서 생성</h3><p>자유 형식의 조건을 구조화해 견적·계약 문서 생성 흐름에 연결합니다. 문서 원본에는 거래 조건이 있어 공개하지 않습니다.</p><div class="links">면접 시 비식별 예시 제시 가능</div></article>
+        <article class="card"><h3>4. 쇼츠 자동편집</h3><p>촬영 원본 전사, 무음·NG 구간 정리, 컷 목록, 자막, Premiere XML 시퀀스 생성을 하나의 편집 파이프라인으로 구성했습니다.</p><div class="links">면접 시 실제 산출물 시연 가능</div></article>
+        <article class="card"><h3>5. 내부 업무 대시보드</h3><p>작업 로그, 프로젝트, 할 일, 일정, 재무 확인을 한 화면에서 운영합니다. 내부 운영 화면은 로그인 보호를 유지합니다.</p><div class="links"><a href="https://qnbang-dashboard.vercel.app">이전 업무 대시보드 열기</a></div></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>공개 제품 화면</h2>
+      <figure><img src="price-monitor.png" alt="가격 모니터링 도구 화면"><figcaption><a href="https://qnbang-price-monitor.vercel.app">가격 모니터링 도구 열기</a></figcaption></figure>
+      <figure><img src="seo-namer.png" alt="SEO 상품명 작명 도구 화면"><figcaption><a href="https://qnbang-seo-namer.vercel.app">SEO 상품명 작명 도구 열기</a></figcaption></figure>
+    </section>
+
+    <section>
+      <h2>코드와 보안</h2>
+      <p>운영 자동화의 소스 저장소는 내부 비공개로 유지합니다. 인증 정보와 고객 데이터가 포함될 수 있는 원본을 공개하지 않고, 요청 시 비식별 코드와 실행 구조를 별도로 시연합니다.</p>
+      <div class="notice"><p>모든 공개 화면과 자료는 고객명·대화 원문·매출·지출·인증 정보를 제외한 범위입니다.</p></div>
+    </section>
+  </main>
+</body>
+</html>
