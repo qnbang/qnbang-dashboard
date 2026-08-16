@@ -673,7 +673,9 @@ to{opacity:1;transform:translateY(0)}
 .filterBar button{min-height:40px;padding:0 14px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted);font:600 13px/1 inherit;cursor:pointer;transition:background-color .18s,color .18s,border-color .18s}
 .filterBar button:hover{background:var(--canvas);color:var(--ink)}
 .filterBar .filterActive{border-color:var(--accent);background:var(--accent);color:#fff}
-.filterBar select{margin-left:auto;background:var(--canvas)}
+.filterBar select,.filterBar input{min-height:40px;box-sizing:border-box;border:1px solid var(--line);border-radius:8px;background:var(--canvas);padding:0 12px;color:var(--ink);font:inherit;font-size:13px}
+.filterBar select{margin-left:auto}
+.filterBar input{width:220px}
 .projectSearch input{min-height:52px;background:var(--surface)}
 .projectTableHead{padding:14px;color:var(--muted)}
 .projectTableRow{padding:18px 14px;border-radius:10px;transition:background-color .18s}
@@ -683,7 +685,7 @@ to{opacity:1;transform:translateY(0)}
 .projectRegister .field input,.projectRegister .field select{background:var(--canvas)}
 .primary,.secondary,.closeButton{border-radius:12px}
 @media(max-width:980px){.side{width:200px}.main{padding:36px 28px 72px}.metrics{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:700px){.side{width:auto;padding:18px}.navGroup>span{padding-top:14px}.main{padding:24px 16px 64px}.homeIntro{min-height:auto;padding:24px;align-items:stretch}.homeIntro h2{font-size:28px}.homeIntro .primary{width:100%}.todayCheck{padding:16px}.metrics{grid-template-columns:1fr 1fr;gap:10px}.metric{min-height:118px;padding:18px}.metric b{font-size:26px}.columns{gap:18px}.columns>.panel{padding:22px}.filterBar{align-items:stretch;flex-direction:row}.filterBar button{flex:1 1 auto}.filterBar select{width:100%;margin-left:0}.projectTableRow{padding:16px 12px}}
+@media(max-width:700px){.side{width:auto;padding:18px}.navGroup>span{padding-top:14px}.main{padding:24px 16px 64px}.homeIntro{min-height:auto;padding:24px;align-items:stretch}.homeIntro h2{font-size:28px}.homeIntro .primary{width:100%}.todayCheck{padding:16px}.metrics{grid-template-columns:1fr 1fr;gap:10px}.metric{min-height:118px;padding:18px}.metric b{font-size:26px}.columns{gap:18px}.columns>.panel{padding:22px}.filterBar{align-items:stretch;flex-direction:row}.filterBar button{flex:1 1 auto}.filterBar select,.filterBar input{width:100%;margin-left:0}.projectTableRow{padding:16px 12px}}
 
 /* 조밀한 체크리스트 */
 .taskListRow{grid-template-columns:28px minmax(0,1fr);gap:12px;min-height:58px;box-sizing:border-box;padding:9px 4px;cursor:default}

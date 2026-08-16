@@ -20,6 +20,18 @@ const OPERATING_SHEET_ID = '1RnmSplWT2-Aqk-flDInpWMljKwBbUes1q6pab9j3dfo';
 const XLSX_PW = process.env.BANK_XLSX_PW || '920623'; // 카카오뱅크 내보내기 고정 암호(생년월일)
 
 const api = sheetsWriteClient;
+type 통장거래 = { id: string; 일시: string; 금액: number; 잔액: number; 거래구분: string; 상대: string };
+const 숫자 = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
+const 이름정리 = (v: unknown) => String(v ?? '').toLowerCase().replace(/[^0-9a-z가-힣]/g, '');
+const 날짜정리 = (v: unknown) => {
+  const matched = String(v ?? '').match(/(20\d{2})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/);
+  return matched ? `${matched[1]}-${matched[2].padStart(2, '0')}-${matched[3].padStart(2, '0')}` : '';
+};
+const 열 = (index: number) => {
+  let out = '';
+  for (let value = index + 1; value > 0; value = Math.floor((value - 1) / 26)) out = String.fromCharCode(((value - 1) % 26) + 65) + out;
+  return out;
+};
 
 async function guard(): Promise<string | null> {
   const jar = await cookies();
@@ -108,6 +120,88 @@ async function 정산확인대기추가(items: { id: string; date: string; count
   return rows.length;
 }
 
+// 통장 원본으로 기존 매출 원장을 보정한다. 같은 금액의 미수 계약이 하나일 때만
+// 입금 상태·일자·금액을 바꾼다. 여러 후보·부분입금은 사람이 확인하도록 남긴다.
+async function 매출자동정산(items: 통장거래[]) {
+  const 입금 = items.filter((item) => item.금액 > 0);
+  if (!입금.length) return 0;
+  const sheets = api();
+  const response = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID!, range: '매출!A:Z', valueRenderOption: 'FORMATTED_VALUE' });
+  const [header = [], ...body] = response.data.values || [];
+  const index = (name: string) => header.findIndex((value) => String(value ?? '').trim() === name);
+  const 이름열 = index('계약명'), 고객열 = index('클라이언트'), 계약금액열 = index('계약금액');
+  const 상태열 = index('입금상태'), 입금일열 = index('입금일'), 입금액열 = index('입금액'), 비고열 = index('비고');
+  if ([이름열, 계약금액열, 상태열, 입금일열, 입금액열, 비고열].some((value) => value < 0)) return 0;
+  const usedRows = new Set<number>();
+  let settled = 0;
+  for (const item of 입금) {
+    const marker = `자동(통장:${item.id})`;
+    if (body.some((row) => String(row[비고열] || '').includes(marker))) continue;
+    const candidates = body.map((row, index) => ({ row, rowNumber: index + 2 })).filter(({ row, rowNumber }) => {
+      if (usedRows.has(rowNumber) || String(row[상태열] || '') === '입금완료') return false;
+      return 숫자(row[계약금액열]) - 숫자(row[입금액열]) === item.금액;
+    });
+    const sender = 이름정리(item.상대);
+    const named = sender ? candidates.filter(({ row }) => {
+      const name = 이름정리(row[이름열]);
+      const client = 고객열 >= 0 ? 이름정리(row[고객열]) : '';
+      return (name && (name.includes(sender) || sender.includes(name))) || (client && (client.includes(sender) || sender.includes(client)));
+    }) : [];
+    const target = named.length === 1 ? named[0] : named.length === 0 && candidates.length === 1 ? candidates[0] : undefined;
+    if (!target) continue;
+    const note = [String(target.row[비고열] || ''), marker, `통장입금:${item.상대}`].filter(Boolean).join(' · ');
+    await sheets.spreadsheets.values.batchUpdate({ spreadsheetId: SHEET_ID!, requestBody: { valueInputOption: 'USER_ENTERED', data: [
+      { range: `매출!${열(상태열)}${target.rowNumber}`, values: [['입금완료']] },
+      { range: `매출!${열(입금일열)}${target.rowNumber}`, values: [[item.일시]] },
+      { range: `매출!${열(입금액열)}${target.rowNumber}`, values: [[String(item.금액)]] },
+      { range: `매출!${열(비고열)}${target.rowNumber}`, values: [[note]] },
+    ] } });
+    usedRows.add(target.rowNumber);
+    settled += 1;
+  }
+  if (settled) invalidateSheets();
+  return settled;
+}
+
+// 지출은 거래일과 상대가 하나로 맞는 기존 행만 금액을 보정한다. 새 지출을
+// 임의로 만들거나 상대·분류가 애매한 항목은 확인 대기에 남긴다.
+async function 지출자동정산(items: 통장거래[]) {
+  const 출금 = items.filter((item) => item.금액 < 0);
+  if (!출금.length) return 0;
+  const sheets = api();
+  let settled = 0;
+  for (const item of 출금) {
+    const 날짜 = 날짜정리(item.일시);
+    if (!날짜) continue;
+    const month = Number(날짜.slice(5, 7));
+    if (!month) continue;
+    const response = await sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID!, range: `${month}월!A:E`, valueRenderOption: 'FORMATTED_VALUE' });
+    const [header = [], ...body] = response.data.values || [];
+    if (!header.length) continue;
+    const marker = `자동(통장:${item.id})`;
+    if (body.some((row) => String(row[4] || '').includes(marker))) continue;
+    const sender = 이름정리(item.상대);
+    if (sender.length < 2) continue;
+    const candidates = body.map((row, index) => ({ row, rowNumber: index + 2 })).filter(({ row }) => {
+      const content = 이름정리(row[2]);
+      return 날짜정리(row[0]) === 날짜 && content.length >= 2 && (content.includes(sender) || sender.includes(content));
+    });
+    if (candidates.length !== 1) continue;
+    const target = candidates[0];
+    const 분류 = 자동분류(item.상대, item.거래구분, item.금액);
+    const category = 분류.confidence >= 0.9 ? 분류.category : String(target.row[1] || '미분류');
+    const note = [String(target.row[4] || ''), marker, `통장출금:${item.상대}`].filter(Boolean).join(' · ');
+    await sheets.spreadsheets.values.batchUpdate({ spreadsheetId: SHEET_ID!, requestBody: { valueInputOption: 'USER_ENTERED', data: [
+      { range: `${month}월!B${target.rowNumber}`, values: [[category]] },
+      { range: `${month}월!D${target.rowNumber}`, values: [[String(Math.abs(item.금액))]] },
+      { range: `${month}월!E${target.rowNumber}`, values: [[note]] },
+    ] } });
+    settled += 1;
+  }
+  if (settled) invalidateSheets();
+  return settled;
+}
+
 export async function POST(req: Request) {
   const err = await guard();
   if (err) return NextResponse.json({ ok: false, error: err }, { status: 401 });
@@ -135,7 +229,7 @@ export async function POST(req: Request) {
     const col = (name: string) => head.findIndex((h) => h.includes(name));
     const cDate = col('거래일시'), cAmt = col('거래금액'), cBal = col('거래 후 잔액');
     const cDirection = col('구분'), cKind = col('거래구분'), cContent = col('내용'), cMemo = col('메모');
-    const num = (v: unknown) => Number(String(v ?? '').replace(/[^0-9.-]/g, '')) || 0;
+    const num = 숫자;
 
     const tx = rows.slice(hi + 1)
       .filter((r) => r && String(r[cDate] ?? '').match(/^\d{4}\./))
@@ -164,12 +258,13 @@ export async function POST(req: Request) {
     const 이번달입금 = 이번달.filter((t) => t.금액 > 0).reduce((s, t) => s + t.금액, 0);
     const 이번달출금 = 이번달.filter((t) => t.금액 < 0).reduce((s, t) => s - t.금액, 0);
 
+    const 자동정산건수 = (await 매출자동정산(tx)) + (await 지출자동정산(tx));
     const 확인대기건수 = await 정산확인대기추가(tx.map((item) => {
       const 분류 = 자동분류(item.상대, item.거래구분, item.금액);
       return { id: item.id, date: item.일시, counterparty: item.상대, income: item.금액 > 0 ? item.금액 : 0, expense: item.금액 < 0 ? -item.금액 : 0, category: 분류.category, confidence: 분류.confidence };
     }));
     await setBalance('통장잔고', last.잔액, 기준일);
-    return NextResponse.json({ ok: true, 잔액: last.잔액, 기준일, 건수: tx.length, 이번달입금, 이번달출금, 확인대기건수 });
+    return NextResponse.json({ ok: true, 잔액: last.잔액, 기준일, 건수: tx.length, 이번달입금, 이번달출금, 자동정산건수, 확인대기건수 });
   } catch (e) {
     logError('/api/company/bank POST', e);
     return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });

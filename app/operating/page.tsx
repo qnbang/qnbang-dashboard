@@ -207,12 +207,34 @@ function Home({ onView, projects: homeProjects, tasks: homeTasks, onOpenProject,
 function ScreenIntro({ crumb, title, description, action, onAction }: { crumb:string; title:string; description:string; action?:string; onAction?:() => void }) { return <section className={styles.screenIntro}><div><p className={styles.crumb}>{crumb}</p><h1>{title}</h1><p>{description}</p></div>{action && onAction && <button className={styles.primary} onClick={onAction}>{action}</button>}</section> }
 
 function TaskList({ projects: taskProjects, tasks: taskItems, editableProjectIds, writeMessage, onOpenProject, onCompleted }: { projects: Project[]; tasks: DashboardTask[]; editableProjectIds: string[]; writeMessage: string; onOpenProject: (name: string) => void; onCompleted: (task: DashboardTask) => void }) {
-  const [projectFilter, setProjectFilter] = useState('전체');
+  const [projectFilter, setProjectFilter] = useState('현재 활성 프로젝트');
+  const [ownerFilter, setOwnerFilter] = useState('전체 담당');
+  const [keyword, setKeyword] = useState('');
+  const [sort, setSort] = useState<'기한 빠른 순' | '기한 늦은 순'>('기한 빠른 순');
   const [selectedTitle, setSelectedTitle] = useState(taskItems[0]?.title || '');
   const [completingId, setCompletingId] = useState('');
   const [notice, setNotice] = useState('');
-  const visible = taskItems.filter((task) => projectFilter === '전체' || task.project === projectFilter);
-  const selected = taskItems.find((task) => task.title === selectedTitle) || visible[0];
+  const activeProjects = taskProjects.filter((project) => project.lifecycle === '현재 진행' || project.lifecycle === '고객대기');
+  const activeNames = new Set(activeProjects.map((project) => project.name));
+  const projectOptions = projectFilter === '현재 활성 프로젝트' ? activeProjects : taskProjects;
+  const dueValue = (value: string) => {
+    const matched = value.match(/(20\d{2})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/);
+    if (!matched) return Number.POSITIVE_INFINITY;
+    return new Date(Number(matched[1]), Number(matched[2]) - 1, Number(matched[3])).getTime();
+  };
+  const visible = taskItems
+    .filter((task) => projectFilter !== '현재 활성 프로젝트' || activeNames.has(task.project))
+    .filter((task) => projectFilter === '현재 활성 프로젝트' || projectFilter === '전체 프로젝트' || task.project === projectFilter)
+    .filter((task) => ownerFilter === '전체 담당' || task.owner === ownerFilter || (ownerFilter === '공통' && (!task.owner || task.owner === '담당 확인 필요' || task.owner === '공통')))
+    .filter((task) => `${task.title} ${task.project} ${task.owner}`.toLowerCase().includes(keyword.trim().toLowerCase()))
+    .sort((a, b) => {
+      const aDue = dueValue(a.due);
+      const bDue = dueValue(b.due);
+      if (!Number.isFinite(aDue)) return 1;
+      if (!Number.isFinite(bDue)) return -1;
+      return sort === '기한 빠른 순' ? aDue - bDue : bDue - aDue;
+    });
+  const selected = visible.find((task) => task.title === selectedTitle) || visible[0];
   const complete = async (task: DashboardTask) => {
     if (!task.id || completingId) { setNotice('이 할 일은 아직 운영원장 ID가 연결되지 않았습니다.'); return; }
     if (task.ledgerProjectId && !editableProjectIds.includes(task.ledgerProjectId)) { setNotice(writeMessage); return; }
@@ -226,7 +248,7 @@ function TaskList({ projects: taskProjects, tasks: taskItems, editableProjectIds
     } catch (error) { setNotice(error instanceof Error ? error.message : '완료 처리에 실패했습니다.'); }
     finally { setCompletingId(''); }
   };
-  return <><div className={styles.filterBar}><div><Badge>{`현재 ${visible.length}`}</Badge><Badge>{`전체 ${taskItems.length}`}</Badge></div><select aria-label="프로젝트 필터" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="전체">프로젝트 전체</option>{taskProjects.map((project) => <option key={project.name} value={project.name}>{project.name}</option>)}</select></div><section className={styles.taskLayout}><div className={styles.panel}><div className={styles.panelLead}><div><h2>모든 할 일</h2><p>프로젝트 운영원장을 우선으로 읽습니다. 완료 처리는 원장에 바로 기록합니다.</p></div></div>{visible.map((t) => { const canComplete = Boolean(t.id) && (!t.ledgerProjectId || editableProjectIds.includes(t.ledgerProjectId)); return <article className={`${styles.taskListRow} ${selected?.title === t.title ? styles.taskSelected : ''}`} key={`${t.ledgerProjectId || t.project}-${t.id || t.title}`}><button className={styles.checkButton} aria-label={`${t.title} 완료 처리`} title={!canComplete ? '원장 편집 권한 연결 필요' : undefined} disabled={!canComplete || Boolean(completingId)} onClick={() => void complete(t)}>{completingId === t.id ? '…' : ''}</button><button className={styles.taskTextButton} onClick={() => setSelectedTitle(t.title)}><span><b>{t.title}</b><small>{t.owner} · {t.state}</small></span><span className={styles.taskProjectButton}>{t.project}</span><time>{t.due}</time></button></article>})}{!visible.length && <p className={styles.empty}>선택한 프로젝트에 표시할 현재 할 일이 없습니다.</p>}<div className={styles.waiting}><b>대기 항목은 프로젝트 상태에서 분리</b><span>고객대기·보류는 프로젝트 화면에서 원래 상태 그대로 확인합니다.</span></div></div><aside className={`${styles.panel} ${styles.taskDetail}`}><div className={styles.panelLead}><div><h2>선택한 할 일</h2></div></div>{selected ? <><h3>{selected.title}</h3><Badge>{selected.due}</Badge><div className={styles.taskConnection}><p><b>연결 프로젝트</b>{selected.project}</p><p><b>담당</b>{selected.owner}</p><p><b>원문·메모</b>{selected.project}에서 이어진 할 일입니다.</p></div><button className={styles.secondary} onClick={() => onOpenProject(selected.project)}>프로젝트 열기</button><button className={styles.primary} disabled={!selected.id || Boolean(completingId) || Boolean(selected.ledgerProjectId && !editableProjectIds.includes(selected.ledgerProjectId))} onClick={() => void complete(selected)}>{completingId === selected.id ? '기록 중' : '완료 처리'}</button><small>{notice || (selected.ledgerProjectId && !editableProjectIds.includes(selected.ledgerProjectId) ? writeMessage : selected.id ? '완료 처리하면 프로젝트 운영원장에 기록되고 이 목록에서 사라집니다.' : '이 항목은 원장 ID 연결 뒤 완료 처리할 수 있습니다.')}</small></> : <p className={styles.empty}>왼쪽에서 할 일을 선택하세요.</p>}</aside></section></>;
+  return <><div className={styles.filterBar}><div><Badge>{`현재 ${visible.length}`}</Badge><Badge>{`전체 ${taskItems.length}`}</Badge></div><input aria-label="할 일·프로젝트 검색" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="할 일·프로젝트 검색"/><select aria-label="활성 프로젝트 필터" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="현재 활성 프로젝트">현재 활성 프로젝트</option><option value="전체 프로젝트">전체 프로젝트</option>{projectOptions.map((project) => <option key={project.name} value={project.name}>{project.name}</option>)}</select><select aria-label="담당 필터" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}><option value="전체 담당">전체 담당</option><option value="신종호">신종호</option><option value="김지영">김지영</option><option value="공통">공통</option></select><select aria-label="기한 정렬" value={sort} onChange={(event) => setSort(event.target.value as typeof sort)}><option value="기한 빠른 순">기한 빠른 순</option><option value="기한 늦은 순">기한 늦은 순</option></select></div><section className={styles.taskLayout}><div className={styles.panel}><div className={styles.panelLead}><div><h2>모든 할 일</h2><p>프로젝트 운영원장을 우선으로 읽습니다. 완료 처리는 원장에 바로 기록합니다.</p></div></div>{visible.map((t) => { const canComplete = Boolean(t.id) && (!t.ledgerProjectId || editableProjectIds.includes(t.ledgerProjectId)); return <article className={`${styles.taskListRow} ${selected?.title === t.title ? styles.taskSelected : ''}`} key={`${t.ledgerProjectId || t.project}-${t.id || t.title}`}><button className={styles.checkButton} aria-label={`${t.title} 완료 처리`} title={!canComplete ? '원장 편집 권한 연결 필요' : undefined} disabled={!canComplete || Boolean(completingId)} onClick={() => void complete(t)}>{completingId === t.id ? '…' : ''}</button><button className={styles.taskTextButton} onClick={() => setSelectedTitle(t.title)}><span><b>{t.title}</b><small>{t.owner} · {t.state}</small></span><span className={styles.taskProjectButton}>{t.project}</span><time>{t.due}</time></button></article>})}{!visible.length && <p className={styles.empty}>선택한 조건에 맞는 할 일이 없습니다.</p>}<div className={styles.waiting}><b>대기 항목은 프로젝트 상태에서 분리</b><span>고객대기·보류는 프로젝트 화면에서 원래 상태 그대로 확인합니다.</span></div></div><aside className={`${styles.panel} ${styles.taskDetail}`}><div className={styles.panelLead}><div><h2>선택한 할 일</h2></div></div>{selected ? <><h3>{selected.title}</h3><Badge>{selected.due}</Badge><div className={styles.taskConnection}><p><b>연결 프로젝트</b>{selected.project}</p><p><b>담당</b>{selected.owner}</p><p><b>원문·메모</b>{selected.project}에서 이어진 할 일입니다.</p></div><button className={styles.secondary} onClick={() => onOpenProject(selected.project)}>프로젝트 열기</button><button className={styles.primary} disabled={!selected.id || Boolean(completingId) || Boolean(selected.ledgerProjectId && !editableProjectIds.includes(selected.ledgerProjectId))} onClick={() => void complete(selected)}>{completingId === selected.id ? '기록 중' : '완료 처리'}</button><small>{notice || (selected.ledgerProjectId && !editableProjectIds.includes(selected.ledgerProjectId) ? writeMessage : selected.id ? '완료 처리하면 프로젝트 운영원장에 기록되고 이 목록에서 사라집니다.' : '이 항목은 원장 ID 연결 뒤 완료 처리할 수 있습니다.')}</small></> : <p className={styles.empty}>왼쪽에서 할 일을 선택하세요.</p>}</aside></section></>;
 }
 
 function 일정으로읽기(value: string) {
@@ -400,7 +422,7 @@ function Finance() {
       const response = await fetch('/api/company/bank', { method: 'POST', body });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.error || '통장 파일을 처리하지 못했습니다.');
-      setUploadNotice(`거래 ${result.건수}건을 읽었습니다. 이번 달 입금 ${금액(result.이번달입금)}, 출금 ${금액(result.이번달출금)} · 확인 대기 ${result.확인대기건수}건`);
+      setUploadNotice(`거래 ${result.건수}건을 읽었습니다. 기존 원장 자동 정산 ${result.자동정산건수 || 0}건 · 이번 달 입금 ${금액(result.이번달입금)}, 출금 ${금액(result.이번달출금)} · 확인 대기 ${result.확인대기건수}건`);
       await loadFinance();
     } catch (error) {
       setUploadNotice(error instanceof Error ? error.message : '통장 파일을 처리하지 못했습니다.');
