@@ -28,7 +28,6 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     twitter: { card: 'summary', title, description, images: [image] },
   };
 }
-
 export default async function SharePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const entry = await getShareBySlug(slug);
@@ -76,4 +75,3 @@ export default async function SharePage({ params }: { params: Promise<{ slug: st
     </div>
   );
 }
-
