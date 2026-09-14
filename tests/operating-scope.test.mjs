@@ -21,3 +21,8 @@ assert.deepEqual(menu,['홈','수신함','할 일','캘린더','프로젝트','�
 for(const endpoint of ['experiments','tools','sync-log'])assert.ok(!page.includes(`fetch('/api/operating/${endpoint}')`));
 assert.ok(page.includes('projects={projectItems}'));assert.ok(page.includes('!자체브랜드(p)'));assert.ok(page.includes('brandItems.map'));
 console.log('폴더ID 범위·브랜드 분리·8개 메뉴 검사 통과');
+const executionFilter=page.match(/const executionTasks = ([^;]+);/)[1];
+const execution=vm.runInNewContext(executionFilter,{currentProjects:[{name:'진행 프로젝트'}],homeTasks:[{project:'고객대기 프로젝트',title:'회신 후 실행'},{project:'진행 프로젝트',title:'지금 실행'}]});
+assert.deepEqual(Array.from(execution,t=>t.title),['지금 실행']);
+assert.ok(page.includes('executionTasks.slice(0,3)'));
+console.log('홈 실행 목록에서 고객대기 과업 제외 검사 통과');
