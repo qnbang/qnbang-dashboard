@@ -4,6 +4,8 @@ import { google } from 'googleapis';
 export const dynamic = 'force-dynamic';
 // 중앙 인덱스나 프로젝트 링크가 바뀌면 개발 서버 모듈 캐시도 새로 읽는다. 2026-08-12 좋은움직임연구소 최신화 반영.
 
+const projectsFolderId = '1xW01foGrl054W-itr4JmyAB26N0jh_It';
+const brandsFolderId = '15n-DQ2Pqq_sWDDuae1_leKFl6DeVG5OE';
 const indexSpreadsheetId = '1RnmSplWT2-Aqk-flDInpWMljKwBbUes1q6pab9j3dfo';
 const 캐시시간 = 300_000;
 let 정상응답캐시: { at: number; data: 프로젝트응답 } | null = null;
@@ -62,12 +64,12 @@ function 할일정규화(row: 행, projectId: string) {
 }
 
 // 폴더ID를 기준으로 연결한다. 같은 번호의 과거 프로젝트를 잘못 붙이지 않는다.
-function 운영대상(rows: 행[], folders: { id: string; name: string }[]): 행[] {
-  const projects = folders.filter((folder) => /^\d{3}_/.test(folder.name)).sort((a, b) => a.name.localeCompare(b.name, 'ko')).map((folder) => {
+function 운영대상(rows: 행[], folders: { id: string; name: string; parents?: string[] }[]): 행[] {
+  const projects = folders.filter((folder) => /^\d{3}_/.test(folder.name) && folder.parents?.includes(projectsFolderId)).sort((a, b) => a.name.localeCompare(b.name, 'ko')).map((folder) => {
     const linked = rows.find((row) => row['구분'] === '대행' && row['드라이브 폴더']?.split('/folders/')[1]?.split(/[/?#]/)[0] === folder.id);
     return { ...(linked || {}), 프로젝트ID: linked?.['프로젝트ID'] || `folder-${folder.id}`, 프로젝트명: folder.name, 구분: '대행', 상태: linked?.['상태'] || '확인 필요', '드라이브 폴더': `https://drive.google.com/drive/folders/${folder.id}` };
   });
-  return [...projects, ...rows.filter((row) => row['구분'] === '자체브랜드')];
+  return [...projects, ...rows.filter((row) => row['구분'] === '자체브랜드' && folders.some((folder) => folder.parents?.includes(brandsFolderId) && row['드라이브 폴더']?.split('/folders/')[1]?.split(/[/?#]/)[0] === folder.id))];
 }
 
 async function 실제조회(): Promise<프로젝트응답> {
@@ -81,11 +83,11 @@ async function 실제조회(): Promise<프로젝트응답> {
     const indexResponse = await sheets.spreadsheets.values.get({ spreadsheetId: indexSpreadsheetId, range: "'프로젝트'!A:Z" });
     const indexRows = 표행((indexResponse.data.values as unknown[][]) || []);
     const drive = google.drive({ version: 'v3', auth });
-    const folders: { id: string; name: string }[] = [];
+    const folders: { id: string; name: string; parents?: string[] }[] = [];
     let pageToken: string | undefined;
     do {
-      const response = await drive.files.list({ q: "'1xW01foGrl054W-itr4JmyAB26N0jh_It' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'", fields: 'nextPageToken,files(id,name)', pageSize: 1000, pageToken });
-      for (const folder of response.data.files || []) if (folder.id && folder.name) folders.push({ id: folder.id, name: folder.name });
+      const response = await drive.files.list({ q: `('${projectsFolderId}' in parents or '${brandsFolderId}' in parents) and trashed=false and mimeType='application/vnd.google-apps.folder'`, fields: 'nextPageToken,files(id,name,parents)', pageSize: 1000, pageToken });
+      for (const folder of response.data.files || []) if (folder.id && folder.name) folders.push({ id: folder.id, name: folder.name, parents: folder.parents || [] });
       pageToken = response.data.nextPageToken || undefined;
     } while (pageToken);
     if (!folders.some((folder) => /^\d{3}_/.test(folder.name))) throw new Error('프로젝트 폴더 접근 권한을 확인해 주세요.');

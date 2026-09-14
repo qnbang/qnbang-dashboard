@@ -9,9 +9,9 @@ const actual=scope([
  {프로젝트ID:'P-002',프로젝트명:'002_옛 고객',구분:'대행','드라이브 폴더':'https://drive.google.com/drive/folders/old'},
  {프로젝트ID:'P-025',프로젝트명:'옛 이름',구분:'대행',상태:'완료','드라이브 폴더':'https://drive.google.com/drive/folders/done'},
  {프로젝트ID:'L-01',프로젝트명:'과거',구분:'과거 기록','드라이브 폴더':'https://drive.google.com/drive/folders/legacy'},
- {프로젝트ID:'B-007',프로젝트명:'자동화청년',구분:'자체브랜드'},
- {프로젝트ID:'B-008',프로젝트명:'반보',구분:'자체브랜드'},
-], [{id:'new',name:'002_봉밀가'},{id:'done',name:'025_롯데웰푸드'},{id:'archive',name:'2026 이전 프로젝트'}]);
+ {프로젝트ID:'B-007',프로젝트명:'자동화청년',구분:'자체브랜드','드라이브 폴더':'https://drive.google.com/drive/folders/brand1'},
+ {프로젝트ID:'B-008',프로젝트명:'반보',구분:'자체브랜드','드라이브 폴더':'https://drive.google.com/drive/folders/brand2'},
+], [{id:'new',name:'002_봉밀가',parents:['1xW01foGrl054W-itr4JmyAB26N0jh_It']},{id:'done',name:'025_롯데웰푸드',parents:['1xW01foGrl054W-itr4JmyAB26N0jh_It']},{id:'archive',name:'2026 이전 프로젝트'},{id:'brand1',name:'자동화청년',parents:['15n-DQ2Pqq_sWDDuae1_leKFl6DeVG5OE']},{id:'brand2',name:'반보',parents:['15n-DQ2Pqq_sWDDuae1_leKFl6DeVG5OE']}]);
 assert.deepEqual(Array.from(actual,x=>x.프로젝트명),['002_봉밀가','025_롯데웰푸드','자동화청년','반보']);
 assert.equal(actual[0].프로젝트ID,'folder-new');assert.equal(actual[0].상태,'확인 필요');assert.equal(actual[1].상태,'완료');
 assert.equal(lifecycle('확인 필요',''),'확인 필요');
@@ -26,3 +26,6 @@ const execution=vm.runInNewContext(executionFilter,{currentProjects:[{name:'진�
 assert.deepEqual(Array.from(execution,t=>t.title),['지금 실행']);
 assert.ok(page.includes('executionTasks.slice(0,3)'));
 console.log('홈 실행 목록에서 고객대기 과업 제외 검사 통과');
+
+assert.equal(scope([{프로젝트ID:'B-003',구분:'자체브랜드','드라이브 폴더':'https://drive.google.com/drive/folders/retired'}],[{id:'retired',name:'촌캉스',parents:['archive']}]).length,0);
+console.log('이전 폴더로 보관한 브랜드 현재 목록 제외 검사 통과');
