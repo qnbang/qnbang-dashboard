@@ -7,7 +7,7 @@ type 진행묶음 = { name: string; outcome?: string; status?: string; owner?: s
 type 프로젝트링크 = { name: string; purpose?: string; url: string; stream?: string };
 type 드라이브파일 = { id: string; name: string; section: string; mimeType: string; isFolder: boolean; updatedAt: string; size: string; url: string };
 type 프로젝트활동 = { id?: string; title: string; detail?: string; actor?: string; at?: string; end?: string; kind: '결정' | '일정' | '이력' };
-export type 운영프로젝트 = { id?: string; spreadsheetId?: string; name: string; client: string; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: 진행묶음[]; links?: 프로젝트링크[]; decisions?: 프로젝트활동[]; schedules?: 프로젝트활동[]; histories?: 프로젝트활동[]; driveUrl?: string; lifecycle?: '현재 진행' | '고객대기' | '보류' | '완료·과거' | '착수 전' };
+export type 운영프로젝트 = { id?: string; spreadsheetId?: string; name: string; client: string; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: 진행묶음[]; links?: 프로젝트링크[]; decisions?: 프로젝트활동[]; schedules?: 프로젝트활동[]; histories?: 프로젝트활동[]; driveUrl?: string; lifecycle?: '현재 진행' | '고객대기' | '보류' | '완료·과거' | '착수 전' | '확인 필요' };
 export type 운영할일 = { id?: string; ledgerProjectId?: string; title: string; project: string; due: string; owner: string; state: string };
 
 const Badge = ({ children }: { children: string }) => <span className={styles.badge}>{children}</span>;

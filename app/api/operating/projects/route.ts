@@ -36,7 +36,8 @@ function 열문자(index: number) {
 
 function 수명주기(status: string, storage: string) {
   if (['제안중(계약전)', '제안 중', '계약 전', '견적 중'].includes(status)) return '착수 전';
-  if (['보류', '확인 필요'].includes(status)) return '보류';
+  if (status === '보류') return '보류';
+  if (!status || ['확인 필요', '상태 확인 필요'].includes(status)) return '확인 필요';
   if (status === '고객대기') return '고객대기';
   if (storage === '보관' || ['보관', '폐기 기록', '완료'].includes(status)) return '완료·과거';
   return '현재 진행';
@@ -60,28 +61,44 @@ function 할일정규화(row: 행, projectId: string) {
   return { ...common, validShape: false };
 }
 
+// 폴더ID를 기준으로 연결한다. 같은 번호의 과거 프로젝트를 잘못 붙이지 않는다.
+function 운영대상(rows: 행[], folders: { id: string; name: string }[]): 행[] {
+  const projects = folders.filter((folder) => /^\d{3}_/.test(folder.name)).sort((a, b) => a.name.localeCompare(b.name, 'ko')).map((folder) => {
+    const linked = rows.find((row) => row['구분'] === '대행' && row['드라이브 폴더']?.split('/folders/')[1]?.split(/[/?#]/)[0] === folder.id);
+    return { ...(linked || {}), 프로젝트ID: linked?.['프로젝트ID'] || `folder-${folder.id}`, 프로젝트명: folder.name, 구분: '대행', 상태: linked?.['상태'] || '확인 필요', '드라이브 폴더': `https://drive.google.com/drive/folders/${folder.id}` };
+  });
+  return [...projects, ...rows.filter((row) => row['구분'] === '자체브랜드')];
+}
+
 async function 실제조회(): Promise<프로젝트응답> {
     const serviceAccount = JSON.parse(process.env.GOOGLE_SA_JSON || '');
     const auth = new google.auth.JWT({
       email: serviceAccount.client_email,
       key: serviceAccount.private_key,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly', 'https://www.googleapis.com/auth/drive.metadata.readonly'],
     });
     const sheets = google.sheets({ version: 'v4', auth });
     const indexResponse = await sheets.spreadsheets.values.get({ spreadsheetId: indexSpreadsheetId, range: "'프로젝트'!A:Z" });
     const indexRows = 표행((indexResponse.data.values as unknown[][]) || []);
-    const pendingResponse = await sheets.spreadsheets.values.get({ spreadsheetId: indexSpreadsheetId, range: "'이관대기 프로젝트'!A:Z" }).catch(() => ({ data: { values: [] as unknown[][] } }));
-    const pending = 표행((pendingResponse.data.values as unknown[][]) || []).filter((row) => !['연결 완료', '폐기', '제외'].includes(row['이관상태'])).map((row) => ({
-      name: row['레거시 프로젝트명'], client: row['고객'], position: row['현재 위치'], status: row['현재 상태'], owner: row['담당'], next: row['다음 행동'], due: row['기한'], updatedAt: row['마지막 갱신'], taskCount: row['연결된 과업 수'],
-    })).filter((row) => row.name);
-    const items = await Promise.all(indexRows.map(async (row) => {
+    const drive = google.drive({ version: 'v3', auth });
+    const folders: { id: string; name: string }[] = [];
+    let pageToken: string | undefined;
+    do {
+      const response = await drive.files.list({ q: "'1xW01foGrl054W-itr4JmyAB26N0jh_It' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'", fields: 'nextPageToken,files(id,name)', pageSize: 1000, pageToken });
+      for (const folder of response.data.files || []) if (folder.id && folder.name) folders.push({ id: folder.id, name: folder.name });
+      pageToken = response.data.nextPageToken || undefined;
+    } while (pageToken);
+    if (!folders.some((folder) => /^\d{3}_/.test(folder.name))) throw new Error('프로젝트 폴더 접근 권한을 확인해 주세요.');
+    const pending: never[] = [];
+    const items = await Promise.all(운영대상(indexRows, folders).map(async (row) => {
       const spreadsheetUrl = row['프로젝트 운영원장'] || row['원장링크'] || '';
       const spreadsheetId = row['원장시트ID'] || 시트ID(spreadsheetUrl);
       const storage = row['보관상태'] || '';
       const base = {
         id: row['프로젝트ID'],
         name: row['프로젝트명'],
-        client: row['고객사'] || (row['구분'] === '자체' ? '큐앤뱅' : '거래상대 확인 필요'),
+        category: row['구분'] || '',
+        client: row['고객사'] || (['자체', '자체브랜드'].includes(row['구분']) ? '큐앤뱅' : '거래상대 확인 필요'),
         status: row['상태'] || '상태 확인 필요',
         owner: row['담당'] || '담당 확인 필요',
         lifecycle: 수명주기(row['상태'] || '', storage),
@@ -91,7 +108,7 @@ async function 실제조회(): Promise<프로젝트응답> {
         spreadsheetUrl,
         contractEstimateUrl: row['계약·견적 폴더'] || '',
       };
-      if (!spreadsheetId) return { ...base, readable: false, reason: '운영원장 연결 대기', workstreams: [], tasks: [] };
+      if (!spreadsheetId) return { ...base, readable: false, reason: '운영원장 연결 필요', overview: { '다음 행동': row['다음 행동'] || '상태·다음 행동 확인 필요' }, links: row['내용 근거'] ? [{ name: '현황판', purpose: '상태·다음 행동 근거', url: row['내용 근거'] }] : [], workstreams: [], tasks: [] };
       try {
         const response = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges: ['개요!A:B', '진행!A:H', '할일!A:Z', '결정!A:E', '일정!A:F', '이력!A:C', '링크!A:E'] });
         const values = response.data.valueRanges?.map((range) => (range.values as unknown[][]) || []) || [];
