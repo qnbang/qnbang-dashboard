@@ -185,7 +185,7 @@ export default function OperatingPage() {
 
   return <div className={styles.shell}>
     <aside className={styles.side}>
-      <Link className={styles.brand} href="/">QNB <span>운영OS</span></Link>
+      <Link className={styles.brand} href="/operating">QNB <span>운영OS</span></Link>
       <nav>{menuGroups.map((group) => <section className={styles.navGroup} key={group.label}><span>{group.label}</span>{group.items.map((item) => <button key={item} className={view === item ? styles.active : ''} onClick={() => setView(item)}>{item}</button>)}</section>)}</nav>
       <div className={styles.sync}><strong>실무 테스트 가동</strong><p>기준: 큐앤뱅 뉴 대시보드</p><p>기존 시스템은 원본 보존</p></div>
     </aside>

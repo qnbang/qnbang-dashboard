@@ -20,7 +20,7 @@ export default function LoginPage() {
     });
     setLoading(false);
     if (res.ok) {
-      router.push('/');
+      router.push('/operating');
       router.refresh();
     } else {
       const j = await res.json().catch(() => ({}));
