@@ -41,6 +41,9 @@ export async function GET() {
         receivedAt: row['수신시각'],
         customer: row['고객명'] || row['고객ID'] || '연결 전',
         project: row['프로젝트명'] || row['프로젝트ID'] || '연결 전',
+        projectId: row['프로젝트ID'],
+        room: row['방'] || '',
+        attachments: row['첨부'] || '',
         taskId: row['할일ID'],
         status: row['처리상태'] || '확인 전',
         originalLink: row['원문링크'],
@@ -50,7 +53,7 @@ export async function GET() {
       .filter((item) => item.id && item.body)
       .sort((a, b) => 수신시각값(b.receivedAt) - 수신시각값(a.receivedAt));
 
-    return NextResponse.json({ items, status: '연결됨' });
+    return NextResponse.json({ items, status: items.length ? '원장 연결됨' : '수신 기록 없음', message: items.length ? '' : '원장은 연결됐지만 수신 기록이 없습니다. 채널별 원문 수집 연결을 확인해 주세요.' });
   } catch {
     return NextResponse.json({ items: [], status: '오류', message: '통합 수신 원장을 읽지 못했습니다.' }, { status: 503 });
   }
@@ -62,21 +65,31 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const inboxId = String(body.inboxId || '').trim();
     const taskId = String(body.taskId || '').trim();
-    if (!inboxId || !taskId) return NextResponse.json({ ok: false, error: '수신 기록과 할 일 ID가 필요합니다.' }, { status: 400 });
+    const projectId = String(body.projectId || '').trim();
+    const status = String(body.status || '확정 반영');
+    if (!inboxId || !['확정 반영', '검토중', '무시'].includes(status) || (status === '확정 반영' && (!taskId || !projectId))) return NextResponse.json({ ok: false, error: '수신 ID와 처리 상태를 확인해 주세요. 확정 반영에는 프로젝트와 할 일 ID가 필요합니다.' }, { status: 400 });
     const serviceAccount = JSON.parse(process.env.GOOGLE_SA_JSON || '');
     const auth = new google.auth.JWT({ email: serviceAccount.client_email, key: serviceAccount.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
     const sheets = google.sheets({ version: 'v4', auth });
     const response = await sheets.spreadsheets.values.get({ spreadsheetId, range: '수신연결!A:Z' });
     const [header = [], ...rows] = (response.data.values as unknown[][]) || [];
-    const idColumn = header.findIndex((value) => ['수신ID', '메시지ID'].includes(String(value)));
+    const idColumn = header.includes('수신ID') ? header.indexOf('수신ID') : header.indexOf('메시지ID');
     const taskColumn = header.findIndex((value) => String(value) === '할일ID');
     const statusColumn = header.findIndex((value) => String(value) === '처리상태');
-    const rowIndex = rows.findIndex((row) => String(row[idColumn] || '') === inboxId);
+    const projectColumn = header.indexOf('프로젝트ID');
+    const messageColumn = header.indexOf('메시지ID');
+    const rowIndex = rows.findIndex((row) => String(row[idColumn] || row[messageColumn] || '') === inboxId);
     if (idColumn < 0 || taskColumn < 0 || statusColumn < 0 || rowIndex < 0) throw new Error('수신 원장에서 연결할 기록을 찾지 못했습니다.');
-    await sheets.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: [
+    const existingTaskId = String(rows[rowIndex][taskColumn] || '');
+    const existingProjectId = String(rows[rowIndex][projectColumn] || '');
+    if (existingTaskId && (status !== '확정 반영' || existingTaskId !== taskId || existingProjectId !== projectId)) return NextResponse.json({ ok: false, error: '이미 연결된 할 일이 있습니다. 기존 연결을 확인해 주세요.' }, { status: 409 });
+    if (status === '확정 반영' && projectColumn < 0) throw new Error('수신 원장의 프로젝트ID 열이 없습니다.');
+    const data = [{ range: `수신연결!${열문자(statusColumn)}${rowIndex + 2}`, values: [[status]] }];
+    if (status === '확정 반영') data.push(
       { range: `수신연결!${열문자(taskColumn)}${rowIndex + 2}`, values: [[taskId]] },
-      { range: `수신연결!${열문자(statusColumn)}${rowIndex + 2}`, values: [['할 일 등록됨']] },
-    ] } });
+      { range: `수신연결!${열문자(projectColumn)}${rowIndex + 2}`, values: [[projectId]] },
+    );
+    await sheets.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data } });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : '수신 기록을 할 일과 연결하지 못했습니다.' }, { status: 500 });

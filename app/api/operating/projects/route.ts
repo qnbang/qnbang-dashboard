@@ -35,6 +35,7 @@ function 열문자(index: number) {
 }
 
 function 수명주기(status: string, storage: string) {
+  if (['제안중(계약전)', '제안 중', '계약 전', '견적 중'].includes(status)) return '착수 전';
   if (['보류', '확인 필요'].includes(status)) return '보류';
   if (status === '고객대기') return '고객대기';
   if (storage === '보관' || ['보관', '폐기 기록', '완료'].includes(status)) return '완료·과거';
@@ -42,19 +43,21 @@ function 수명주기(status: string, storage: string) {
 }
 
 const 다른프로젝트로이관 = new Set(['디자인 포폴 디벨롭', '크리에이티브지식 통합위키', '아트 디렉터 에이전트', '큐앤뱅 디자인 시스템', '바이브코딩 인터랙션 위키', '웹 인터랙션 갤러리', '크리에이티브 인덱스']);
-const 완료상태 = new Set(['완료', '완수', '전달 완료', '폐기', '종료']);
 
 function 상태확인메모(title: string) {
   return title.includes('운영 상태와 다음 행동 확인') || title === '현재 상태 확인' || title === '다음 행동 확인';
 }
 
 function 할일정규화(row: 행, projectId: string) {
-  const shifted = row['프로젝트ID'] && row['프로젝트ID'] !== projectId;
-  if (!shifted) return { id: row['할일ID'] || row['ID'], title: row['할 일'] || row['제목'], status: row['상태'], owner: row['담당'], next: row['다음 행동'], stream: row['연결 진행'] || row['진행ID'], due: row['마감'] || row['확인 시점'], source: row['출처'], validShape: true };
-  const oldShape = Boolean(row['상태']);
-  return oldShape
-    ? { id: row['할일ID'], title: row['상태'], status: row['진행ID'], owner: row['할 일'], next: '', stream: row['프로젝트ID'], due: row['담당'], source: row['마감'], validShape: false }
-    : { id: row['할일ID'], title: row['프로젝트ID'], status: row['진행ID'], owner: row['할 일'], next: '', stream: '', due: '', source: row['마감'], validShape: false };
+  const id = row['할일ID'] || row['ID'];
+  const common = { id, title: row['할 일'] || row['제목'], status: row['상태'], owner: row['담당'], next: row['다음 행동'], stream: row['연결 진행'] || row['진행ID'], due: row['마감'] || row['기한'] || row['마감일'] || row['확인 시점'], source: row['출처'] || row['원문ID'], validShape: true, legacy: false };
+  if (!row['프로젝트ID'] || row['프로젝트ID'] === projectId) return common;
+  // 실제 다른 프로젝트ID가 있는 행은 과거 이관형으로 추측해서 해석하지 않는다.
+  if (/^[PBL]-\d+$/.test(row['프로젝트ID'])) return { ...common, validShape: false };
+  if (id?.startsWith('이관-')) return { ...common, title: row['상태'], status: row['진행ID'], owner: row['할 일'], next: row['프로젝트ID'], stream: '', due: row['담당'], source: row['마감'], legacy: true };
+  // 확인된 8열 이관형: ID·제목·상태·담당·다음행동·기한·출처·생성시각.
+  if (id?.includes('-T-M')) return { ...common, title: row['프로젝트ID'], status: ['완료', '완수', '전달 완료', '폐기', '종료'].includes(row['상태']) ? row['상태'] : row['진행ID'], owner: row['할 일'], next: row['상태'], stream: '', due: row['담당'], source: row['마감'], legacy: true };
+  return { ...common, validShape: false };
 }
 
 async function 실제조회(): Promise<프로젝트응답> {
@@ -90,25 +93,30 @@ async function 실제조회(): Promise<프로젝트응답> {
       };
       if (!spreadsheetId) return { ...base, readable: false, reason: '운영원장 연결 대기', workstreams: [], tasks: [] };
       try {
-        const response = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges: ['개요!A:B', '진행!A:H', '할일!A:H', '결정!A:E', '일정!A:F', '이력!A:C', '링크!A:E'] });
+        const response = await sheets.spreadsheets.values.batchGet({ spreadsheetId, ranges: ['개요!A:B', '진행!A:H', '할일!A:Z', '결정!A:E', '일정!A:F', '이력!A:C', '링크!A:E'] });
         const values = response.data.valueRanges?.map((range) => (range.values as unknown[][]) || []) || [];
         const overview = Object.fromEntries((values[0] || []).slice(1).map((item) => [String(item[0] ?? ''), String(item[1] ?? '')]));
         const workstreams = 표행(values[1] || []).map((item) => ({
           name: item['진행 묶음명'] || item['이름'], outcome: item['만들 결과'] || item['결과'], status: item['상태'], owner: item['담당'], next: item['다음 행동'], due: item['마감 또는 확인 시점'] || item['마감'], links: item['문서·자료 링크'] || item['링크'],
         })).filter((item) => item.name);
+        const normalizedTasks = 표행(values[2] || []).map((item) => 할일정규화(item, base.id));
+        const invalidTasks = normalizedTasks.filter((item) => !item.validShape);
+        const normalTitles = new Set(normalizedTasks.filter((item) => item.validShape && !item.legacy).map((item) => item.title));
         const taskMap = new Map<string, ReturnType<typeof 할일정규화>>();
-        표행(values[2] || []).map((item) => 할일정규화(item, base.id)).filter((item) => item.title && !상태확인메모(item.title)).filter((item) => !(base.id === 'B-002' && (item.title === '큐앤뱅 네이버 광고 셋팅' || 다른프로젝트로이관.has(item.title)))).forEach((item) => taskMap.set(item.title, item));
-        const tasks = [...taskMap.values()].map(({ validShape: _validShape, ...item }) => item);
+        normalizedTasks.filter((item) => item.validShape && item.title && !상태확인메모(item.title))
+          .filter((item) => !item.legacy || !normalTitles.has(item.title))
+          .filter((item) => !(base.id === 'B-002' && (item.title === '큐앤뱅 네이버 광고 셋팅' || 다른프로젝트로이관.has(item.title))))
+          .forEach((item) => taskMap.set(item.legacy ? `이관:${item.title}` : item.id || item.title, item));
+        const tasks = [...taskMap.values()];
+        const dataWarnings = invalidTasks.length ? [`프로젝트ID 또는 이관 형식이 맞지 않는 할 일 ${invalidTasks.length}건은 원문 확인이 필요합니다.`] : [];
         const decisions = 표행(values[3] || []).map((item) => ({ id: item['결정ID'] || item['ID'], title: item['결정'] || item['내용'], detail: item['이유'], actor: item['결정자'], at: item['시각'], kind: '결정' })).filter((item) => item.title);
         const schedules = 표행(values[4] || []).map((item) => ({ id: item['일정ID'] || item['ID'], title: item['일정명'] || item['제목'], detail: item['메모'], actor: item['담당'], at: item['시작'], end: item['종료'], kind: '일정' })).filter((item) => item.title);
         const histories = 표행(values[5] || []).map((item) => ({ id: item['시각'], title: item['내용'], actor: item['기록자'], at: item['시각'], kind: '이력' })).filter((item) => item.title);
         const links = 표행(values[6] || []).map((item) => ({ name: item['이름'], purpose: item['용도'], url: item['URL'], stream: item['연결 진행'] })).filter((item) => item.url);
         if (base.contractEstimateUrl && !links.some((item) => item.url === base.contractEstimateUrl)) links.push({ name: '계약·견적', purpose: '행정 원본 폴더', url: base.contractEstimateUrl, stream: '프로젝트 공통' });
-        const hasNextAction = Boolean(String(overview['다음 행동'] || '').trim()) || workstreams.some((item) => item.next && !['완료', '완수', '전달 완료'].includes(item.status));
-        const hasOpenTask = tasks.some((item) => !완료상태.has(item.status));
-        const lifecycle = base.lifecycle === '현재 진행' && !hasNextAction && !hasOpenTask ? '보류' : base.lifecycle;
-        const status = lifecycle === '보류' && base.lifecycle === '현재 진행' ? '상태 확인 필요' : (overview['상태'] || base.status);
-        return { ...base, status, lifecycle, owner: overview['담당'] || base.owner, client: overview['거래상대'] || overview['고객사'] || base.client, due: overview['확인 시점'] || '', readable: true, overview, workstreams, tasks, decisions, schedules, histories, links, progress: 진행률(workstreams) };
+        const status = overview['상태'] || base.status;
+        const lifecycle = 수명주기(status, storage);
+        return { ...base, status, lifecycle, owner: overview['담당'] || base.owner, client: overview['거래상대'] || overview['고객사'] || base.client, due: overview['확인 시점'] || '', readable: true, dataWarnings, overview, workstreams, tasks, decisions, schedules, histories, links, progress: 진행률(workstreams) };
       } catch {
         return { ...base, readable: false, reason: '대시보드 읽기 권한 확인 필요', workstreams: [], tasks: [] };
       }

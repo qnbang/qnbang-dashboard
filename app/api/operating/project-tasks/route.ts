@@ -44,7 +44,10 @@ export async function POST(request: Request) {
     const projectId = String(body.projectId || '').trim();
     const title = String(body.title || '').trim();
     const owner = String(body.owner || '담당 확인 필요').trim();
-    const source = String(body.source || '운영OS 대시보드').trim();
+    const inboxId = String(body.inboxId || '').trim();
+    const source = inboxId ? `수신ID:${inboxId}` : String(body.source || '운영OS 대시보드').trim();
+    const due = String(body.due || '').trim();
+    if (due && (!/^\d{4}-\d{2}-\d{2}$/.test(due) || Number.isNaN(Date.parse(due)) || new Date(due).toISOString().slice(0, 10) !== due)) return NextResponse.json({ ok: false, error: '기한은 올바른 날짜로 입력해 주세요.' }, { status: 400 });
     if (!projectId || !title) return NextResponse.json({ ok: false, error: '프로젝트와 할 일 제목이 필요합니다.' }, { status: 400 });
 
     const { sheets, 원장ID } = await 프로젝트원장(projectId);
@@ -62,16 +65,22 @@ export async function POST(request: Request) {
     값[상태열] = '진행 중';
     const 담당열 = 헤더번호(헤더, ['담당']);
     const 프로젝트열 = 헤더번호(헤더, ['프로젝트ID']);
-    const 출처열 = 헤더번호(헤더, ['출처']);
+    const 출처열 = 헤더번호(헤더, ['출처', '원문ID']);
+    const 저장출처 = inboxId && 헤더[출처열] === '원문ID' ? inboxId : source;
     const 생성열 = 헤더번호(헤더, ['생성시각']);
-    const 기존 = 출처열 >= 0 ? 기존행.find((row) => String(row[출처열] || '') === source) : undefined;
-    if (기존) return NextResponse.json({ ok: true, task: { id: String(기존[id열] || ''), title: String(기존[제목열] || title), owner: 담당열 >= 0 ? String(기존[담당열] || owner) : owner, state: String(기존[상태열] || '진행 중') }, reused: true });
+    const 기한열 = 헤더번호(헤더, ['마감', '기한', '마감일', '확인 시점']);
+    if (inboxId && 출처열 < 0) throw new Error('재시도 중복을 확인할 출처 열이 없습니다.');
+    if (due && 기한열 < 0) throw new Error('기한을 저장할 열이 없습니다.');
+    // ponytail: 시트 조회 후 추가하므로 여러 서버의 동시 요청까지 원자적으로 보장하지는 않는다.
+    const 기존 = inboxId && 출처열 >= 0 ? 기존행.find((row) => String(row[출처열] || '') === 저장출처) : undefined;
+    if (기존) return NextResponse.json({ ok: true, task: { id: String(기존[id열] || ''), title: String(기존[제목열] || title), owner: 담당열 >= 0 ? String(기존[담당열] || owner) : owner, due: 기한열 >= 0 ? String(기존[기한열] || '') : '', ledgerProjectId: projectId, state: String(기존[상태열] || '진행 중') }, reused: true });
+    if (기한열 >= 0) 값[기한열] = due;
     if (담당열 >= 0) 값[담당열] = owner;
     if (프로젝트열 >= 0) 값[프로젝트열] = projectId;
-    if (출처열 >= 0) 값[출처열] = source;
-    if (생성열 >= 0) 값[생성열] = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
-    await sheets.spreadsheets.values.append({ spreadsheetId: 원장ID, range: '할일!A:Z', valueInputOption: 'USER_ENTERED', requestBody: { values: [값] } });
-    return NextResponse.json({ ok: true, task: { id: taskId, title, owner, state: '진행 중', ledgerProjectId: projectId } });
+    if (출처열 >= 0) 값[출처열] = 저장출처;
+    if (생성열 >= 0) 값[생성열] = new Date().toISOString();
+    await sheets.spreadsheets.values.append({ spreadsheetId: 원장ID, range: '할일!A:Z', valueInputOption: 'RAW', requestBody: { values: [값] } });
+    return NextResponse.json({ ok: true, task: { id: taskId, title, owner, due, state: '진행 중', ledgerProjectId: projectId } });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : '할 일을 기록하지 못했습니다.' }, { status: 500 });
   }
@@ -91,7 +100,7 @@ export async function PATCH(request: Request) {
     const 상태열 = 헤더번호(헤더, ['상태']);
     const 행번호 = 행.findIndex((row) => String(row[id열] || '') === taskId);
     if (id열 < 0 || 상태열 < 0 || 행번호 < 0) throw new Error('완료 처리할 할 일을 운영원장에서 찾지 못했습니다.');
-    await sheets.spreadsheets.values.update({ spreadsheetId: 원장ID, range: `할일!${열문자(상태열)}${행번호 + 2}`, valueInputOption: 'USER_ENTERED', requestBody: { values: [['완료']] } });
+    await sheets.spreadsheets.values.update({ spreadsheetId: 원장ID, range: `할일!${열문자(상태열)}${행번호 + 2}`, valueInputOption: 'RAW', requestBody: { values: [['완료']] } });
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : '완료 처리하지 못했습니다.' }, { status: 500 });

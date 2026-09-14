@@ -11,7 +11,7 @@ type View = '홈' | '수신함' | '할 일' | '캘린더' | '고객 관리' | '�
 type Workstream = { name: string; outcome?: string; status?: string; owner?: string; next?: string; due?: string; links?: string };
 type ProjectActivity = { id?: string; title: string; detail?: string; actor?: string; at?: string; end?: string; kind: '결정' | '일정' | '이력' };
 type ProjectLink = { name: string; purpose?: string; url: string; stream?: string };
-type Project = { id?: string; spreadsheetId?: string; name: string; client: string; progress: number; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: Workstream[]; links?: ProjectLink[]; decisions?: ProjectActivity[]; schedules?: ProjectActivity[]; histories?: ProjectActivity[]; hubUrl?: string; driveUrl?: string; lifecycle?: '현재 진행' | '고객대기' | '보류' | '완료·과거'; updatedAt?: string; taskCount?: number };
+type Project = { readable?: boolean; reason?: string; dataWarnings?: string[]; id?: string; spreadsheetId?: string; name: string; client: string; progress: number; next: string; status: string; owner: string; summary?: string; blocker?: string; due?: string; workstreams?: Workstream[]; links?: ProjectLink[]; decisions?: ProjectActivity[]; schedules?: ProjectActivity[]; histories?: ProjectActivity[]; hubUrl?: string; driveUrl?: string; lifecycle?: '현재 진행' | '고객대기' | '보류' | '완료·과거' | '착수 전'; updatedAt?: string; taskCount?: number };
 type DashboardTask = { id?: string; ledgerProjectId?: string; title: string; project: string; due: string; owner: string; state: string; source?: string };
 type CalendarEvent = { id: string; title: string; start: string; end?: string; allDay: boolean; location?: string; link?: string; source: string };
 type Experiment = { id: string; name: string; updatedAt: string; driveUrl: string };
@@ -24,13 +24,12 @@ const menuGroups: { label: string; items: View[] }[] = [
   { label: '자산', items: ['실험', '공용 도구', '사이트 관리'] },
   { label: '전환', items: ['이관 현황', '통합 운영 로그', '운영 설정'] },
 ];
-const tasks: DashboardTask[] = [];
 const projects: Project[] = [];
 const messages: 수신메시지[] = [];
 
 const managedSites = [
   { name: '큐앤뱅 공식 홈페이지', kind: '회사 사이트', status: '운영 중', site: 'https://qnbang-website.vercel.app', detail: '공개 사이트는 Vercel에서 정상 응답합니다. 현재 로컬 관리자 서버는 꺼져 있어 작동하지 않는 관리 버튼은 표시하지 않습니다.' },
-  { name: '큐앤뱅 기존 운영 대시보드', kind: '내부 운영', status: '비교 운영', site: 'https://qnbang-dashboard.vercel.app', detail: '새 운영OS 안정화 전까지 기존 업무 기록을 대조하는 운영 화면입니다.' },
+  { name: '큐앤뱅 운영 대시보드', kind: '내부 운영', status: '운영 중', site: 'https://dashboard.qnbang.com/operating', detail: '프로젝트 운영원장과 통합 수신함을 확인하는 팀 공용 업무 화면입니다.' },
 ];
 
 const Badge = ({ children }: { children: string }) => <span className={styles.badge}>{children}</span>;
@@ -63,7 +62,7 @@ export default function OperatingPage() {
   const operatingTasks = useMemo(() => {
     const 공식프로젝트명 = new Set(operatingProjects.filter((project) => project.lifecycle === '현재 진행' || project.lifecycle === '고객대기').map((project) => project.name));
     return ledgerTasks
-      .filter((task, index, all) => 공식프로젝트명.has(task.project) && all.findIndex((candidate) => candidate.title === task.title && candidate.project === task.project) === index);
+      .filter((task, index, all) => 공식프로젝트명.has(task.project) && all.findIndex((candidate) => (task.id && candidate.id ? candidate.id === task.id && candidate.ledgerProjectId === task.ledgerProjectId : candidate.title === task.title && candidate.project === task.project)) === index);
   }, [ledgerTasks, operatingProjects]);
   const shownProjects = useMemo(() => operatingProjects.filter((p) => `${p.name} ${p.client}`.includes(query)), [operatingProjects, query]);
   const openProject = (project: Project) => { setSelectedProject(project); setOpenedProject(project); };
@@ -82,8 +81,9 @@ export default function OperatingPage() {
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error(data.message || '프로젝트 원장 연결 실패');
       const updated = (data.items || []).filter((item: { name?: string }) => item.name).map((item: {
-        id?: string; spreadsheetId?: string; name: string; client: string; status: string; owner: string; due?: string; lifecycle?: Project['lifecycle']; driveUrl?: string; overview?: Record<string, string>; workstreams?: Workstream[]; tasks?: { title?: string; due?: string }[]; links?: ProjectLink[]; decisions?: ProjectActivity[]; schedules?: ProjectActivity[]; histories?: ProjectActivity[]; progress?: number;
+        readable?: boolean; reason?: string; dataWarnings?: string[]; id?: string; spreadsheetId?: string; name: string; client: string; status: string; owner: string; due?: string; lifecycle?: Project['lifecycle']; driveUrl?: string; overview?: Record<string, string>; workstreams?: Workstream[]; tasks?: { title?: string; due?: string }[]; links?: ProjectLink[]; decisions?: ProjectActivity[]; schedules?: ProjectActivity[]; histories?: ProjectActivity[]; progress?: number;
       }) => ({
+        readable: item.readable, reason: item.reason, dataWarnings: item.dataWarnings,
         id: item.id,
         spreadsheetId: item.spreadsheetId,
         name: item.name,
@@ -105,10 +105,11 @@ export default function OperatingPage() {
       }));
       setMigrationPending(data.pending || []);
       setLedgerTasks((data.items || []).flatMap((item: { id?: string; name?: string; tasks?: { id?: string; title?: string; due?: string; owner?: string; status?: string; source?: string }[] }) => (item.tasks || []).filter((task) => task.id && task.title && !['완료', '완수', '전달 완료', '폐기', '종료'].includes(task.status || '')).map((task) => ({ id: task.id, ledgerProjectId: item.id, title: task.title || '', project: item.name || '', due: task.due || '기한 미정', owner: task.owner || '담당 확인 필요', state: task.status || '확인 필요', source: task.source || '프로젝트 운영원장' }))));
-      if (!updated.length) return;
-      setOperatingProjects((current) => [...current.filter((project) => !updated.some((item: Project) => item.name === project.name)), ...updated]);
-      setSelectedProject(updated[0]);
-      setProjectStatus('연결됨');
+      if (!active) return;
+      setOperatingProjects(updated);
+      setSelectedProject((current) => updated.find((item: Project) => item.id === current?.id) || updated[0] || null);
+      const unreadable = (data.items || []).filter((item: { readable?: boolean; lifecycle?: string }) => item.readable === false && item.lifecycle !== '완료·과거').length;
+      setProjectStatus(data.cached ? '이전 조회 자료 · 재연결 필요' : unreadable ? `원장 연결 확인 ${unreadable}건` : '연결됨');
     }).catch(() => {
       if (!active) return;
       setProjectStatus('잠시 후 다시 연결 중');
@@ -200,8 +201,8 @@ function Home({ onView, projects: homeProjects, tasks: homeTasks, onOpenProject,
   <section className={styles.homeIntro}><div><p className={styles.crumb}>운영 대시보드</p><h2>오늘, 팀이 이어서 일할 수 있게</h2><p>수신함과 원장을 확인해 다음 행동을 정리합니다.</p></div><button className={styles.primary} onClick={() => onView('프로젝트')}>프로젝트 보기</button></section>
   <section className={styles.todayCheck}><b>오늘 확인할 것</b><span>수신 원문 {homeMessages.length}건 · 금액 확정은 재무 원장에서 확인</span><button onClick={() => onView('수신함')}>수신함 보기</button></section>
   <section className={styles.metrics}><Metric label="새 수신" value={`${homeMessages.length}건`} detail={inboxStatus}/><Metric label="현재 할 일" value={`${homeTasks.length}건`} detail="프로젝트 운영원장 기준"/><Metric label="진행 중" value={`${currentProjects.length}건`} detail="지금 실행 중인 프로젝트"/><Metric label="고객대기" value={`${waitingProjects.length}건`} detail="회신·확인을 기다리는 프로젝트"/></section>
-  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>통합 수신함</h2><p>원문과 출처를 유지한 채, 필요한 것만 할 일로 전환합니다.</p></div><button onClick={() => onView('수신함')}>전체 보기</button></div>{homeMessages.length ? homeMessages.slice(0, 3).map((m) => <button key={m.id} className={styles.messageRow} onClick={() => onView('수신함')}><Badge>{m.channel}</Badge><span><b>{m.sender}</b><small>{m.body}</small></span><time>{m.receivedAt || '시각 미상'}</time></button>) : <p className={styles.empty}>통합 수신 원장 연결 뒤 라크·카카오톡·메일 원문이 여기에 표시됩니다.</p>}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>오늘 팀의 실행</h2><p>프로젝트 운영원장과 연결된 현재 진행 항목입니다.</p></div></div>{homeTasks.slice(0,3).map((t, index) => <button className={styles.executionRow} key={`${t.project}-${t.title}`} onClick={() => onView('할 일')}><b>{t.due || ['우선', '다음', '확인'][index]}</b><span><strong>{t.title}</strong><small>{t.project}</small></span></button>)}<div className={styles.panelActions}><button onClick={() => onView('할 일')}>할 일·일정 보기</button></div></div></section>
-  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>진행 프로젝트</h2><p>실제로 움직이고 있는 프로젝트만 먼저 보여줍니다.</p></div><button onClick={() => onView('프로젝트')}>프로젝트 전체</button></div>{currentProjects.slice(0, 6).map((p) => <button className={styles.projectRow} key={p.name} onClick={() => onOpenProject(p)}><span><b>{p.name}</b><small>{p.client}</small></span><StatusBadge lifecycle={p.lifecycle} status={p.status}/><small>{p.next}</small></button>)}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>정산 확인</h2><p>기존 재무 원장을 읽어 최신 매출·지출·잔고를 확인합니다.</p></div></div><p className={styles.empty}>통장 거래를 올리면 자동분류하고, 불확실한 거래만 사람이 확인합니다.</p><div className={styles.panelActions}><button className={styles.primary} onClick={() => onView('재무·정산')}>재무 원장 보기</button></div></div></section>
+  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>통합 수신함</h2><p>원문과 출처를 유지한 채, 필요한 것만 할 일로 전환합니다.</p></div><button onClick={() => onView('수신함')}>전체 보기</button></div>{homeMessages.length ? homeMessages.slice(0, 3).map((m) => <button key={m.id} className={styles.messageRow} onClick={() => onView('수신함')}><Badge>{m.channel}</Badge><span><b>{m.sender}</b><small>{m.body}</small></span><time>{m.receivedAt || '시각 미상'}</time></button>) : <p className={styles.empty}>원장에 수신 기록이 없습니다. 채널별 원문 수집 연결을 확인해 주세요.</p>}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>오늘 팀의 실행</h2><p>프로젝트 운영원장과 연결된 현재 진행 항목입니다.</p></div></div>{homeTasks.slice(0,3).map((t, index) => <button className={styles.executionRow} key={`${t.ledgerProjectId || t.project}-${t.id || t.title}`} onClick={() => onView('할 일')}><b>{t.due || ['우선', '다음', '확인'][index]}</b><span><strong>{t.title}</strong><small>{t.project}</small></span></button>)}<div className={styles.panelActions}><button onClick={() => onView('할 일')}>할 일·일정 보기</button></div></div></section>
+  <section className={styles.columns}><div className={styles.panel}><div className={styles.panelLead}><div><h2>진행 프로젝트</h2><p>실제로 움직이고 있는 프로젝트만 먼저 보여줍니다.</p></div><button onClick={() => onView('프로젝트')}>프로젝트 전체</button></div>{currentProjects.slice(0, 6).map((p) => <button className={styles.projectRow} key={p.name} onClick={() => onOpenProject(p)}><span><b>{p.name}</b><small>{p.client}</small></span><StatusBadge lifecycle={p.lifecycle} status={p.status}/><small>{p.next}</small></button>)}</div><div className={styles.panel}><div className={styles.panelLead}><div><h2>정산 확인</h2><p>재무 원장의 매출·지출과 기준일이 표시된 잔고를 확인합니다.</p></div></div><p className={styles.empty}>통장 거래를 올리면 자동분류하고, 불확실한 거래만 사람이 확인합니다.</p><div className={styles.panelActions}><button className={styles.primary} onClick={() => onView('재무·정산')}>재무 원장 보기</button></div></div></section>
 </> }
 
 function ScreenIntro({ crumb, title, description, action, onAction }: { crumb:string; title:string; description:string; action?:string; onAction?:() => void }) { return <section className={styles.screenIntro}><div><p className={styles.crumb}>{crumb}</p><h1>{title}</h1><p>{description}</p></div>{action && onAction && <button className={styles.primary} onClick={onAction}>{action}</button>}</section> }
@@ -321,13 +322,13 @@ function Partners({ query }: { query: string }) {
 }
 
 function Projects({ projects: rows, status, selected, creationReady, creationMessage, onSelect, onOpenProject, onRegistered }: { projects: Project[]; status: string; selected: Project | null; creationReady: boolean; creationMessage: string; onSelect: (p: Project) => void; onOpenProject: (p: Project) => void; onRegistered: (p: Project) => void }) {
-  type 프로젝트범위 = '전체' | '진행 중' | '고객대기' | '보류' | '완료·과거';
+  type 프로젝트범위 = '전체' | '진행 중' | '고객대기' | '보류' | '완료·과거' | '착수 전';
   const [scope, setScope] = useState<프로젝트범위>('전체');
   const emptyForm = { name: '', client: '', owner: '신종호', goal: '', evidenceType: '', evidenceUrl: '' };
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
-  const scopes: 프로젝트범위[] = ['전체', '진행 중', '고객대기', '보류', '완료·과거'];
+  const scopes: 프로젝트범위[] = ['전체', '진행 중', '고객대기', '보류', '착수 전', '완료·과거'];
   const matchesScope = (project: Project, target: 프로젝트범위) => target === '전체' || (target === '진행 중' ? (project.lifecycle || '현재 진행') === '현재 진행' : (project.lifecycle || '현재 진행') === target);
   const visible = rows.filter((project) => matchesScope(project, scope));
   const register = async () => {
@@ -351,9 +352,9 @@ function Projects({ projects: rows, status, selected, creationReady, creationMes
   return <section className={styles.projectsScreen}>
     <div className={styles.panel}>
       <div className={styles.panelLead}><div><h2>{scope === '전체' ? '전체 프로젝트' : scope}</h2><p>전체 프로젝트를 먼저 보여주며, 상태 필터로 필요한 목록만 좁혀볼 수 있습니다.</p></div><span>{status === '연결됨' ? `${visible.length}건` : status}</span></div>
-      <div className={styles.filterBar}>{scopes.map((item) => <button key={item} aria-pressed={scope === item} className={scope === item ? styles.filterActive : ''} onClick={() => setScope(item)}>{item} {status === '연결됨' ? rows.filter((project) => matchesScope(project, item)).length : '—'}</button>)}</div>
+      <div className={styles.filterBar}>{scopes.map((item) => <button key={item} aria-pressed={scope === item} className={scope === item ? styles.filterActive : ''} onClick={() => setScope(item)}>{item} {status === '불러오는 중' ? '—' : rows.filter((project) => matchesScope(project, item)).length}</button>)}</div>
       <div className={styles.projectTableHead}><span>프로젝트</span><span>거래상대</span><span>현재 상태</span><span>다음 행동</span><span>마지막 기록</span></div>
-      {visible.map((p) => <button className={`${styles.projectTableRow} ${selected?.name === p.name ? styles.selected : ''}`} onClick={() => { onSelect(p); onOpenProject(p); }} key={p.name}><span><b>{p.name}</b><small>담당 {p.owner}</small></span><span>{p.client}</span><span className={styles.progressCell}><StatusBadge lifecycle={p.lifecycle} status={p.status}/></span><span>{p.next}</span><time>{p.updatedAt || p.due || '기록 없음'}</time></button>)}
+      {visible.map((p) => <button className={`${styles.projectTableRow} ${selected?.name === p.name ? styles.selected : ''}`} onClick={() => { onSelect(p); onOpenProject(p); }} key={p.name}><span><b>{p.name}</b><small>담당 {p.owner}</small>{p.readable === false && <small>{p.reason || '원장 연결 확인 필요'}</small>}{p.dataWarnings?.map((warning) => <small key={warning}>{warning}</small>)}</span><span>{p.client}</span><span className={styles.progressCell}><StatusBadge lifecycle={p.lifecycle} status={p.status}/></span><span>{p.next}</span><time>{p.updatedAt || p.due || '기록 없음'}</time></button>)}
       {!visible.length && <p className={styles.empty}>{status === '연결됨' ? '이 상태에 해당하는 프로젝트가 없습니다.' : '프로젝트 원장을 다시 연결하고 있습니다.'}</p>}
     </div>
     <aside className={`${styles.panel} ${styles.projectRegister}`}>
@@ -470,7 +471,7 @@ function Finance() {
       <aside className={styles.panel}>
         <Header title="재무 원장 요약" action="기존 원장 읽기 전용"/>
         <div className={styles.settings}>
-          <p><b>통장 잔고</b><span>{금액(data.balances.통장잔고)} · {data.balances.업데이트 || '기준일 미상'}</span></p>
+          <p className={styles.empty}>잔고는 아래 기준일의 기록입니다. 현재 은행 잔고와 다를 수 있습니다.</p><p><b>통장 잔고</b><span>{금액(data.balances.통장잔고)} · {data.balances.업데이트 || '기준일 미상'}</span></p>
           <p><b>세이프박스</b><span>{금액(data.balances.세이프박스)}</span></p>
           <p><b>보유 현금</b><span>{금액(data.balances.보유현금)}</span></p>
           <p><b>이번 달 예산</b><span>{budgetDetail}</span></p>
